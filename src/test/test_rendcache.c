@@ -15,73 +15,17 @@
 #include "test.h"
 #include "rendcache.h"
 
-static const char *hs_desc_content = "rendezvous-service-descriptor 3xqunszqnaolrrfmtzgaki7mxelgvkje\n\
-version 2\n\
-permanent-key\n\
------BEGIN RSA PUBLIC KEY-----\n\
-MIGJAoGBAKUr5opfKa29Q1lBK78k2+Crqliaolam/8/MDMTJ7OXt8XRAgSHzgp3A\n\
-ZDpxdiDZPcHOQat+4b1Kx9H8sutVX9fjDZXEf/Iaj5E9aCt8AEC/HusS3qlkPNi0\n\
-Y1AnxDR8j1cD6rU2OODnPLLQ7Q2KufE6Zfz9UW/yjZELRhykfbwjAgMBAAE=\n\
------END RSA PUBLIC KEY-----\n\
-secret-id-part os4hldf7a6v4r55yji2hv5yijuok57v6\n\
-publication-time 2015-08-18 16:52:18\n\
-protocol-versions 1,3,5\n\
-introduction-points\n\
------BEGIN MESSAGE-----\n\
-aW50cm9kdWN0aW9uLXBvaW50IHlkbzd2MmU0ZGx3Zng0YzN2Mm9jaXpmNWZoM2dk\n\
-N2x0CmlwLWFkZHJlc3MgMC4wLjg3Ljk0Cm9uaW9uLXBvcnQgMTIxMjgKb25pb24t\n\
-a2V5Ci0tLS0tQkVHSU4gUlNBIFBVQkxJQyBLRVktLS0tLQpNSUdKQW9HQkFLMHBN\n\
-VjFXY3dMR1l4VFEzeTRpQUx3anJ3SE9NdFV0ZVZ0R0puaDFyR3pZb1BTSEZzQmY4\n\
-YXZUCkJ3SFFlSFZ1V3pUSmxIcVFrbTRZUVFjbm5FNVdtQVU4ckx6OEpEQ0F5M2dx\n\
-RjZiV2l3WFM3RElHaVRNZ2s2RzQKSUlqUFFtQlpxNUJJaUkwZHp6MWFjVGpvQkRP\n\
-T1Rnb3dRRFAwSHRYZFhvWExaN0JyRElEN0FnTUJBQUU9Ci0tLS0tRU5EIFJTQSBQ\n\
-VUJMSUMgS0VZLS0tLS0Kc2VydmljZS1rZXkKLS0tLS1CRUdJTiBSU0EgUFVCTElD\n\
-IEtFWS0tLS0tCk1JR0pBb0dCQUwzQkVBbGl4ajZEemxuM2N1alVtOXdxUGpMOUhx\n\
-UXpKSGVBMjltbFg0VFJmWnAvMWxza29Bc3gKY3NtUkIwYnM3NFM0RkNhaWxqV3Z3\n\
-QXlnb3RUUlpNUTZvSVZvOGN0ZXhaRVY4SWw0QVM1Vk5aMjMzeXl1N3dMdwpCNmlh\n\
-aWdrTFBRNjQwbFhxV1ZQL2huN0k2TXRuWGtyYytJbVFGQVdPWGdxK3RFTVRaYThu\n\
-QWdNQkFBRT0KLS0tLS1FTkQgUlNBIFBVQkxJQyBLRVktLS0tLQppbnRyb2R1Y3Rp\n\
-b24tcG9pbnQgaGVneG8ybXlnaDZhNTJic3V1bGE0cnN1Y3J3NWwyYzcKaXAtYWRk\n\
-cmVzcyAwLjAuMjQ4LjE4NApvbmlvbi1wb3J0IDQ0NzYxCm9uaW9uLWtleQotLS0t\n\
-LUJFR0lOIFJTQSBQVUJMSUMgS0VZLS0tLS0KTUlHSkFvR0JBT2RBbnBPemV5Tm5v\n\
-MVNBNWlBTG9MSUE2ZnpBQnZFR1RkSkxDMUVpNndRYzkrKzJqWUJvS0UrbAphZTJ6\n\
-Q05IOER3VFQrTTNjZ0dWRy9oNjd3Y2taMjc5a2ovOXBBWnQxN2Ric0hoSVFtNE1B\n\
-VHE1OTJhbm0rVGFrCmRhMmI0ck1Pcmp4d2RDUlRYMzNWYmxST2kxSzJBRk1XUmg1\n\
-MVYwWHhmcVZrWS9ZVVZqeTlBZ01CQUFFPQotLS0tLUVORCBSU0EgUFVCTElDIEtF\n\
-WS0tLS0tCnNlcnZpY2Uta2V5Ci0tLS0tQkVHSU4gUlNBIFBVQkxJQyBLRVktLS0t\n\
-LQpNSUdKQW9HQkFMM0JFQWxpeGo2RHpsbjNjdWpVbTl3cVBqTDlIcVF6SkhlQTI5\n\
-bWxYNFRSZlpwLzFsc2tvQXN4CmNzbVJCMGJzNzRTNEZDYWlsald2d0F5Z290VFJa\n\
-TVE2b0lWbzhjdGV4WkVWOElsNEFTNVZOWjIzM3l5dTd3THcKQjZpYWlna0xQUTY0\n\
-MGxYcVdWUC9objdJNk10blhrcmMrSW1RRkFXT1hncSt0RU1UWmE4bkFnTUJBQUU9\n\
-Ci0tLS0tRU5EIFJTQSBQVUJMSUMgS0VZLS0tLS0KaW50cm9kdWN0aW9uLXBvaW50\n\
-IGF6M2dsNmtwdTJ4d25lM2t6MjM1dzdmZXFvYjY2ZGt1CmlwLWFkZHJlc3MgMC4w\n\
-LjEyOS4xMzIKb25pb24tcG9ydCA0MjMzNwpvbmlvbi1rZXkKLS0tLS1CRUdJTiBS\n\
-U0EgUFVCTElDIEtFWS0tLS0tCk1JR0pBb0dCQUs1Ym4xNWpuS3pvU3k4aDJKZWpQ\n\
-WGVDdis3WkhnMGNocHowUStkUk5TTFMraXptaUoraEhSeGoKR2VRbEEvUCswR3ZJ\n\
-QjQxS01ocnVJQ243clRKVzk0dDJxR1hCVTBYVTlMTHUyR0FNTHpLQ0hwTG0rdm9h\n\
-WWkvegorR0NHamt6K3h3a1hUZVF0enVHN2dFemJrVDZxZEIyRzBITkZVOEhldlJ2\n\
-MTY0L1VERTBoQWdNQkFBRT0KLS0tLS1FTkQgUlNBIFBVQkxJQyBLRVktLS0tLQpz\n\
-ZXJ2aWNlLWtleQotLS0tLUJFR0lOIFJTQSBQVUJMSUMgS0VZLS0tLS0KTUlHSkFv\n\
-R0JBTDNCRUFsaXhqNkR6bG4zY3VqVW05d3FQakw5SHFRekpIZUEyOW1sWDRUUmZa\n\
-cC8xbHNrb0FzeApjc21SQjBiczc0UzRGQ2FpbGpXdndBeWdvdFRSWk1RNm9JVm84\n\
-Y3RleFpFVjhJbDRBUzVWTloyMzN5eXU3d0x3CkI2aWFpZ2tMUFE2NDBsWHFXVlAv\n\
-aG43STZNdG5Ya3JjK0ltUUZBV09YZ3ErdEVNVFphOG5BZ01CQUFFPQotLS0tLUVO\n\
-RCBSU0EgUFVCTElDIEtFWS0tLS0tCgo=\n\
------END MESSAGE-----\n\
-signature\n\
------BEGIN SIGNATURE-----\n\
-JiOLtXzEgN43Ai5wdF8YawjuzAV5dpBCDA4RfUWoOuVkWUPA5L24SHtN5bnbIQE0\n\
-LnGCMU4+SjG9hN9fbO2gHzBzzNklNLX6E+vrkTCCYnul/QAeB1Vqdnk2Ml3bSZX0\n\
-d8UCllh0LkFlTBssEe4hQ96PXeZui6H7BGrBDgrLAq0=\n\
------END SIGNATURE-----";
+static const int RECENT_TIME = -10;
+static const int TIME_IN_THE_PAST = -(REND_CACHE_MAX_AGE + REND_CACHE_MAX_SKEW + 10);
+static const int TIME_IN_THE_FUTURE = REND_CACHE_MAX_SKEW + 10;
 
 static rend_data_t
-mock_rend_data(void)
+mock_rend_data(char *onion_address)
 {
   rend_data_t rend_query;
 
   memset(&rend_query, 0, sizeof(rend_query));
-  strncpy(rend_query.onion_address, "p5ilyyatkmqeoat2", REND_SERVICE_ID_LEN_BASE32+1);
+  strncpy(rend_query.onion_address, onion_address, REND_SERVICE_ID_LEN_BASE32+1);
   rend_query.auth_type = REND_NO_AUTH;
   rend_query.hsdirs_fp = smartlist_new();
   smartlist_add(rend_query.hsdirs_fp, tor_memdup("aaaaaaaaaaaaaaaaaaaaaaaa", DIGEST_LEN));
@@ -90,15 +34,71 @@ mock_rend_data(void)
 }
 
 static void
+generate_desc(int time_diff, rend_encoded_v2_service_descriptor_t **desc, char **service_id)
+{
+  rend_service_descriptor_t *generated = NULL;
+  smartlist_t *descs = smartlist_new();
+  crypto_pk_t *pk1 = NULL, *pk2 = NULL;
+  time_t now;
+  int i;
+
+  *service_id = tor_malloc(REND_SERVICE_ID_LEN_BASE32+1);
+
+  pk1 = pk_generate(0);
+  pk2 = pk_generate(1);
+  generated = tor_malloc_zero(sizeof(rend_service_descriptor_t));
+  generated->pk = crypto_pk_dup_key(pk1);
+  rend_get_service_id(generated->pk, *service_id);
+
+  now = time(NULL) + time_diff;
+  generated->timestamp = now;
+  generated->version = 2;
+  generated->protocols = 42;
+  generated->intro_nodes = smartlist_new();
+
+  for (i = 0; i < 3; i++) {
+    rend_intro_point_t *intro = tor_malloc_zero(sizeof(rend_intro_point_t));
+    crypto_pk_t *okey = pk_generate(2 + i);
+    intro->extend_info = tor_malloc_zero(sizeof(extend_info_t));
+    intro->extend_info->onion_key = okey;
+    crypto_pk_get_digest(intro->extend_info->onion_key,
+                         intro->extend_info->identity_digest);
+    intro->extend_info->nickname[0] = '$';
+    base16_encode(intro->extend_info->nickname + 1,
+                  sizeof(intro->extend_info->nickname) - 1,
+                  intro->extend_info->identity_digest, DIGEST_LEN);
+    tor_addr_from_ipv4h(&intro->extend_info->addr, crypto_rand_int(65536));
+    intro->extend_info->port = 1 + crypto_rand_int(65535);
+    intro->intro_key = crypto_pk_dup_key(pk2);
+    smartlist_add(generated->intro_nodes, intro);
+  }
+  rend_encode_v2_descriptors(descs, generated, now, 0, REND_NO_AUTH, NULL, NULL);
+  *desc = ((rend_encoded_v2_service_descriptor_t *)smartlist_get(descs, 0));
+
+  smartlist_free(descs);
+  rend_service_descriptor_free(generated);
+  crypto_pk_free(pk1);
+  crypto_pk_free(pk2);
+}
+
+static void
 test_rend_cache_lookup_entry(void *data)
 {
   int ret;
   rend_data_t mock_rend_query;
   char desc_id_base32[REND_DESC_ID_V2_LEN_BASE32 + 1];
-
+  rend_cache_entry_t *entry = NULL;
+  rend_encoded_v2_service_descriptor_t *desc_holder;
+  char *service_id = NULL;
   (void)data;
 
   rend_cache_init();
+
+  generate_desc(RECENT_TIME, &desc_holder, &service_id);
+
+
+  ret = rend_cache_lookup_entry("abababababababab", 0, NULL);
+  tt_int_op(ret, OP_EQ, -ENOENT);
 
   ret = rend_cache_lookup_entry("invalid query", 2, NULL);
   tt_int_op(ret, OP_EQ, -EINVAL);
@@ -109,18 +109,110 @@ test_rend_cache_lookup_entry(void *data)
   ret = rend_cache_lookup_entry("abababababababab", 4224, NULL);
   tt_int_op(ret, OP_EQ, -ENOENT);
 
-  mock_rend_query = mock_rend_data();
-  base32_encode(desc_id_base32, sizeof(desc_id_base32), "3xqunszqnaolrrfmtzgaki7mxelgvkje", DIGEST_LEN);
-  rend_cache_store_v2_desc_as_client(hs_desc_content, "3xqunszqnaolrrfmtzgaki7mxelgvkje", &mock_rend_query, NULL);
+  mock_rend_query = mock_rend_data(service_id);
+  base32_encode(desc_id_base32, sizeof(desc_id_base32), desc_holder->desc_id, DIGEST_LEN);
+  rend_cache_store_v2_desc_as_client(desc_holder->desc_str, desc_id_base32, &mock_rend_query, NULL);
 
-  ret = rend_cache_lookup_entry("p5ilyyatkmqeoat2", 2, NULL);
+  ret = rend_cache_lookup_entry(service_id, 2, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
+  ret = rend_cache_lookup_entry(service_id, 2, &entry);
+  tt_assert(entry);
+  tt_int_op(entry->len, OP_EQ, strlen(desc_holder->desc_str));
+  tt_str_op(entry->desc, OP_EQ, desc_holder->desc_str);
+
  done:
-  (void)1;
+  tor_free(desc_holder);
+  tor_free(entry);
+  tor_free(service_id);
+}
+
+static void
+test_rend_cache_store_v2_desc_as_client(void *data)
+{
+  rend_cache_store_status_t ret;
+  rend_data_t mock_rend_query;
+  char desc_id_base32[REND_DESC_ID_V2_LEN_BASE32 + 1];
+  rend_cache_entry_t *entry = NULL;
+  rend_encoded_v2_service_descriptor_t *desc_holder;
+  char *service_id = NULL;
+  (void)data;
+
+  rend_cache_init();
+
+  generate_desc(RECENT_TIME, &desc_holder, &service_id);
+
+  // Test success
+  mock_rend_query = mock_rend_data(service_id);
+  base32_encode(desc_id_base32, sizeof(desc_id_base32), desc_holder->desc_id, DIGEST_LEN);
+  ret = rend_cache_store_v2_desc_as_client(desc_holder->desc_str, desc_id_base32, &mock_rend_query, &entry);
+
+  tt_int_op(ret, OP_EQ, RCS_OKAY);
+  tt_assert(entry);
+  tt_int_op(entry->len, OP_EQ, strlen(desc_holder->desc_str));
+  tt_str_op(entry->desc, OP_EQ, desc_holder->desc_str);
+
+
+  // Test various failure modes
+
+  // TODO: a too long desc_id_base32 argument crashes the function
+  /* ret = rend_cache_store_v2_desc_as_client(desc_holder->desc_str, "3TOOLONG3TOOLONG3TOOLONG3TOOLONG3TOOLONG3TOOLONG", &mock_rend_query, NULL); */
+  /* tt_int_op(ret, OP_EQ, RCS_BADDESC); */
+
+  // Test bad base32 failure
+  ret = rend_cache_store_v2_desc_as_client(desc_holder->desc_str, "!xqunszqnaolrrfmtzgaki7mxelgvkj", &mock_rend_query, NULL);
+  tt_int_op(ret, OP_EQ, RCS_BADDESC);
+
+  // Test invalid descriptor
+  ret = rend_cache_store_v2_desc_as_client("invalid descriptor", "3xqunszqnaolrrfmtzgaki7mxelgvkje", &mock_rend_query, NULL);
+  tt_int_op(ret, OP_EQ, RCS_BADDESC);
+
+  // TODO: it doesn't seem to be possible to test invalid service ID condition.
+  // that means it is likely not possible to have that condition without earlier conditions failing first (such as signature checking of the desc)
+
+  // Test mismatch between service ID and onion address
+  strncpy(mock_rend_query.onion_address, "abc", REND_SERVICE_ID_LEN_BASE32+1);
+  ret = rend_cache_store_v2_desc_as_client(desc_holder->desc_str, desc_id_base32, &mock_rend_query, NULL);
+  tt_int_op(ret, OP_EQ, RCS_BADDESC);
+
+  // Test incorrect descriptor ID
+  mock_rend_query = mock_rend_data(service_id);
+  desc_id_base32[0]++;
+  ret = rend_cache_store_v2_desc_as_client(desc_holder->desc_str, desc_id_base32, &mock_rend_query, NULL);
+  tt_int_op(ret, OP_EQ, RCS_BADDESC);
+  desc_id_base32[0]--;
+
+  // Test too old descriptor
+  tor_free(desc_holder);
+  tor_free(service_id);
+
+  generate_desc(TIME_IN_THE_PAST, &desc_holder, &service_id);
+  mock_rend_query = mock_rend_data(service_id);
+  base32_encode(desc_id_base32, sizeof(desc_id_base32), desc_holder->desc_id, DIGEST_LEN);
+
+  ret = rend_cache_store_v2_desc_as_client(desc_holder->desc_str, desc_id_base32, &mock_rend_query, NULL);
+  tt_int_op(ret, OP_EQ, RCS_BADDESC);
+
+  /* // Test too new descriptor (in the future) */
+  tor_free(desc_holder);
+  tor_free(service_id);
+
+  generate_desc(TIME_IN_THE_FUTURE, &desc_holder, &service_id);
+  mock_rend_query = mock_rend_data(service_id);
+  base32_encode(desc_id_base32, sizeof(desc_id_base32), desc_holder->desc_id, DIGEST_LEN);
+
+  ret = rend_cache_store_v2_desc_as_client(desc_holder->desc_str, desc_id_base32, &mock_rend_query, NULL);
+  tt_int_op(ret, OP_EQ, RCS_BADDESC);
+
+
+ done:
+  tor_free(desc_holder);
+  tor_free(entry);
+  tor_free(service_id);
 }
 
 struct testcase_t rendcache_tests[] = {
-  { "cache_lookup", test_rend_cache_lookup_entry, TT_FORK, NULL, NULL },
+  { "cache_lookup", test_rend_cache_lookup_entry, 0, NULL, NULL },
+  { "cache_store_v2_desc_as_client", test_rend_cache_store_v2_desc_as_client, 0, NULL, NULL },
   END_OF_TESTCASES
 };
