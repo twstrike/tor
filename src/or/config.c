@@ -790,7 +790,6 @@ config_free_all(void)
 
   tor_free(torrc_fname);
   tor_free(torrc_defaults_fname);
-  tor_free(the_tor_version);
   tor_free(global_dirfrontpagecontents);
 
   tor_free(the_short_tor_version);
