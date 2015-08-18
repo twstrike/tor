@@ -1148,6 +1148,7 @@ extern struct testcase_t policy_tests[];
 extern struct testcase_t pt_tests[];
 extern struct testcase_t relay_tests[];
 extern struct testcase_t relaycell_tests[];
+extern struct testcase_t rendcache_tests[];
 extern struct testcase_t replaycache_tests[];
 extern struct testcase_t router_tests[];
 extern struct testcase_t routerkeys_tests[];
@@ -1194,6 +1195,7 @@ struct testgroup_t testgroups[] = {
   { "pt/", pt_tests },
   { "relay/" , relay_tests },
   { "relaycell/", relaycell_tests },
+  { "rendcache/", rendcache_tests },
   { "replaycache/", replaycache_tests },
   { "routerkeys/", routerkeys_tests },
   { "routerlist/", routerlist_tests },
@@ -1206,4 +1208,3 @@ struct testgroup_t testgroups[] = {
   { "util/thread/", thread_tests },
   END_OF_GROUPS
 };
-
