@@ -3,7 +3,7 @@
 
 /**
  * \file rendcache.c
- * \brief Hidden service desriptor cache.
+ * \brief Hidden service descriptor cache.
  **/
 
 #include "rendcache.h"
@@ -873,4 +873,3 @@ rend_cache_store_v2_desc_as_client(const char *desc,
   tor_free(intro_content);
   return retval;
 }
-
