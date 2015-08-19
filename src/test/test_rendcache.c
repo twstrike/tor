@@ -4,14 +4,6 @@
 #include "orconfig.h"
 #include "or.h"
 
-#include "config.h"
-#include "dirvote.h"
-#include "microdesc.h"
-#include "networkstatus.h"
-#include "routerlist.h"
-#include "routerparse.h"
-#include "torcert.h"
-
 #include "test.h"
 #include "rendcache.h"
 
