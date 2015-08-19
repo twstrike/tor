@@ -19,12 +19,12 @@
 static void
 test_tortls_errno_to_tls_error(void *data)
 {
-    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ECONNRESET)),==,TOR_TLS_ERROR_CONNRESET);
-    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ETIMEDOUT)),==,TOR_TLS_ERROR_TIMEOUT);
-    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(EHOSTUNREACH)),==,TOR_TLS_ERROR_NO_ROUTE);
-    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ENETUNREACH)),==,TOR_TLS_ERROR_NO_ROUTE);
-    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ECONNREFUSED)),==,TOR_TLS_ERROR_CONNREFUSED);
-    tt_int_op(tor_errno_to_tls_error(0),==,TOR_TLS_ERROR_MISC);
+    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ECONNRESET)),OP_EQ,TOR_TLS_ERROR_CONNRESET);
+    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ETIMEDOUT)),OP_EQ,TOR_TLS_ERROR_TIMEOUT);
+    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(EHOSTUNREACH)),OP_EQ,TOR_TLS_ERROR_NO_ROUTE);
+    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ENETUNREACH)),OP_EQ,TOR_TLS_ERROR_NO_ROUTE);
+    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ECONNREFUSED)),OP_EQ,TOR_TLS_ERROR_CONNREFUSED);
+    tt_int_op(tor_errno_to_tls_error(0),OP_EQ,TOR_TLS_ERROR_MISC);
  done:
   (void)1;
 }
@@ -32,17 +32,17 @@ test_tortls_errno_to_tls_error(void *data)
 static void
 test_tortls_err_to_string(void *data)
 {
-    tt_int_op(strcmp(tor_tls_err_to_string(1),"[Not an error.]"), ==, 0);
-    tt_int_op(strcmp(tor_tls_err_to_string(TOR_TLS_ERROR_MISC),"misc error"), ==, 0);
-    tt_int_op(strcmp(tor_tls_err_to_string(TOR_TLS_ERROR_IO),"unexpected close"), ==, 0);
-    tt_int_op(strcmp(tor_tls_err_to_string(TOR_TLS_ERROR_CONNREFUSED),"connection refused"), ==, 0);
-    tt_int_op(strcmp(tor_tls_err_to_string(TOR_TLS_ERROR_CONNRESET),"connection reset"), ==, 0);
-    tt_int_op(strcmp(tor_tls_err_to_string(TOR_TLS_ERROR_NO_ROUTE),"host unreachable"), ==, 0);
-    tt_int_op(strcmp(tor_tls_err_to_string(TOR_TLS_ERROR_TIMEOUT),"connection timed out"), ==, 0);
-    tt_int_op(strcmp(tor_tls_err_to_string(TOR_TLS_CLOSE),"closed"), ==, 0);
-    tt_int_op(strcmp(tor_tls_err_to_string(TOR_TLS_WANTREAD),"want to read"), ==, 0);
-    tt_int_op(strcmp(tor_tls_err_to_string(TOR_TLS_WANTWRITE),"want to write"), ==, 0);
-    tt_int_op(strcmp(tor_tls_err_to_string(-100),"(unknown error code)"), ==, 0);
+    tt_str_op(tor_tls_err_to_string(1),OP_EQ,"[Not an error.]");
+    tt_str_op(tor_tls_err_to_string(TOR_TLS_ERROR_MISC),OP_EQ,"misc error");
+    tt_str_op(tor_tls_err_to_string(TOR_TLS_ERROR_IO),OP_EQ,"unexpected close");
+    tt_str_op(tor_tls_err_to_string(TOR_TLS_ERROR_CONNREFUSED),OP_EQ,"connection refused");
+    tt_str_op(tor_tls_err_to_string(TOR_TLS_ERROR_CONNRESET),OP_EQ,"connection reset");
+    tt_str_op(tor_tls_err_to_string(TOR_TLS_ERROR_NO_ROUTE),OP_EQ,"host unreachable");
+    tt_str_op(tor_tls_err_to_string(TOR_TLS_ERROR_TIMEOUT),OP_EQ,"connection timed out");
+    tt_str_op(tor_tls_err_to_string(TOR_TLS_CLOSE),OP_EQ,"closed");
+    tt_str_op(tor_tls_err_to_string(TOR_TLS_WANTREAD),OP_EQ,"want to read");
+    tt_str_op(tor_tls_err_to_string(TOR_TLS_WANTWRITE),OP_EQ,"want to write");
+    tt_str_op(tor_tls_err_to_string(-100),OP_EQ,"(unknown error code)");
  done:
   (void)1;
 }
