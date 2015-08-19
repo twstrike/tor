@@ -3494,6 +3494,26 @@ test_dir_packages(void *arg)
   tor_free(res);
 }
 
+static void
+test_dir_authdir_type_to_string(void *data)
+{
+  (void)data;
+
+  tt_str_op(authdir_type_to_string(NO_DIRINFO), OP_EQ,
+            "[Not an authority]");
+  tt_str_op(authdir_type_to_string(EXTRAINFO_DIRINFO), OP_EQ,
+            "[Not an authority]");
+  tt_str_op(authdir_type_to_string(MICRODESC_DIRINFO), OP_EQ,
+            "[Not an authority]");
+
+  tt_str_op(authdir_type_to_string(V3_DIRINFO), OP_EQ, "V3");
+  tt_str_op(authdir_type_to_string(BRIDGE_DIRINFO), OP_EQ, "Bridge");
+  tt_str_op(authdir_type_to_string(
+            V3_DIRINFO | BRIDGE_DIRINFO | EXTRAINFO_DIRINFO), OP_EQ,
+            "V3, Bridge");
+  done: ;
+}
+
 #define DIR_LEGACY(name)                                                   \
   { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
 
@@ -3525,6 +3545,7 @@ struct testcase_t dir_tests[] = {
   DIR(purpose_needs_anonymity, 0),
   DIR(fetch_type, 0),
   DIR(packages, 0),
+  DIR(authdir_type_to_string, 0),
   END_OF_TESTCASES
 };
 

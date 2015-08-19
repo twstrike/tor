@@ -143,7 +143,7 @@ purpose_needs_anonymity(uint8_t dir_purpose, uint8_t router_purpose)
 
 /** Return a newly allocated string describing <b>auth</b>. Only describes
  * authority features. */
-static char *
+STATIC char *
 authdir_type_to_string(dirinfo_type_t auth)
 {
   char *result;
