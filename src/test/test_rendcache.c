@@ -666,18 +666,113 @@ test_rend_cache_purge(void *data)
   (void)0;
 }
 
+static void
+test_rend_cache_failure_intro_add(void *data)
+{
+  (void)data;
+  rend_cache_failure_t *fail_entry;
+  rend_cache_failure_intro_t *entry;
+
+  rend_cache_init();
+
+  cache_failure_intro_add((const uint8_t *)"foo1", "foo2", INTRO_POINT_FAILURE_TIMEOUT);
+  fail_entry = strmap_get_lc(rend_cache_failure, "foo2");
+  tt_assert(fail_entry);
+  tt_int_op(digestmap_size(fail_entry->intro_failures), OP_EQ, 1);
+  entry = digestmap_get(fail_entry->intro_failures, "foo1");
+  tt_assert(entry);
+
+ done:
+  rend_cache_purge();
+}
+
+
+static void
+test_rend_cache_intro_failure_note(void *data)
+{
+  (void)data;
+  rend_cache_failure_t *fail_entry;
+  rend_cache_failure_intro_t *entry;
+
+  // Test not found
+  rend_cache_intro_failure_note(INTRO_POINT_FAILURE_TIMEOUT,(const uint8_t *)"foo1", "foo2");
+  fail_entry = strmap_get_lc(rend_cache_failure, "foo2");
+  tt_assert(fail_entry);
+  tt_int_op(digestmap_size(fail_entry->intro_failures), OP_EQ, 1);
+  entry = digestmap_get(fail_entry->intro_failures, "foo1");
+  tt_assert(entry);
+  tt_int_op(entry->failure_type, OP_EQ, INTRO_POINT_FAILURE_TIMEOUT);
+
+  // Test found
+  rend_cache_intro_failure_note(INTRO_POINT_FAILURE_UNREACHABLE,(const uint8_t *)"foo1", "foo2");
+  tt_int_op(entry->failure_type, OP_EQ, INTRO_POINT_FAILURE_UNREACHABLE);
+
+ done:
+  rend_cache_purge();
+}
+
+#define NS_SUBMODULE clean_v2_descs_as_dir
+NS_DECL(int, hid_serv_responsible_for_desc_id, (const char *id));
+
+static int hid_serv_responsible_for_desc_id_response;
+
+static int
+NS(hid_serv_responsible_for_desc_id)(const char *id)
+{
+  return hid_serv_responsible_for_desc_id_response;
+}
+
+
+static void
+test_rend_cache_clean_v2_descs_as_dir(void *data)
+{
+  rend_cache_entry_t *e;
+  rend_service_descriptor_t *desc;
+
+  (void)data;
+
+  NS_MOCK(hid_serv_responsible_for_desc_id);
+  rend_cache_init();
+
+  // Test running with an empty cache
+  rend_cache_clean_v2_descs_as_dir(time(NULL), 0);
+  tt_int_op(digestmap_size(rend_cache_v2_dir), OP_EQ, 0);
+
+  // Test with only one new entry
+  e = tor_malloc_zero(sizeof(rend_cache_entry_t));
+  e->last_served = time(NULL);
+  desc = tor_malloc_zero(sizeof(rend_service_descriptor_t));
+  desc->timestamp = time(NULL);
+  desc->pk = pk_generate(0);
+  e->parsed = desc;
+  digestmap_set(rend_cache_v2_dir, "abcde", e);
+
+  hid_serv_responsible_for_desc_id_response = 1;
+  rend_cache_clean_v2_descs_as_dir(time(NULL), 0);
+  tt_int_op(digestmap_size(rend_cache_v2_dir), OP_EQ, 1);
+
+ done:
+  NS_UNMOCK(hid_serv_responsible_for_desc_id);
+  rend_cache_purge();
+}
+
+#undef NS_SUBMODULE
+
 
 struct testcase_t rend_cache_tests[] = {
   { "init", test_rend_cache_init, 0, NULL, NULL },
   { "decrement_allocation", test_rend_cache_decrement_allocation, 0, NULL, NULL },
   { "increment_allocation", test_rend_cache_increment_allocation, 0, NULL, NULL },
-  { "failure_intro_entry_new", test_rend_cache_failure_intro_entry_new, 0, NULL, NULL },
   { "clean", test_rend_cache_clean, 0, NULL, NULL },
+  { "clean_v2_descs_as_dir", test_rend_cache_clean_v2_descs_as_dir, 0, NULL, NULL },
   { "free_all", test_rend_cache_free_all, 0, NULL, NULL },
-  { "failure_clean", test_rend_cache_failure_clean, 0, NULL, NULL },
   { "purge", test_rend_cache_purge, 0, NULL, NULL },
+  { "failure_clean", test_rend_cache_failure_clean, 0, NULL, NULL },
   { "failure_entry_new", test_rend_cache_failure_entry_new, 0, NULL, NULL },
+  { "failure_intro_add", test_rend_cache_failure_intro_add, 0, NULL, NULL },
+  { "failure_intro_entry_new", test_rend_cache_failure_intro_entry_new, 0, NULL, NULL },
   { "failure_remove", test_rend_cache_failure_remove, 0, NULL, NULL },
+  { "intro_failure_note", test_rend_cache_intro_failure_note, 0, NULL, NULL },
   { "lookup", test_rend_cache_lookup_entry, 0, NULL, NULL },
   { "lookup_v2_desc_as_dir", test_rend_cache_lookup_v2_desc_as_dir, 0, NULL, NULL },
   { "store_v2_desc_as_client", test_rend_cache_store_v2_desc_as_client, 0, NULL, NULL },

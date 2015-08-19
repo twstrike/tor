@@ -338,7 +338,7 @@ not_found:
 /** Add an intro point failure to the failure cache using the relay
  * <b>identity</b> and service ID <b>service_id</b>. Record the
  * <b>failure</b> in that object. */
-static void
+STATIC void
 cache_failure_intro_add(const uint8_t *identity, const char *service_id,
                         rend_intro_point_failure_t failure)
 {
