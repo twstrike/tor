@@ -11,6 +11,11 @@ static const int RECENT_TIME = -10;
 static const int TIME_IN_THE_PAST = -(REND_CACHE_MAX_AGE + REND_CACHE_MAX_SKEW + 10);
 static const int TIME_IN_THE_FUTURE = REND_CACHE_MAX_SKEW + 10;
 
+extern strmap_t *rend_cache;
+extern digestmap_t *rend_cache_v2_dir;
+extern strmap_t *rend_cache_failure;
+extern size_t rend_cache_total_allocation;
+
 static rend_data_t
 mock_rend_data(char *onion_address)
 {
@@ -307,10 +312,35 @@ test_rend_cache_lookup_v2_desc_as_dir(void *data)
   (void)0;
 }
 
+
+static void
+test_rend_cache_init(void *data)
+{
+  (void)data;
+
+  tt_assert_msg(!rend_cache, "rend_cache should be NULL when starting");
+  tt_assert_msg(!rend_cache_v2_dir, "rend_cache_v2_dir should be NULL when starting");
+  tt_assert_msg(!rend_cache_failure, "rend_cache_failure should be NULL when starting");
+
+  rend_cache_init();
+
+  tt_assert_msg(rend_cache, "rend_cache should not be NULL after initing");
+  tt_assert_msg(rend_cache_v2_dir, "rend_cache_v2_dir should not be NULL after initing");
+  tt_assert_msg(rend_cache_failure, "rend_cache_failure should not be NULL after initing");
+
+  tt_int_op(strmap_size(rend_cache), OP_EQ, 0);
+  tt_int_op(digestmap_size(rend_cache_v2_dir), OP_EQ, 0);
+  tt_int_op(strmap_size(rend_cache_failure), OP_EQ, 0);
+
+ done:
+  (void)0;
+}
+
 struct testcase_t rendcache_tests[] = {
-  { "cache_lookup", test_rend_cache_lookup_entry, 0, NULL, NULL },
-  { "cache_lookup_v2_desc_as_dir", test_rend_cache_lookup_v2_desc_as_dir, 0, NULL, NULL },
-  { "cache_store_v2_desc_as_client", test_rend_cache_store_v2_desc_as_client, 0, NULL, NULL },
-  { "cache_store_v2_desc_as_client_with_different_time", test_rend_cache_store_v2_desc_as_client_with_different_time, 0, NULL, NULL },
+  { "init", test_rend_cache_init, 0, NULL, NULL },
+  { "lookup", test_rend_cache_lookup_entry, 0, NULL, NULL },
+  { "lookup_v2_desc_as_dir", test_rend_cache_lookup_v2_desc_as_dir, 0, NULL, NULL },
+  { "store_v2_desc_as_client", test_rend_cache_store_v2_desc_as_client, 0, NULL, NULL },
+  { "store_v2_desc_as_client_with_different_time", test_rend_cache_store_v2_desc_as_client_with_different_time, 0, NULL, NULL },
   END_OF_TESTCASES
 };
