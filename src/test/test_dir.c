@@ -3514,6 +3514,31 @@ test_dir_authdir_type_to_string(void *data)
   done: ;
 }
 
+static void
+test_dir_conn_purpose_to_string(void *data)
+{
+  (void)data;
+
+#define EXPECT_CONN_PURPOSE(purpose, expected) \
+  tt_str_op(dir_conn_purpose_to_string(purpose), OP_EQ, expected);
+
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_UPLOAD_DIR, "server descriptor upload");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_UPLOAD_VOTE, "server vote upload");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_UPLOAD_SIGNATURES, "consensus signature upload");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_FETCH_SERVERDESC, "server descriptor fetch");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_FETCH_EXTRAINFO, "extra-info fetch");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_FETCH_CONSENSUS, "consensus network-status fetch");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_FETCH_CERTIFICATE, "authority cert fetch");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_FETCH_STATUS_VOTE, "status vote fetch");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_FETCH_DETACHED_SIGNATURES, "consensus signature fetch");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_FETCH_RENDDESC_V2, "hidden-service v2 descriptor fetch");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_UPLOAD_RENDDESC_V2, "hidden-service v2 descriptor upload");
+  EXPECT_CONN_PURPOSE(DIR_PURPOSE_FETCH_MICRODESC, "microdescriptor fetch");
+  EXPECT_CONN_PURPOSE(1024, "(unknown)");
+
+  done: ;
+}
+
 #define DIR_LEGACY(name)                                                   \
   { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
 
@@ -3546,6 +3571,7 @@ struct testcase_t dir_tests[] = {
   DIR(fetch_type, 0),
   DIR(packages, 0),
   DIR(authdir_type_to_string, 0),
+  DIR(conn_purpose_to_string, 0),
   END_OF_TESTCASES
 };
 

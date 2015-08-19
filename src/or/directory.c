@@ -162,7 +162,7 @@ authdir_type_to_string(dirinfo_type_t auth)
 }
 
 /** Return a string describing a given directory connection purpose. */
-static const char *
+STATIC const char *
 dir_conn_purpose_to_string(int purpose)
 {
   switch (purpose)

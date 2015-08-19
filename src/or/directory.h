@@ -127,8 +127,8 @@ STATIC int purpose_needs_anonymity(uint8_t dir_purpose,
                                    uint8_t router_purpose);
 STATIC dirinfo_type_t dir_fetch_type(int dir_purpose, int router_purpose,
                                      const char *resource);
-
 STATIC char* authdir_type_to_string(dirinfo_type_t auth);
+STATIC const char * dir_conn_purpose_to_string(int purpose);
 #endif
 
 #endif
