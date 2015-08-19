@@ -14,9 +14,23 @@
 
 #include "test.h"
 #include "tortls.h"
+#include "tortls.c"
 
 static void
-test_tor_tls_err_to_string(void *data)
+test_tortls_errno_to_tls_error(void *data)
+{
+    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ECONNRESET)),==,TOR_TLS_ERROR_CONNRESET);
+    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ETIMEDOUT)),==,TOR_TLS_ERROR_TIMEOUT);
+    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(EHOSTUNREACH)),==,TOR_TLS_ERROR_NO_ROUTE);
+    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ENETUNREACH)),==,TOR_TLS_ERROR_NO_ROUTE);
+    tt_int_op(tor_errno_to_tls_error(SOCK_ERRNO(ECONNREFUSED)),==,TOR_TLS_ERROR_CONNREFUSED);
+    tt_int_op(tor_errno_to_tls_error(0),==,TOR_TLS_ERROR_MISC);
+ done:
+  (void)1;
+}
+
+static void
+test_tortls_err_to_string(void *data)
 {
     tt_int_op(strcmp(tor_tls_err_to_string(1),"[Not an error.]"), ==, 0);
     tt_int_op(strcmp(tor_tls_err_to_string(TOR_TLS_ERROR_MISC),"misc error"), ==, 0);
@@ -33,7 +47,11 @@ test_tor_tls_err_to_string(void *data)
   (void)1;
 }
 
+#define NODE(name, flags) \
+  { #name, test_tortls_##name, (flags), NULL, NULL }
+
 struct testcase_t tortls_tests[] = {
-    { "tortls", test_tor_tls_err_to_string, TT_FORK, NULL, NULL },
+  NODE(err_to_string, 0),
+  NODE(errno_to_tls_error, 0),
   END_OF_TESTCASES
 };
