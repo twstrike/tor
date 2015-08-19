@@ -82,6 +82,7 @@ STATIC void rend_cache_decrement_allocation(size_t n);
 STATIC void rend_cache_increment_allocation(size_t n);
 STATIC rend_cache_failure_intro_t *rend_cache_failure_intro_entry_new(rend_intro_point_failure_t failure);
 STATIC rend_cache_failure_t *rend_cache_failure_entry_new(void);
+STATIC void rend_cache_failure_remove(rend_service_descriptor_t *desc);
 #endif
 
 #endif /* TOR_RENDCACHE_H */

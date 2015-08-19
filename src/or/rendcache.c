@@ -171,7 +171,7 @@ rend_cache_failure_entry_new(void)
 
 /** Remove failure cache entry for the service ID in the given descriptor
  * <b>desc</b>. */
-static void
+STATIC void
 rend_cache_failure_remove(rend_service_descriptor_t *desc)
 {
   char service_id[REND_SERVICE_ID_LEN_BASE32 + 1];

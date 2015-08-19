@@ -468,6 +468,7 @@ test_rend_cache_clean(void *data)
 
   // Test with empty rendcache
   rend_cache_clean(time(NULL));
+  tt_int_op(strmap_size(rend_cache), OP_EQ, 0);
 
   // Test with two old entries
   one = tor_malloc_zero(sizeof(rend_cache_entry_t));
@@ -530,14 +531,153 @@ test_rend_cache_failure_entry_new(void *data)
   tor_free(failure);
 }
 
+static void
+test_rend_cache_failure_clean(void *data)
+{
+  rend_cache_failure_t *failure;
+  rend_cache_failure_intro_t *ip_one, *ip_two;
 
-struct testcase_t rendcache_tests[] = {
+  (void)data;
+
+  rend_cache_init();
+
+  // Test with empty failure cache
+  rend_cache_failure_clean(time(NULL));
+  tt_int_op(strmap_size(rend_cache_failure), OP_EQ, 0);
+
+  // Test with one empty failure entry
+  failure = rend_cache_failure_entry_new();
+  strmap_set_lc(rend_cache_failure, "foo1", failure);
+  rend_cache_failure_clean(time(NULL));
+  tt_int_op(strmap_size(rend_cache_failure), OP_EQ, 0);
+
+  // Test with one new intro point
+  failure = rend_cache_failure_entry_new();
+  ip_one = rend_cache_failure_intro_entry_new(INTRO_POINT_FAILURE_TIMEOUT);
+  digestmap_set(failure->intro_failures, "ip1", ip_one);
+  strmap_set_lc(rend_cache_failure, "foo1", failure);
+  rend_cache_failure_clean(time(NULL));
+  tt_int_op(strmap_size(rend_cache_failure), OP_EQ, 1);
+
+  // Test with one old intro point
+  rend_cache_failure_purge();
+  failure = rend_cache_failure_entry_new();
+  ip_one = rend_cache_failure_intro_entry_new(INTRO_POINT_FAILURE_TIMEOUT);
+  ip_one->created_ts = time(NULL) - 7*60;
+  digestmap_set(failure->intro_failures, "ip1", ip_one);
+  strmap_set_lc(rend_cache_failure, "foo1", failure);
+  rend_cache_failure_clean(time(NULL));
+  tt_int_op(strmap_size(rend_cache_failure), OP_EQ, 0);
+
+
+  // Test with one old intro point and one new one
+  rend_cache_failure_purge();
+  failure = rend_cache_failure_entry_new();
+  ip_one = rend_cache_failure_intro_entry_new(INTRO_POINT_FAILURE_TIMEOUT);
+  ip_one->created_ts = time(NULL) - 7*60;
+  digestmap_set(failure->intro_failures, "ip1", ip_one);
+  ip_two = rend_cache_failure_intro_entry_new(INTRO_POINT_FAILURE_TIMEOUT);
+  ip_two->created_ts = time(NULL) - 2*60;
+  digestmap_set(failure->intro_failures, "ip2", ip_two);
+  strmap_set_lc(rend_cache_failure, "foo1", failure);
+  rend_cache_failure_clean(time(NULL));
+  tt_int_op(strmap_size(rend_cache_failure), OP_EQ, 1);
+  tt_int_op(digestmap_size(failure->intro_failures), OP_EQ, 1);
+
+ done:
+  (void)0;
+}
+
+
+static void
+test_rend_cache_failure_remove(void *data)
+{
+  rend_service_descriptor_t *desc;
+  (void)data;
+
+  rend_cache_init();
+
+  // Test that it deals well with a NULL desc
+  rend_cache_failure_remove(NULL);
+
+  // Test a descriptor that isn't in the cache
+  desc = tor_malloc_zero(sizeof(rend_service_descriptor_t));
+  desc->pk = pk_generate(0);
+  rend_cache_failure_remove(desc);
+
+ /* done: */
+ /*  (void)0; */
+}
+
+static void
+test_rend_cache_free_all(void *data)
+{
+  rend_cache_failure_t *failure;
+  rend_cache_entry_t *one;
+  rend_service_descriptor_t *desc_one;
+
+  (void)data;
+
+  rend_cache_init();
+
+  failure = rend_cache_failure_entry_new();
+  strmap_set_lc(rend_cache_failure, "foo1", failure);
+
+  one = tor_malloc_zero(sizeof(rend_cache_entry_t));
+  desc_one = tor_malloc_zero(sizeof(rend_service_descriptor_t));
+  one->parsed = desc_one;
+  desc_one->timestamp = time(NULL) + TIME_IN_THE_PAST;
+  desc_one->pk = pk_generate(0);
+  strmap_set_lc(rend_cache, "foo1", one);
+
+  rend_cache_free_all();
+
+  tt_assert(!rend_cache);
+  tt_assert(!rend_cache_v2_dir);
+  tt_assert(!rend_cache_failure);
+  tt_assert(!rend_cache_total_allocation);
+
+ done:
+  (void)0;
+}
+
+
+static void
+test_rend_cache_purge(void *data)
+{
+  strmap_t *our_rend_cache;
+
+  (void)data;
+
+  // Deals with a NULL rend_cache
+  rend_cache_purge();
+  tt_assert(rend_cache);
+  tt_int_op(strmap_size(rend_cache), OP_EQ, 0);
+
+  // Deals with existing rend_cache
+  rend_cache_init();
+
+  our_rend_cache = rend_cache;
+  rend_cache_purge();
+  tt_assert(rend_cache);
+  tt_assert(rend_cache == our_rend_cache);
+
+ done:
+  (void)0;
+}
+
+
+struct testcase_t rend_cache_tests[] = {
   { "init", test_rend_cache_init, 0, NULL, NULL },
   { "decrement_allocation", test_rend_cache_decrement_allocation, 0, NULL, NULL },
   { "increment_allocation", test_rend_cache_increment_allocation, 0, NULL, NULL },
   { "failure_intro_entry_new", test_rend_cache_failure_intro_entry_new, 0, NULL, NULL },
   { "clean", test_rend_cache_clean, 0, NULL, NULL },
+  { "free_all", test_rend_cache_free_all, 0, NULL, NULL },
+  { "failure_clean", test_rend_cache_failure_clean, 0, NULL, NULL },
+  { "purge", test_rend_cache_purge, 0, NULL, NULL },
   { "failure_entry_new", test_rend_cache_failure_entry_new, 0, NULL, NULL },
+  { "failure_remove", test_rend_cache_failure_remove, 0, NULL, NULL },
   { "lookup", test_rend_cache_lookup_entry, 0, NULL, NULL },
   { "lookup_v2_desc_as_dir", test_rend_cache_lookup_v2_desc_as_dir, 0, NULL, NULL },
   { "store_v2_desc_as_client", test_rend_cache_store_v2_desc_as_client, 0, NULL, NULL },
