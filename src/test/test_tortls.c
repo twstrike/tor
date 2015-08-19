@@ -47,11 +47,11 @@ test_tortls_err_to_string(void *data)
   (void)1;
 }
 
-#define NODE(name, flags) \
-  { #name, test_tortls_##name, (flags), NULL, NULL }
+#define LOCAL_TEST_CASE(name) \
+  { #name, test_tortls_##name, 0, NULL, NULL }
 
 struct testcase_t tortls_tests[] = {
-  NODE(err_to_string, 0),
-  NODE(errno_to_tls_error, 0),
+  LOCAL_TEST_CASE(err_to_string),
+  LOCAL_TEST_CASE(errno_to_tls_error),
   END_OF_TESTCASES
 };
