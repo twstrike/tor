@@ -6,6 +6,7 @@
  * \brief Hidden service descriptor cache.
  **/
 
+#define RENDCACHE_PRIVATE
 #include "rendcache.h"
 
 #include "config.h"
@@ -80,7 +81,7 @@ rend_cache_get_total_allocation(void)
 }
 
 /** Decrement the total bytes attributed to the rendezvous cache by n. */
-static void
+STATIC void
 rend_cache_decrement_allocation(size_t n)
 {
   static int have_underflowed = 0;
@@ -97,7 +98,7 @@ rend_cache_decrement_allocation(size_t n)
 }
 
 /** Increase the total bytes attributed to the rendezvous cache by n. */
-static void
+STATIC void
 rend_cache_increment_allocation(size_t n)
 {
   static int have_overflowed = 0;
@@ -124,7 +125,7 @@ rend_cache_failure_intro_entry_free(rend_cache_failure_intro_t *entry)
 
 /** Allocate a rend cache failure intro object and return it. <b>failure</b>
  * is set into the object. This function can not fail. */
-static rend_cache_failure_intro_t *
+STATIC rend_cache_failure_intro_t *
 rend_cache_failure_intro_entry_new(rend_intro_point_failure_t failure)
 {
   rend_cache_failure_intro_t *entry = tor_malloc(sizeof(*entry));
@@ -160,7 +161,7 @@ rend_cache_failure_entry_free_(void *entry)
 
 /** Allocate a rend cache failure object and return it. This function can
  * not fail. */
-static rend_cache_failure_t *
+STATIC rend_cache_failure_t *
 rend_cache_failure_entry_new(void)
 {
   rend_cache_failure_t *entry = tor_malloc(sizeof(*entry));

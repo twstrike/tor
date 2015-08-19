@@ -76,5 +76,12 @@ void rend_cache_intro_failure_note(rend_intro_point_failure_t failure,
                                    const char *service_id);
 void rend_cache_failure_purge(void);
 
-#endif /* TOR_RENDCACHE_H */
 
+#ifdef RENDCACHE_PRIVATE
+STATIC void rend_cache_decrement_allocation(size_t n);
+STATIC void rend_cache_increment_allocation(size_t n);
+STATIC rend_cache_failure_intro_t *rend_cache_failure_intro_entry_new(rend_intro_point_failure_t failure);
+STATIC rend_cache_failure_t *rend_cache_failure_entry_new(void);
+#endif
+
+#endif /* TOR_RENDCACHE_H */

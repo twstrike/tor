@@ -5,6 +5,7 @@
 #include "or.h"
 
 #include "test.h"
+#define RENDCACHE_PRIVATE
 #include "rendcache.h"
 #include "router.h"
 #include "routerlist.h"
@@ -384,8 +385,159 @@ test_rend_cache_init(void *data)
   (void)0;
 }
 
+static void
+test_rend_cache_decrement_allocation(void *data)
+{
+  (void)data;
+
+  // Test when the cache has enough allocations
+  rend_cache_total_allocation = 10;
+  rend_cache_decrement_allocation(3);
+  tt_int_op(rend_cache_total_allocation, OP_EQ, 7);
+
+  // Test when there are not enough allocations
+  rend_cache_total_allocation = 1;
+  rend_cache_decrement_allocation(2);
+  tt_int_op(rend_cache_total_allocation, OP_EQ, 0);
+
+  // And again
+  rend_cache_decrement_allocation(2);
+  tt_int_op(rend_cache_total_allocation, OP_EQ, 0);
+
+ done:
+  (void)0;
+}
+
+static void
+test_rend_cache_increment_allocation(void *data)
+{
+  (void)data;
+
+  // Test when the cache is not overflowing
+  rend_cache_total_allocation = 5;
+  rend_cache_increment_allocation(3);
+  tt_int_op(rend_cache_total_allocation, OP_EQ, 8);
+
+  // Test when there are too many allocations
+  rend_cache_total_allocation = SIZE_MAX-1;
+  rend_cache_increment_allocation(2);
+  tt_int_op(rend_cache_total_allocation, OP_EQ, SIZE_MAX);
+
+  // And again
+  rend_cache_increment_allocation(2);
+  tt_int_op(rend_cache_total_allocation, OP_EQ, SIZE_MAX);
+
+ done:
+  (void)0;
+}
+
+
+static void
+test_rend_cache_failure_intro_entry_new(void *data)
+{
+  time_t now;
+  rend_cache_failure_intro_t *entry;
+  rend_intro_point_failure_t failure;
+
+  (void)data;
+
+  failure = INTRO_POINT_FAILURE_TIMEOUT;
+  now = time(NULL);
+  entry = rend_cache_failure_intro_entry_new(failure);
+
+  tt_int_op(entry->failure_type, OP_EQ, INTRO_POINT_FAILURE_TIMEOUT);
+  tt_int_op(entry->created_ts, OP_GE, now-5);
+  tt_int_op(entry->created_ts, OP_LE, now+5);
+
+ done:
+  tor_free(entry);
+}
+
+static void
+test_rend_cache_clean(void *data)
+{
+  rend_cache_entry_t *one, *two;
+  rend_service_descriptor_t *desc_one, *desc_two;
+  strmap_iter_t *iter = NULL;
+  const char *key;
+  void *val;
+
+  (void)data;
+
+  rend_cache_init();
+
+  // Test with empty rendcache
+  rend_cache_clean(time(NULL));
+
+  // Test with two old entries
+  one = tor_malloc_zero(sizeof(rend_cache_entry_t));
+  two = tor_malloc_zero(sizeof(rend_cache_entry_t));
+  desc_one = tor_malloc_zero(sizeof(rend_service_descriptor_t));
+  desc_two = tor_malloc_zero(sizeof(rend_service_descriptor_t));
+  one->parsed = desc_one;
+  two->parsed = desc_two;
+
+  desc_one->timestamp = time(NULL) + TIME_IN_THE_PAST;
+  desc_two->timestamp = (time(NULL) + TIME_IN_THE_PAST) - 10;
+  desc_one->pk = pk_generate(0);
+  desc_two->pk = pk_generate(1);
+
+  strmap_set_lc(rend_cache, "foo1", one);
+  strmap_set_lc(rend_cache, "foo2", two);
+
+  rend_cache_clean(time(NULL));
+  tt_int_op(strmap_size(rend_cache), OP_EQ, 0);
+
+  // Test with one old entry and one newer entry
+  one = tor_malloc_zero(sizeof(rend_cache_entry_t));
+  two = tor_malloc_zero(sizeof(rend_cache_entry_t));
+  desc_one = tor_malloc_zero(sizeof(rend_service_descriptor_t));
+  desc_two = tor_malloc_zero(sizeof(rend_service_descriptor_t));
+  one->parsed = desc_one;
+  two->parsed = desc_two;
+
+  desc_one->timestamp = (time(NULL) + TIME_IN_THE_PAST) - 10;
+  desc_two->timestamp = time(NULL) - 100;
+  desc_one->pk = pk_generate(0);
+  desc_two->pk = pk_generate(1);
+
+  strmap_set_lc(rend_cache, "foo1", one);
+  strmap_set_lc(rend_cache, "foo2", two);
+
+  rend_cache_clean(time(NULL));
+  tt_int_op(strmap_size(rend_cache), OP_EQ, 1);
+
+  iter = strmap_iter_init(rend_cache);
+  strmap_iter_get(iter, &key, &val);
+  tt_str_op(key, OP_EQ, "foo2");
+
+ done:
+  (void)1;
+}
+
+static void
+test_rend_cache_failure_entry_new(void *data)
+{
+  rend_cache_failure_t *failure;
+
+  (void)data;
+
+  failure = rend_cache_failure_entry_new();
+  tt_assert(failure);
+  tt_int_op(digestmap_size(failure->intro_failures), OP_EQ, 0);
+
+ done:
+  tor_free(failure);
+}
+
+
 struct testcase_t rendcache_tests[] = {
   { "init", test_rend_cache_init, 0, NULL, NULL },
+  { "decrement_allocation", test_rend_cache_decrement_allocation, 0, NULL, NULL },
+  { "increment_allocation", test_rend_cache_increment_allocation, 0, NULL, NULL },
+  { "failure_intro_entry_new", test_rend_cache_failure_intro_entry_new, 0, NULL, NULL },
+  { "clean", test_rend_cache_clean, 0, NULL, NULL },
+  { "failure_entry_new", test_rend_cache_failure_entry_new, 0, NULL, NULL },
   { "lookup", test_rend_cache_lookup_entry, 0, NULL, NULL },
   { "lookup_v2_desc_as_dir", test_rend_cache_lookup_v2_desc_as_dir, 0, NULL, NULL },
   { "store_v2_desc_as_client", test_rend_cache_store_v2_desc_as_client, 0, NULL, NULL },
