@@ -3340,12 +3340,33 @@ static void
 test_dir_fetch_type(void *arg)
 {
   (void)arg;
-  tt_assert(dir_fetch_type(DIR_PURPOSE_FETCH_MICRODESC, ROUTER_PURPOSE_GENERAL,
-                           NULL) == MICRODESC_DIRINFO);
-  tt_assert(dir_fetch_type(DIR_PURPOSE_FETCH_SERVERDESC, ROUTER_PURPOSE_BRIDGE,
-                           NULL) == BRIDGE_DIRINFO);
-  tt_assert(dir_fetch_type(DIR_PURPOSE_FETCH_CONSENSUS, ROUTER_PURPOSE_GENERAL,
-                           "microdesc") == (V3_DIRINFO | MICRODESC_DIRINFO));
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_EXTRAINFO, ROUTER_PURPOSE_BRIDGE,
+                           NULL), OP_EQ, EXTRAINFO_DIRINFO | BRIDGE_DIRINFO);
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_EXTRAINFO, ROUTER_PURPOSE_GENERAL,
+                           NULL), OP_EQ, EXTRAINFO_DIRINFO | V3_DIRINFO);
+
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_SERVERDESC, ROUTER_PURPOSE_BRIDGE,
+                           NULL), OP_EQ, BRIDGE_DIRINFO);
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_SERVERDESC, ROUTER_PURPOSE_GENERAL,
+                           NULL), OP_EQ, V3_DIRINFO);
+
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_STATUS_VOTE, ROUTER_PURPOSE_GENERAL,
+                           NULL), OP_EQ, V3_DIRINFO);
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_DETACHED_SIGNATURES, ROUTER_PURPOSE_GENERAL,
+                           NULL), OP_EQ, V3_DIRINFO);
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_CERTIFICATE, ROUTER_PURPOSE_GENERAL,
+                           NULL), OP_EQ, V3_DIRINFO);
+
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_CONSENSUS, ROUTER_PURPOSE_GENERAL,
+                           "microdesc"), OP_EQ, V3_DIRINFO | MICRODESC_DIRINFO);
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_CONSENSUS, ROUTER_PURPOSE_GENERAL,
+                           NULL), OP_EQ, V3_DIRINFO);
+
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_MICRODESC, ROUTER_PURPOSE_GENERAL,
+                           NULL), OP_EQ, MICRODESC_DIRINFO);
+
+  tt_int_op(dir_fetch_type(DIR_PURPOSE_FETCH_RENDDESC_V2, ROUTER_PURPOSE_GENERAL,
+                           NULL), OP_EQ, NO_DIRINFO);
  done: ;
 }
 
