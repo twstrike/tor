@@ -6,6 +6,11 @@
 
 #include "test.h"
 #include "rendcache.h"
+#include "router.h"
+#include "routerlist.h"
+#include "config.h"
+
+#define NS_MODULE rend_cache
 
 static const int RECENT_TIME = -10;
 static const int TIME_IN_THE_PAST = -(REND_CACHE_MAX_AGE + REND_CACHE_MAX_SKEW + 10);
@@ -291,12 +296,43 @@ test_rend_cache_store_v2_desc_as_client_with_different_time(void *data)
   tor_free(service_id);
 }
 
+
+#define NS_SUBMODULE lookup_v2_desc_as_dir
+NS_DECL(const routerinfo_t *, router_get_my_routerinfo, (void));
+NS_DECL(int, hid_serv_responsible_for_desc_id, (const char *id));
+
+static routerinfo_t *mock_routerinfo;
+static int hid_serv_responsible_for_desc_id_response;
+
+static const routerinfo_t *
+NS(router_get_my_routerinfo)(void)
+{
+  if(!mock_routerinfo) {
+    mock_routerinfo = tor_malloc(sizeof(routerinfo_t));
+  }
+
+  return mock_routerinfo;
+}
+
+static int
+NS(hid_serv_responsible_for_desc_id)(const char *id)
+{
+  return hid_serv_responsible_for_desc_id_response;
+}
+
 static void
 test_rend_cache_lookup_v2_desc_as_dir(void *data)
 {
   int ret;
+  char desc_id_base32[REND_DESC_ID_V2_LEN_BASE32 + 1];
+  rend_encoded_v2_service_descriptor_t *desc_holder;
+  char *service_id = NULL;
+  const char *ret_desc = NULL;
 
   (void)data;
+
+  NS_MOCK(router_get_my_routerinfo);
+  NS_MOCK(hid_serv_responsible_for_desc_id);
 
   rend_cache_init();
 
@@ -304,14 +340,26 @@ test_rend_cache_lookup_v2_desc_as_dir(void *data)
   ret = rend_cache_lookup_v2_desc_as_dir("!bababababababab", NULL);
   tt_int_op(ret, OP_EQ, -1);
 
-  // Test non-existent descriptor
+  // Test non-existent descriptor but well formed
   ret = rend_cache_lookup_v2_desc_as_dir("3xqunszqnaolrrfmtzgaki7mxelgvkje", NULL);
   tt_int_op(ret, OP_EQ, 0);
 
+  // Test existing descriptor
+  hid_serv_responsible_for_desc_id_response = 1;
+  generate_desc(RECENT_TIME, &desc_holder, &service_id);
+  rend_cache_store_v2_desc_as_dir(desc_holder->desc_str);
+  base32_encode(desc_id_base32, sizeof(desc_id_base32), desc_holder->desc_id, DIGEST_LEN);
+  ret = rend_cache_lookup_v2_desc_as_dir(desc_id_base32, &ret_desc);
+  tt_int_op(ret, OP_EQ, 1);
+  tt_assert(ret_desc);
+
  done:
-  (void)0;
+  NS_UNMOCK(router_get_my_routerinfo);
+  NS_UNMOCK(hid_serv_responsible_for_desc_id);
+  tor_free(mock_routerinfo);
 }
 
+#undef NS_SUBMODULE
 
 static void
 test_rend_cache_init(void *data)
