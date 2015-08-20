@@ -3643,8 +3643,6 @@ NS_DECL(void, directory_initiate_command_routerstatus,
                size_t payload_len,
                time_t if_modified_since));
 
-static int directory_initiate_command_routerstatus_count;
-
 static void test_dir_should_not_init_request_to_ourselves(void *data){
   char digest[DIGEST_LEN];
   dir_server_t *ourself = NULL;
@@ -3665,15 +3663,13 @@ static void test_dir_should_not_init_request_to_ourselves(void *data){
   tt_assert(ourself);
   dir_server_add(ourself);
 
-  directory_initiate_command_routerstatus_count = 0;
-
   // should not initiate a request to ourself
   directory_get_from_all_authorities(DIR_PURPOSE_FETCH_STATUS_VOTE, 0, NULL);
-  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 0);
+  tt_int_op(CALLED(directory_initiate_command_routerstatus), OP_EQ, 0);
 
   // should not initiate a request to ourself
   directory_get_from_all_authorities(DIR_PURPOSE_FETCH_DETACHED_SIGNATURES, 0, NULL);
-  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 0);
+  tt_int_op(CALLED(directory_initiate_command_routerstatus), OP_EQ, 0);
 
   done:
     NS_UNMOCK(directory_initiate_command_routerstatus);
@@ -3698,15 +3694,13 @@ static void test_dir_should_not_init_request_to_dir_auths_without_v3_info(void *
   tt_assert(ds);
   dir_server_add(ds);
 
-  directory_initiate_command_routerstatus_count = 0;
-
   // ignore servers that don't provide v3 directory information
   directory_get_from_all_authorities(DIR_PURPOSE_FETCH_STATUS_VOTE, 0, NULL);
-  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 0);
+  tt_int_op(CALLED(directory_initiate_command_routerstatus), OP_EQ, 0);
 
   // ignore servers that don't provide v3 directory information
   directory_get_from_all_authorities(DIR_PURPOSE_FETCH_DETACHED_SIGNATURES, 0, NULL);
-  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 0);
+  tt_int_op(CALLED(directory_initiate_command_routerstatus), OP_EQ, 0);
 
   done:
     NS_UNMOCK(directory_initiate_command_routerstatus);
@@ -3728,13 +3722,11 @@ static void test_dir_should_init_request_to_dir_auths(void *data){
   tt_assert(ds);
   dir_server_add(ds);
 
-  directory_initiate_command_routerstatus_count = 0;
-
   directory_get_from_all_authorities(DIR_PURPOSE_FETCH_STATUS_VOTE, 0, NULL);
-  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 1);
+  tt_int_op(CALLED(directory_initiate_command_routerstatus), OP_EQ, 1);
 
   directory_get_from_all_authorities(DIR_PURPOSE_FETCH_DETACHED_SIGNATURES, 0, NULL);
-  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 2);
+  tt_int_op(CALLED(directory_initiate_command_routerstatus), OP_EQ, 2);
 
   done:
     NS_UNMOCK(directory_initiate_command_routerstatus);
@@ -3750,7 +3742,7 @@ NS(directory_initiate_command_routerstatus)(const routerstatus_t *status,
                                             size_t payload_len,
                                             time_t if_modified_since)
 {
-  directory_initiate_command_routerstatus_count++;
+  CALLED(directory_initiate_command_routerstatus)++;
 }
 
 #undef NS_SUBMODULE
