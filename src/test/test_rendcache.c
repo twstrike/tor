@@ -102,7 +102,7 @@ test_rend_cache_lookup_entry(void *data)
   rend_data_t mock_rend_query;
   char desc_id_base32[REND_DESC_ID_V2_LEN_BASE32 + 1];
   rend_cache_entry_t *entry = NULL;
-  rend_encoded_v2_service_descriptor_t *desc_holder;
+  rend_encoded_v2_service_descriptor_t *desc_holder = NULL;
   char *service_id = NULL;
   (void)data;
 
@@ -148,7 +148,7 @@ test_rend_cache_store_v2_desc_as_client(void *data)
   rend_data_t mock_rend_query;
   char desc_id_base32[REND_DESC_ID_V2_LEN_BASE32 + 1];
   rend_cache_entry_t *entry = NULL;
-  rend_encoded_v2_service_descriptor_t *desc_holder;
+  rend_encoded_v2_service_descriptor_t *desc_holder = NULL;
   char *service_id = NULL;
   char client_cookie[REND_DESC_COOKIE_LEN];
   (void)data;
@@ -376,7 +376,7 @@ test_rend_cache_lookup_v2_desc_as_dir(void *data)
 {
   int ret;
   char desc_id_base32[REND_DESC_ID_V2_LEN_BASE32 + 1];
-  rend_encoded_v2_service_descriptor_t *desc_holder;
+  rend_encoded_v2_service_descriptor_t *desc_holder = NULL;
   char *service_id = NULL;
   const char *ret_desc = NULL;
 
@@ -436,7 +436,7 @@ test_rend_cache_store_v2_desc_as_dir(void *data)
 {
   (void)data;
   rend_cache_store_status_t ret;
-  rend_encoded_v2_service_descriptor_t *desc_holder;
+  rend_encoded_v2_service_descriptor_t *desc_holder = NULL;
   char *service_id = NULL;
 
   NS_MOCK(router_get_my_routerinfo);
