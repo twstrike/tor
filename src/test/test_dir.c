@@ -3631,6 +3631,130 @@ test_dir_should_use_directory_guards(void *data)
 
 #undef NS_SUBMODULE
 
+#define NS_SUBMODULE directory_get_from_all_authorities
+
+NS_DECL(void, directory_initiate_command_routerstatus,
+              (const routerstatus_t *status,
+               uint8_t dir_purpose,
+               uint8_t router_purpose,
+               dir_indirection_t indirection,
+               const char *resource,
+               const char *payload,
+               size_t payload_len,
+               time_t if_modified_since));
+
+static int directory_initiate_command_routerstatus_count;
+
+static void test_dir_should_not_init_request_to_ourselves(void *data){
+  char digest[DIGEST_LEN];
+  dir_server_t *ourself = NULL;
+  crypto_pk_t *key = pk_generate(2);
+  (void) data;
+
+  NS_MOCK(directory_initiate_command_routerstatus);
+
+  // clear dir servers list
+  clear_dir_servers();
+  routerlist_free_all();
+
+  set_server_identity_key(key);
+  crypto_pk_get_digest(key, (char*) &digest);
+  ourself = trusted_dir_server_new("ourself", "127.0.0.1", 9059, 9060, digest,
+                                   NULL, V3_DIRINFO, 1.0);
+
+  tt_assert(ourself);
+  dir_server_add(ourself);
+
+  directory_initiate_command_routerstatus_count = 0;
+
+  // should not initiate a request to ourself
+  directory_get_from_all_authorities(DIR_PURPOSE_FETCH_STATUS_VOTE, 0, NULL);
+  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 0);
+
+  // should not initiate a request to ourself
+  directory_get_from_all_authorities(DIR_PURPOSE_FETCH_DETACHED_SIGNATURES, 0, NULL);
+  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 0);
+
+  done:
+    NS_UNMOCK(directory_initiate_command_routerstatus);
+    crypto_pk_free(key);
+    tor_free(ourself);
+}
+
+static void test_dir_should_not_init_request_to_dir_auths_without_v3_info(void *data){
+  dir_server_t *ds = NULL;
+  dirinfo_type_t dirinfo_type = BRIDGE_DIRINFO | EXTRAINFO_DIRINFO \
+                                | MICRODESC_DIRINFO;
+  (void) data;
+
+  NS_MOCK(directory_initiate_command_routerstatus);
+
+  // clear dir servers list
+  clear_dir_servers();
+  routerlist_free_all();
+
+  ds = trusted_dir_server_new("ds", "10.0.0.1", 9059, 9060,
+                              "12345678901234567890", NULL, dirinfo_type, 1.0);
+  tt_assert(ds);
+  dir_server_add(ds);
+
+  directory_initiate_command_routerstatus_count = 0;
+
+  // ignore servers that don't provide v3 directory information
+  directory_get_from_all_authorities(DIR_PURPOSE_FETCH_STATUS_VOTE, 0, NULL);
+  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 0);
+
+  // ignore servers that don't provide v3 directory information
+  directory_get_from_all_authorities(DIR_PURPOSE_FETCH_DETACHED_SIGNATURES, 0, NULL);
+  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 0);
+
+  done:
+    NS_UNMOCK(directory_initiate_command_routerstatus);
+    tor_free(ds);
+}
+
+static void test_dir_should_init_request_to_dir_auths(void *data){
+  dir_server_t *ds = NULL;
+  (void) data;
+
+  NS_MOCK(directory_initiate_command_routerstatus);
+
+  // clear dir servers list
+  clear_dir_servers();
+  routerlist_free_all();
+
+  ds = trusted_dir_server_new("ds", "10.0.0.1", 9059, 9060,
+                              "12345678901234567890", NULL, V3_DIRINFO, 1.0);
+  tt_assert(ds);
+  dir_server_add(ds);
+
+  directory_initiate_command_routerstatus_count = 0;
+
+  directory_get_from_all_authorities(DIR_PURPOSE_FETCH_STATUS_VOTE, 0, NULL);
+  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 1);
+
+  directory_get_from_all_authorities(DIR_PURPOSE_FETCH_DETACHED_SIGNATURES, 0, NULL);
+  tt_int_op(directory_initiate_command_routerstatus_count, OP_EQ, 2);
+
+  done:
+    NS_UNMOCK(directory_initiate_command_routerstatus);
+    tor_free(ds);
+}
+void
+NS(directory_initiate_command_routerstatus)(const routerstatus_t *status,
+                                            uint8_t dir_purpose,
+                                            uint8_t router_purpose,
+                                            dir_indirection_t indirection,
+                                            const char *resource,
+                                            const char *payload,
+                                            size_t payload_len,
+                                            time_t if_modified_since)
+{
+  directory_initiate_command_routerstatus_count++;
+}
+
+#undef NS_SUBMODULE
+
 #define DIR_LEGACY(name)                                                   \
   { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
 
@@ -3665,6 +3789,9 @@ struct testcase_t dir_tests[] = {
   DIR(authdir_type_to_string, 0),
   DIR(conn_purpose_to_string, 0),
   DIR(should_use_directory_guards, 0),
+  DIR(should_not_init_request_to_ourselves, TT_FORK),
+  DIR(should_not_init_request_to_dir_auths_without_v3_info, TT_FORK),
+  DIR(should_init_request_to_dir_auths, TT_FORK),
   END_OF_TESTCASES
 };
 

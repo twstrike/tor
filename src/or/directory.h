@@ -37,14 +37,16 @@ typedef enum {
   DIRIND_ANON_DIRPORT,
 } dir_indirection_t;
 
-void directory_initiate_command_routerstatus(const routerstatus_t *status,
-                                             uint8_t dir_purpose,
-                                             uint8_t router_purpose,
-                                             dir_indirection_t indirection,
-                                             const char *resource,
-                                             const char *payload,
-                                             size_t payload_len,
-                                             time_t if_modified_since);
+MOCK_DECL(void, directory_initiate_command_routerstatus,
+                (const routerstatus_t *status,
+                 uint8_t dir_purpose,
+                 uint8_t router_purpose,
+                 dir_indirection_t indirection,
+                 const char *resource,
+                 const char *payload,
+                 size_t payload_len,
+                 time_t if_modified_since));
+
 void directory_initiate_command_routerstatus_rend(const routerstatus_t *status,
                                                   uint8_t dir_purpose,
                                                   uint8_t router_purpose,

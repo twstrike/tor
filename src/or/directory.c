@@ -666,15 +666,15 @@ directory_initiate_command_routerstatus_rend(const routerstatus_t *status,
  * When fetching a rendezvous descriptor, <b>resource</b> is the service ID we
  * want to fetch.
  */
-void
-directory_initiate_command_routerstatus(const routerstatus_t *status,
-                                        uint8_t dir_purpose,
-                                        uint8_t router_purpose,
-                                        dir_indirection_t indirection,
-                                        const char *resource,
-                                        const char *payload,
-                                        size_t payload_len,
-                                        time_t if_modified_since)
+MOCK_IMPL(void, directory_initiate_command_routerstatus,
+                (const routerstatus_t *status,
+                 uint8_t dir_purpose,
+                 uint8_t router_purpose,
+                 dir_indirection_t indirection,
+                 const char *resource,
+                 const char *payload,
+                 size_t payload_len,
+                 time_t if_modified_since))
 {
   directory_initiate_command_routerstatus_rend(status, dir_purpose,
                                           router_purpose,
