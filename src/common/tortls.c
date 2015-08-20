@@ -405,7 +405,7 @@ tor_tls_err_to_string(int err)
  * If an error has occurred, log it at level <b>severity</b> and describe the
  * current action as <b>doing</b>.
  */
-static int
+STATIC int
 tor_tls_get_error(tor_tls_t *tls, int r, int extra,
                   const char *doing, int severity, int domain)
 {
