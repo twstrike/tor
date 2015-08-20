@@ -63,7 +63,7 @@ rend_cache_init(void)
 }
 
 /** Return the approximate number of bytes needed to hold <b>e</b>. */
-static size_t
+STATIC size_t
 rend_cache_entry_allocation(const rend_cache_entry_t *e)
 {
   if (!e)
@@ -114,7 +114,7 @@ rend_cache_increment_allocation(size_t n)
 }
 
 /** Helper: free a rend cache failure intro object. */
-static void
+STATIC void
 rend_cache_failure_intro_entry_free(rend_cache_failure_intro_t *entry)
 {
   if (entry == NULL) {
@@ -135,7 +135,7 @@ rend_cache_failure_intro_entry_new(rend_intro_point_failure_t failure)
 }
 
 /** Helper: free a rend cache failure object. */
-static void
+STATIC void
 rend_cache_failure_entry_free(rend_cache_failure_t *entry)
 {
   if (entry == NULL) {
@@ -191,7 +191,7 @@ rend_cache_failure_remove(rend_service_descriptor_t *desc)
 }
 
 /** Helper: free storage held by a single service descriptor cache entry. */
-static void
+STATIC void
 rend_cache_entry_free(rend_cache_entry_t *e)
 {
   if (!e)
@@ -305,7 +305,7 @@ rend_cache_failure_purge(void)
  * <b>identity</b> and service ID <b>service_id</b>. If found, the intro
  * failure is set in <b>intro_entry</b> else it stays untouched. Return 1
  * iff found else 0. */
-static int
+STATIC int
 cache_failure_intro_lookup(const uint8_t *identity, const char *service_id,
                            rend_cache_failure_intro_t **intro_entry)
 {
@@ -362,7 +362,7 @@ cache_failure_intro_add(const uint8_t *identity, const char *service_id,
  * descriptor and kept into the failure cache. Then, each intro points that
  * are NOT in the descriptor but in the failure cache for the given
  * <b>service_id</b> are removed from the failure cache. */
-static void
+STATIC void
 validate_intro_point_failure(const rend_service_descriptor_t *desc,
                              const char *service_id)
 {
