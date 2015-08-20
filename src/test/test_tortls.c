@@ -2,19 +2,12 @@
 /* See LICENSE for licensing information */
 
 #include "orconfig.h"
-#include "or.h"
 
+#include "or.h"
 #include "config.h"
-#include "dirvote.h"
-#include "microdesc.h"
-#include "networkstatus.h"
-#include "routerlist.h"
-#include "routerparse.h"
-#include "torcert.h"
+#include "tortls.h"
 
 #include "test.h"
-#include "tortls.h"
-#include "tortls.c"
 
 static void
 test_tortls_errno_to_tls_error(void *data)
@@ -47,11 +40,38 @@ test_tortls_err_to_string(void *data)
   (void)1;
 }
 
+static int
+mock_tls_cert_matches_key(const tor_tls_t *tls, const tor_x509_cert_t *cert)
+{
+  (void) tls;
+  (void) cert; // XXXX look at this.
+  return 1;
+}
+
+static void
+test_tortls_tor_tls_new(void *data)
+{
+    MOCK(tor_tls_cert_matches_key, mock_tls_cert_matches_key);
+    crypto_pk_t *key1 = NULL, *key2 = NULL;
+    key1 = pk_generate(2);
+    key2 = pk_generate(3);
+
+    tor_tls_t *tls;
+    tt_int_op(tor_tls_context_init(TOR_TLS_CTX_IS_PUBLIC_SERVER,
+                key1, key2, 86400), OP_EQ, 0);
+    tls = tor_tls_new(-1, 0);
+ done:
+  UNMOCK(tor_tls_cert_matches_key);
+  crypto_pk_free(key1);
+  crypto_pk_free(key2);
+}
+
 #define LOCAL_TEST_CASE(name) \
   { #name, test_tortls_##name, 0, NULL, NULL }
 
 struct testcase_t tortls_tests[] = {
-  LOCAL_TEST_CASE(err_to_string),
   LOCAL_TEST_CASE(errno_to_tls_error),
+  LOCAL_TEST_CASE(err_to_string),
+  LOCAL_TEST_CASE(tor_tls_new),
   END_OF_TESTCASES
 };

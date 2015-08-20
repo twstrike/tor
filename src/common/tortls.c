@@ -354,7 +354,7 @@ tls_log_errors(tor_tls_t *tls, int severity, int domain, const char *doing)
 
 /** Convert an errno (or a WSAerrno on windows) into a TOR_TLS_* error
  * code. */
-static int
+STATIC int
 tor_errno_to_tls_error(int e)
 {
   switch (e) {

@@ -144,3 +144,6 @@ int evaluate_ecgroup_for_tls(const char *ecgroup);
 
 #endif
 
+#ifdef TOR_UNIT_TESTS
+STATIC int tor_errno_to_tls_error(int e);
+#endif
