@@ -370,7 +370,7 @@ directory_post_to_dirservers(uint8_t dir_purpose, uint8_t router_purpose,
 
 /** Return true iff, according to the values in <b>options</b>, we should be
  * using directory guards for direct downloads of directory information. */
-static int
+STATIC int
 should_use_directory_guards(const or_options_t *options)
 {
   /* Public (non-bridge) servers never use directory guards. */

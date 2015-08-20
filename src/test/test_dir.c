@@ -28,6 +28,8 @@
 #include "test.h"
 #include "torcert.h"
 
+#define NS_MODULE dir
+
 static void
 test_dir_nicknames(void *arg)
 {
@@ -3560,6 +3562,75 @@ test_dir_conn_purpose_to_string(void *data)
   done: ;
 }
 
+#define NS_SUBMODULE should_use_directory_guards
+
+NS_DECL(int, public_server_mode, (const or_options_t *options));
+
+static int public_server_ret;
+static int
+NS(public_server_mode)(const or_options_t *options)
+{
+  (void)options;
+
+  return public_server_ret;
+}
+
+static void
+test_dir_should_use_directory_guards(void *data)
+{
+  or_options_t *options;
+  char *errmsg = NULL;
+  (void)data;
+
+  NS_MOCK(public_server_mode);
+
+  options = options_new();
+  options_init(options);
+
+  public_server_ret = 1;
+  tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+
+  public_server_ret = 0;
+  options->UseEntryGuardsAsDirGuards = 1;
+  options->UseEntryGuards = 1;
+  options->DownloadExtraInfo = 0;
+  options->FetchDirInfoEarly = 0;
+  options->FetchDirInfoExtraEarly = 0;
+  options->FetchUselessDescriptors = 0;
+  tt_int_op(should_use_directory_guards(options), OP_EQ, 1);
+
+  options->UseEntryGuards = 0;
+  tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  options->UseEntryGuards = 1;
+
+  options->UseEntryGuardsAsDirGuards = 0;
+  tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  options->UseEntryGuardsAsDirGuards = 1;
+
+  options->DownloadExtraInfo = 1;
+  tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  options->DownloadExtraInfo = 0;
+
+  options->FetchDirInfoEarly = 1;
+  tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  options->FetchDirInfoEarly = 0;
+
+  options->FetchDirInfoExtraEarly = 1;
+  tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  options->FetchDirInfoExtraEarly = 0;
+
+  options->FetchUselessDescriptors = 1;
+  tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  options->FetchUselessDescriptors = 0;
+
+  done:
+    NS_UNMOCK(public_server_mode);
+    tor_free(options);
+    tor_free(errmsg);
+}
+
+#undef NS_SUBMODULE
+
 #define DIR_LEGACY(name)                                                   \
   { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
 
@@ -3593,6 +3664,7 @@ struct testcase_t dir_tests[] = {
   DIR(packages, 0),
   DIR(authdir_type_to_string, 0),
   DIR(conn_purpose_to_string, 0),
+  DIR(should_use_directory_guards, 0),
   END_OF_TESTCASES
 };
 
