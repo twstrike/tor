@@ -144,7 +144,7 @@ int evaluate_ecgroup_for_tls(const char *ecgroup);
 
 #endif
 
-#ifdef TOR_UNIT_TESTS
+#ifdef TORTLS_PRIVATE
 STATIC int tor_errno_to_tls_error(int e);
 STATIC int tor_tls_get_error(tor_tls_t *tls, int r, int extra,
                   const char *doing, int severity, int domain);

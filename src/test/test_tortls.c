@@ -1,6 +1,7 @@
 /* Copyright (c) 2010-2015, The Tor Project, Inc. */
 /* See LICENSE for licensing information */
 
+#define TORTLS_PRIVATE
 #define LOG_PRIVATE
 #include "orconfig.h"
 
