@@ -3564,7 +3564,8 @@ test_dir_conn_purpose_to_string(void *data)
 
 #define NS_SUBMODULE should_use_directory_guards
 
-NS_DECL(int, public_server_mode, (const or_options_t *options));
+NS_DECL(int,
+public_server_mode, (const or_options_t *options));
 
 static int public_server_ret;
 static int
@@ -3633,17 +3634,18 @@ test_dir_should_use_directory_guards(void *data)
 
 #define NS_SUBMODULE directory_get_from_all_authorities
 
-NS_DECL(void, directory_initiate_command_routerstatus,
-              (const routerstatus_t *status,
-               uint8_t dir_purpose,
-               uint8_t router_purpose,
-               dir_indirection_t indirection,
-               const char *resource,
-               const char *payload,
-               size_t payload_len,
-               time_t if_modified_since));
+NS_DECL(void,
+directory_initiate_command_routerstatus, (const routerstatus_t *status,
+                                          uint8_t dir_purpose,
+                                          uint8_t router_purpose,
+                                          dir_indirection_t indirection,
+                                          const char *resource,
+                                          const char *payload,
+                                          size_t payload_len,
+                                          time_t if_modified_since));
 
-static void test_dir_should_not_init_request_to_ourselves(void *data){
+static void
+test_dir_should_not_init_request_to_ourselves(void *data){
   char digest[DIGEST_LEN];
   dir_server_t *ourself = NULL;
   crypto_pk_t *key = pk_generate(2);
@@ -3677,7 +3679,8 @@ static void test_dir_should_not_init_request_to_ourselves(void *data){
     tor_free(ourself);
 }
 
-static void test_dir_should_not_init_request_to_dir_auths_without_v3_info(void *data){
+static void
+test_dir_should_not_init_request_to_dir_auths_without_v3_info(void *data){
   dir_server_t *ds = NULL;
   dirinfo_type_t dirinfo_type = BRIDGE_DIRINFO | EXTRAINFO_DIRINFO \
                                 | MICRODESC_DIRINFO;
