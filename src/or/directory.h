@@ -133,6 +133,7 @@ STATIC char* authdir_type_to_string(dirinfo_type_t auth);
 STATIC const char * dir_conn_purpose_to_string(int purpose);
 STATIC int should_use_directory_guards(const or_options_t *options);
 STATIC zlib_compression_level_t choose_compression_level(ssize_t n_bytes);
+STATIC int directory_handle_command_get(dir_connection_t *conn, const char *headers, const char *req_body, size_t req_body_len);
 #endif
 
 #endif

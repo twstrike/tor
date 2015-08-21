@@ -2614,7 +2614,7 @@ choose_compression_level(ssize_t n_bytes)
  * service descriptor.  On finding one, write a response into
  * conn-\>outbuf.  If the request is unrecognized, send a 400.
  * Always return 0. */
-static int
+STATIC int
 directory_handle_command_get(dir_connection_t *conn, const char *headers,
                              const char *req_body, size_t req_body_len)
 {

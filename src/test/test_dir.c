@@ -30,6 +30,8 @@
 #include "test.h"
 #include "torcert.h"
 #include "relay.h"
+#include "buffers.h"
+#include "connection.h"
 
 #define NS_MODULE dir
 
@@ -3742,6 +3744,39 @@ static void test_dir_should_init_request_to_dir_auths(void *data){
     tor_free(ds);
 }
 
+static void connection_write_to_buf_mock(const char *string, size_t len,
+                                         connection_t *conn, int zlib)
+{
+  (void) zlib;
+
+  tor_assert(string);
+  tor_assert(conn);
+  write_to_buf(string, len, conn->outbuf);
+}
+
+static void test_dir_directory_handle_command_get_bad_request(void *data)
+{
+  dir_connection_t *conn;
+  char *sent_headers = NULL;
+  const char *empty_header = "";
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(NULL));
+  tt_int_op(directory_handle_command_get(conn, empty_header, NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent_headers, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1000, 0);
+
+  tt_str_op(sent_headers, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(sent_headers);
+}
+
 void
 NS(directory_initiate_command_routerstatus)(const routerstatus_t *status,
                                             uint8_t dir_purpose,
@@ -3778,7 +3813,7 @@ test_dir_choose_compression_level(void* data)
   tt_assert(HIGH_COMPRESSION == choose_compression_level(2048));
 
   done: ;
-}  
+}
 
 #define DIR_LEGACY(name)                                                   \
   { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
@@ -3818,6 +3853,7 @@ struct testcase_t dir_tests[] = {
   DIR(should_not_init_request_to_dir_auths_without_v3_info, TT_FORK),
   DIR(should_init_request_to_dir_auths, TT_FORK),
   DIR(choose_compression_level, 0),
+  DIR(directory_handle_command_get_bad_request, 0),
   END_OF_TESTCASES
 };
 
