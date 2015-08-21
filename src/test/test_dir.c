@@ -12,6 +12,8 @@
 #define ROUTERLIST_PRIVATE
 #define HIBERNATE_PRIVATE
 #define NETWORKSTATUS_PRIVATE
+#define RELAY_PRIVATE
+
 #include "or.h"
 #include "config.h"
 #include "crypto_ed25519.h"
@@ -27,6 +29,7 @@
 #include "routerset.h"
 #include "test.h"
 #include "torcert.h"
+#include "relay.h"
 
 #define NS_MODULE dir
 
@@ -3738,6 +3741,7 @@ static void test_dir_should_init_request_to_dir_auths(void *data){
     NS_UNMOCK(directory_initiate_command_routerstatus);
     tor_free(ds);
 }
+
 void
 NS(directory_initiate_command_routerstatus)(const routerstatus_t *status,
                                             uint8_t dir_purpose,
@@ -3750,6 +3754,31 @@ NS(directory_initiate_command_routerstatus)(const routerstatus_t *status,
 {
   CALLED(directory_initiate_command_routerstatus)++;
 }
+
+static void
+test_dir_choose_compression_level(void* data)
+{
+  (void)data;
+
+  /* It starts under_memory_pressure */
+  tt_int_op(have_been_under_memory_pressure(), OP_EQ, 1);
+
+  tt_assert(HIGH_COMPRESSION == choose_compression_level(-1));
+  tt_assert(LOW_COMPRESSION == choose_compression_level(1024-1));
+  tt_assert(MEDIUM_COMPRESSION == choose_compression_level(2048-1));
+  tt_assert(HIGH_COMPRESSION == choose_compression_level(2048));
+
+  /* Reset under_memory_pressure timer */
+  cell_queues_check_size();
+  tt_int_op(have_been_under_memory_pressure(), OP_EQ, 0);
+
+  tt_assert(HIGH_COMPRESSION == choose_compression_level(-1));
+  tt_assert(HIGH_COMPRESSION == choose_compression_level(1024-1));
+  tt_assert(HIGH_COMPRESSION == choose_compression_level(2048-1));
+  tt_assert(HIGH_COMPRESSION == choose_compression_level(2048));
+
+  done: ;
+}  
 
 #define DIR_LEGACY(name)                                                   \
   { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
@@ -3788,6 +3817,7 @@ struct testcase_t dir_tests[] = {
   DIR(should_not_init_request_to_ourselves, TT_FORK),
   DIR(should_not_init_request_to_dir_auths_without_v3_info, TT_FORK),
   DIR(should_init_request_to_dir_auths, TT_FORK),
+  DIR(choose_compression_level, 0),
   END_OF_TESTCASES
 };
 
