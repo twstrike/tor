@@ -3460,7 +3460,7 @@ connection_dir_finished_connecting(dir_connection_t *conn)
  * then return a list of int pointers defining download delays in seconds.
  * Helper function for download_status_increment_failure() and
  * download_status_reset(). */
-static const smartlist_t *
+STATIC const smartlist_t *
 find_dl_schedule_and_len(download_status_t *dls, int server)
 {
   switch (dls->schedule) {

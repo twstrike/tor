@@ -3815,6 +3815,39 @@ test_dir_choose_compression_level(void* data)
   done: ;
 }
 
+static void
+test_dir_find_dl_schedule_and_len(void* data)
+{
+  download_status_t dls;
+  smartlist_t server, client, server_cons, client_cons, bridge;
+  (void)data;
+
+  mock_options = malloc(sizeof(or_options_t));
+  reset_options(mock_options, &mock_get_options_calls);
+  MOCK(get_options, mock_get_options);
+
+  mock_options->TestingServerDownloadSchedule = &server;
+  mock_options->TestingClientDownloadSchedule = &client;
+  mock_options->TestingServerConsensusDownloadSchedule = &server_cons;
+  mock_options->TestingClientConsensusDownloadSchedule = &client_cons;
+  mock_options->TestingBridgeDownloadSchedule = &bridge;
+
+  dls.schedule = DL_SCHED_GENERIC;
+  tt_ptr_op(find_dl_schedule_and_len(&dls, 0), OP_EQ, &client);
+  tt_ptr_op(find_dl_schedule_and_len(&dls, 1), OP_EQ, &server);
+
+  dls.schedule = DL_SCHED_CONSENSUS;
+  tt_ptr_op(find_dl_schedule_and_len(&dls, 0), OP_EQ, &client_cons);
+  tt_ptr_op(find_dl_schedule_and_len(&dls, 1), OP_EQ, &server_cons);
+
+  dls.schedule = DL_SCHED_BRIDGE;
+  tt_ptr_op(find_dl_schedule_and_len(&dls, 0), OP_EQ, &bridge);
+  tt_ptr_op(find_dl_schedule_and_len(&dls, 1), OP_EQ, &bridge);
+
+  done:
+    UNMOCK(get_options);
+}
+
 #define DIR_LEGACY(name)                                                   \
   { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
 
@@ -3854,6 +3887,7 @@ struct testcase_t dir_tests[] = {
   DIR(should_init_request_to_dir_auths, TT_FORK),
   DIR(choose_compression_level, 0),
   DIR(directory_handle_command_get_bad_request, 0),
+  DIR(find_dl_schedule_and_len, 0),
   END_OF_TESTCASES
 };
 

@@ -134,6 +134,7 @@ STATIC const char * dir_conn_purpose_to_string(int purpose);
 STATIC int should_use_directory_guards(const or_options_t *options);
 STATIC zlib_compression_level_t choose_compression_level(ssize_t n_bytes);
 STATIC int directory_handle_command_get(dir_connection_t *conn, const char *headers, const char *req_body, size_t req_body_len);
+STATIC const smartlist_t * find_dl_schedule_and_len(download_status_t *dls, int server);
 #endif
 
 #endif
