@@ -62,6 +62,7 @@ test_tortls_tor_tls_new(void *data)
     tt_int_op(tor_tls_context_init(TOR_TLS_CTX_IS_PUBLIC_SERVER,
                 key1, key2, 86400), OP_EQ, 0);
     tls = tor_tls_new(-1, 0);
+    tt_want(tls)
  done:
   UNMOCK(tor_tls_cert_matches_key);
   crypto_pk_free(key1);
