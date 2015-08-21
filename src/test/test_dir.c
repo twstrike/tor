@@ -3754,28 +3754,28 @@ static void connection_write_to_buf_mock(const char *string, size_t len,
   write_to_buf(string, len, conn->outbuf);
 }
 
-/* static void test_dir_directory_handle_command_get_bad_request(void *data) */
-/* { */
-/*   dir_connection_t *conn; */
-/*   char *sent_headers = NULL; */
-/*   const char *empty_header = ""; */
-/*   (void) data; */
+static void test_dir_directory_handle_command_get_bad_request(void *data)
+{
+  dir_connection_t *conn;
+  char *sent_headers = NULL;
+  const char *empty_header = "";
+  (void) data;
 
-/*   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock); */
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
-/*   conn = dir_connection_new(tor_addr_family(NULL)); */
-/*   tt_int_op(directory_handle_command_get(conn, empty_header, NULL, 0), OP_EQ, 0); */
+  conn = dir_connection_new(tor_addr_family(NULL));
+  tt_int_op(directory_handle_command_get(conn, empty_header, NULL, 0), OP_EQ, 0);
 
-/*   fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent_headers, MAX_HEADERS_SIZE, */
-/*                       NULL, NULL, 1000, 0); */
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent_headers, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1000, 0);
 
-/*   tt_str_op(sent_headers, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n"); */
+  tt_str_op(sent_headers, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
 
-/*   done: */
-/*     UNMOCK(connection_write_to_buf_impl_); */
-/*     tor_free(conn); */
-/*     tor_free(sent_headers); */
-/* } */
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(sent_headers);
+}
 
 void
 NS(directory_initiate_command_routerstatus)(const routerstatus_t *status,
@@ -3886,7 +3886,8 @@ struct testcase_t dir_tests[] = {
   DIR(should_not_init_request_to_dir_auths_without_v3_info, TT_FORK),
   DIR(should_init_request_to_dir_auths, TT_FORK),
   DIR(choose_compression_level, 0),
-  /* DIR(directory_handle_command_get_bad_request, 0), */
+  DIR(directory_handle_command_get_bad_request, 0),
   DIR(find_dl_schedule_and_len, 0),
   END_OF_TESTCASES
 };
+
