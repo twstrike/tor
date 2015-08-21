@@ -3567,13 +3567,16 @@ test_dir_conn_purpose_to_string(void *data)
 NS_DECL(int,
 public_server_mode, (const or_options_t *options));
 
-static int public_server_ret;
 static int
 NS(public_server_mode)(const or_options_t *options)
 {
   (void)options;
 
-  return public_server_ret;
+  if (CALLED(public_server_mode)++ == 0) {
+    return 1;
+  }
+
+  return 0;
 }
 
 static void
@@ -3588,10 +3591,9 @@ test_dir_should_use_directory_guards(void *data)
   options = options_new();
   options_init(options);
 
-  public_server_ret = 1;
   tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  tt_int_op(CALLED(public_server_mode), OP_EQ, 1);
 
-  public_server_ret = 0;
   options->UseEntryGuardsAsDirGuards = 1;
   options->UseEntryGuards = 1;
   options->DownloadExtraInfo = 0;
@@ -3599,29 +3601,36 @@ test_dir_should_use_directory_guards(void *data)
   options->FetchDirInfoExtraEarly = 0;
   options->FetchUselessDescriptors = 0;
   tt_int_op(should_use_directory_guards(options), OP_EQ, 1);
+  tt_int_op(CALLED(public_server_mode), OP_EQ, 2);
 
   options->UseEntryGuards = 0;
   tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  tt_int_op(CALLED(public_server_mode), OP_EQ, 3);
   options->UseEntryGuards = 1;
 
   options->UseEntryGuardsAsDirGuards = 0;
   tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  tt_int_op(CALLED(public_server_mode), OP_EQ, 4);
   options->UseEntryGuardsAsDirGuards = 1;
 
   options->DownloadExtraInfo = 1;
   tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  tt_int_op(CALLED(public_server_mode), OP_EQ, 5);
   options->DownloadExtraInfo = 0;
 
   options->FetchDirInfoEarly = 1;
   tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  tt_int_op(CALLED(public_server_mode), OP_EQ, 6);
   options->FetchDirInfoEarly = 0;
 
   options->FetchDirInfoExtraEarly = 1;
   tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  tt_int_op(CALLED(public_server_mode), OP_EQ, 7);
   options->FetchDirInfoExtraEarly = 0;
 
   options->FetchUselessDescriptors = 1;
   tt_int_op(should_use_directory_guards(options), OP_EQ, 0);
+  tt_int_op(CALLED(public_server_mode), OP_EQ, 8);
   options->FetchUselessDescriptors = 0;
 
   done:
