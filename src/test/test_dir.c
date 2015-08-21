@@ -3760,24 +3760,75 @@ static void
 test_dir_directory_handle_command_get_bad_request(void *data)
 {
   dir_connection_t *conn;
-  char *sent_headers = NULL;
-  const char *empty_header = "";
+  char *sent = NULL;
   (void) data;
 
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
-  tt_int_op(directory_handle_command_get(conn, empty_header, NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, "", NULL, 0), OP_EQ, 0);
 
-  fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent_headers, MAX_HEADERS_SIZE,
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
                       NULL, NULL, 1000, 0);
 
-  tt_str_op(sent_headers, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
+  tt_str_op(sent, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
     tor_free(conn);
-    tor_free(sent_headers);
+    tor_free(sent);
+}
+
+static void
+test_dir_directory_handle_command_get_handle_v1(void *data)
+{
+  dir_connection_t *conn;
+  char *sent = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  // no frontpage configured
+  tt_ptr_op(get_dirportfrontpage(), OP_EQ, NULL);
+
+  /* V1 path */
+  tt_int_op(directory_handle_command_get(conn, "GET /tor/foo HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1000, 0);
+
+  tt_str_op(sent, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(sent);
+}
+
+static void
+test_dir_directory_handle_command_get_handle_unknown_path(void *data)
+{
+  dir_connection_t *conn;
+  char *sent = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  /* Unrecognized path */
+  tt_int_op(directory_handle_command_get(conn, "GET / HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1000, 0);
+
+  tt_str_op(sent, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(sent);
 }
 
 void
@@ -3890,6 +3941,8 @@ struct testcase_t dir_tests[] = {
   DIR(should_init_request_to_dir_auths, TT_FORK),
   DIR(choose_compression_level, 0),
   DIR(directory_handle_command_get_bad_request, 0),
+  DIR(directory_handle_command_get_handle_v1, 0),
+  DIR(directory_handle_command_get_handle_unknown_path, 0),
   DIR(find_dl_schedule_and_len, 0),
   END_OF_TESTCASES
 };
