@@ -5887,7 +5887,7 @@ config_parse_unix_port(const char *addrport, char **path_out)
  * <b>out</b> for every port that the client should listen on.  Return 0
  * on success, -1 on failure.
  */
-static int
+STATIC int
 parse_port_config(smartlist_t *out,
                   const config_line_t *ports,
                   const config_line_t *listenaddrs,
@@ -7301,4 +7301,3 @@ init_cookie_authentication(const char *fname, const char *header,
   tor_free(cookie_file_str);
   return retval;
 }
-

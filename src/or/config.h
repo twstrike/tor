@@ -154,7 +154,15 @@ MOCK_DECL(STATIC void, add_default_fallback_dir_servers, (void));
 STATIC int
 parse_dir_fallback_line(const char *line,
                         int validate_only);
+STATIC int
+parse_port_config(smartlist_t *out,
+                  const config_line_t *ports,
+                  const config_line_t *listenaddrs,
+                  const char *portname,
+                  int listener_type,
+                  const char *defaultaddr,
+                  int defaultport,
+                  const unsigned flags);
 #endif
 
 #endif
-
