@@ -3864,6 +3864,20 @@ test_config_parse_port_config__ports(void *data)
 
 
 
+static void test_config_options_act(void *arg)
+{
+    or_options_t *global_options, *old_options;
+    global_options = get_options_mutable();
+    old_options = get_options_mutable();
+    global_options->command = CMD_RUN_TOR;
+    global_options->DisableDebuggerAttachment = 0;
+    options_act(old_options);
+
+    tt_int_op(options_act(old_options),OP_EQ,0);
+  done:
+    (void)arg;
+}
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -3879,5 +3893,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(fix_my_family, 0),
   CONFIG_TEST(parse_port_config__listenaddress, 0),
   CONFIG_TEST(parse_port_config__ports, 0),
+  CONFIG_TEST(options_act, 0),
   END_OF_TESTCASES
 };
