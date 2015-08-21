@@ -3754,7 +3754,10 @@ static void connection_write_to_buf_mock(const char *string, size_t len,
   write_to_buf(string, len, conn->outbuf);
 }
 
-static void test_dir_directory_handle_command_get_bad_request(void *data)
+static tor_addr_t MOCK_TOR_ADDR;
+
+static void
+test_dir_directory_handle_command_get_bad_request(void *data)
 {
   dir_connection_t *conn;
   char *sent_headers = NULL;
@@ -3763,7 +3766,7 @@ static void test_dir_directory_handle_command_get_bad_request(void *data)
 
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
-  conn = dir_connection_new(tor_addr_family(NULL));
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   tt_int_op(directory_handle_command_get(conn, empty_header, NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent_headers, MAX_HEADERS_SIZE,
