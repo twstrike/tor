@@ -3562,8 +3562,6 @@ test_dir_conn_purpose_to_string(void *data)
   done: ;
 }
 
-#define NS_SUBMODULE should_use_directory_guards
-
 NS_DECL(int,
 public_server_mode, (const or_options_t *options));
 
@@ -3638,10 +3636,6 @@ test_dir_should_use_directory_guards(void *data)
     tor_free(options);
     tor_free(errmsg);
 }
-
-#undef NS_SUBMODULE
-
-#define NS_SUBMODULE directory_get_from_all_authorities
 
 NS_DECL(void,
 directory_initiate_command_routerstatus, (const routerstatus_t *status,
@@ -3756,8 +3750,6 @@ NS(directory_initiate_command_routerstatus)(const routerstatus_t *status,
 {
   CALLED(directory_initiate_command_routerstatus)++;
 }
-
-#undef NS_SUBMODULE
 
 #define DIR_LEGACY(name)                                                   \
   { #name, test_dir_ ## name , TT_FORK, NULL, NULL }
