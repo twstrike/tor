@@ -3924,13 +3924,19 @@ static void test_config_options_act_Bridge(void *arg)
     options = get_options_mutable();
     options_init(options);
     options->command = CMD_RUN_TOR;
-    options->Bridges = tor_malloc_zero(sizeof(config_line_t));
-    options->Bridges->key = tor_strdup("Bridges");
-    options->Bridges->value = tor_strdup("192.0.2.1:4123");
-    options->Bridges->next = NULL;
+    config_line_t *test_bridges = tor_malloc(sizeof(config_line_t));
+    memset(test_bridges, 0, sizeof(config_line_t));
+    test_bridges->key = tor_strdup("Bridges");
+    test_bridges->value = tor_strdup("192.0.2.1:4123");
+    test_bridges->next = NULL;
+    options->Bridges = test_bridges;
 
     tt_int_op(options_act(old_options),OP_EQ,0);
   done:
+    tor_free(test_bridges->key);
+    tor_free(test_bridges->value);
+    tor_free(test_bridges);
+    options->Bridges = NULL;
     (void)arg;
 }
 
@@ -3941,13 +3947,19 @@ static void test_config_options_act_Bridge_err(void *arg)
     options = get_options_mutable();
     options_init(options);
     options->command = CMD_RUN_TOR;
-    options->Bridges = tor_malloc_zero(sizeof(config_line_t));
-    options->Bridges->key = tor_strdup("NotBridges");
-    options->Bridges->value = tor_strdup("some not correct format of Bridge");
-    options->Bridges->next = NULL;
+    config_line_t *test_bridges = tor_malloc(sizeof(config_line_t));
+    memset(test_bridges, 0, sizeof(config_line_t));
+    test_bridges->key = tor_strdup("NotBridges");
+    test_bridges->value = tor_strdup("some not correct format of Bridge");
+    test_bridges->next = NULL;
+    options->Bridges = test_bridges;
 
     tt_int_op(options_act(old_options),OP_EQ,-1);
   done:
+    tor_free(test_bridges->key);
+    tor_free(test_bridges->value);
+    tor_free(test_bridges);
+    options->Bridges = NULL;
     (void)arg;
 }
 
