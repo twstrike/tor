@@ -263,6 +263,66 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id(void *dat
     tor_free(header);
 }
 
+static void
+test_dir_handle_get_rendezvous2_on_encrypted_conn_not_well_formed(void *data)
+{
+  dir_connection_t *conn;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  // connection is encrypted
+  TO_CONN(conn)->linked = 1;
+  tt_assert(connection_dir_is_encrypted(conn));
+
+  //FIXME: this cant be reached because rend_valid_descriptor_id() prevents this
+  //case to happen. This test is the same as 
+  //test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id
+  //We should refactor to remove the case from the switch.
+
+  tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/1bababababababababababababababab HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1000, 0);
+
+  tt_str_op(header, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
+static void
+test_dir_handle_get_rendezvous2_on_encrypted_conn_not_present(void *data)
+{
+  dir_connection_t *conn;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  rend_cache_init();
+
+  // connection is encrypted
+  TO_CONN(conn)->linked = 1;
+  tt_assert(connection_dir_is_encrypted(conn));
+
+  tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/3xqunszqnaolrrfmtzgaki7mxelgvkje HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1000, 0);
+
+  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+    rend_cache_free_all();
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -275,6 +335,8 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(bytes_txt, 0),
   DIR_HANDLE_CMD(rendezvous2_on_not_encrypted_conn, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_with_invalid_desc_id, 0),
+  DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_well_formed, 0),
+  DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_present, 0),
   END_OF_TESTCASES
 };
 
