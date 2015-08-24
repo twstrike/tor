@@ -2284,4 +2284,3 @@ assert_circuit_ok(const circuit_t *c)
     tor_assert(!or_circ || !or_circ->rend_splice);
   }
 }
-
