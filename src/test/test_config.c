@@ -3963,6 +3963,27 @@ static void test_config_options_act_Bridge_err(void *arg)
     (void)arg;
 }
 
+static void test_config_options_act_ClientTransportPlugin_err(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    config_line_t *test_clientTransportPlugin = tor_malloc(sizeof(config_line_t));
+    memset(test_clientTransportPlugin, 0, sizeof(config_line_t));
+    test_clientTransportPlugin->key = tor_strdup("ClientTransportPlugin");
+    test_clientTransportPlugin->value = tor_strdup("some not correct format of ClientTransportPlugin");
+    options->ClientTransportPlugin = test_clientTransportPlugin;
+
+    tt_int_op(options_act(old_options),OP_EQ,-1);
+  done:
+    tor_free(test_clientTransportPlugin->key);
+    tor_free(test_clientTransportPlugin->value);
+    tor_free(test_clientTransportPlugin);
+    options->ClientTransportPlugin = NULL;
+    (void)arg;
+}
 
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
@@ -3984,5 +4005,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_DirAuthority_line_err, 0),
   CONFIG_TEST(options_act_Bridge, 0),
   CONFIG_TEST(options_act_Bridge_err, 0),
+  CONFIG_TEST(options_act_ClientTransportPlugin_err, 0),
   END_OF_TESTCASES
 };
