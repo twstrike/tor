@@ -3890,6 +3890,7 @@ static void test_config_options_act_Tor2webMode_err(void *arg)
     options->Tor2webMode = 1;
     tt_int_op(options_act(old_options),OP_EQ,-1);
   done:
+    options->Tor2webMode = 0;
     (void)arg;
 }
 
