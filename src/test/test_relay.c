@@ -336,6 +336,65 @@ test_relay_connection_edge_process_relay_cell(void *ignored)
   tt_int_op(circ->dirreq_id, OP_GT, id_before);
   tt_int_op(circ->dirreq_id, OP_EQ, or_circ->p_chan->dirreq_id);
 
+  // Test relay command resolved
+  rh->command = RELAY_COMMAND_RESOLVED;
+  relay_header_pack(cell->payload, rh);
+  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  edgeconn->base_.marked_for_close = 0;
+  edgeconn->base_.type = CONN_TYPE_OR;
+  edgeconn->base_.state = OR_CONN_STATE_OPEN;
+  ret = connection_edge_process_relay_cell(cell, circ, edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
+
+  // Test establish intro
+  rh->command = RELAY_COMMAND_ESTABLISH_INTRO;
+  relay_header_pack(cell->payload, rh);
+  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  // Test establish rendezvous
+  rh->command = RELAY_COMMAND_ESTABLISH_RENDEZVOUS;
+  relay_header_pack(cell->payload, rh);
+  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  // Test introduce1
+  rh->command = RELAY_COMMAND_INTRODUCE1;
+  relay_header_pack(cell->payload, rh);
+  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  // Test introduce2
+  rh->command = RELAY_COMMAND_INTRODUCE2;
+  relay_header_pack(cell->payload, rh);
+  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  // Test rendezvous 1
+  rh->command = RELAY_COMMAND_RENDEZVOUS1;
+  relay_header_pack(cell->payload, rh);
+  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  // Test rendezvous 2
+  rh->command = RELAY_COMMAND_RENDEZVOUS2;
+  relay_header_pack(cell->payload, rh);
+  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  // Test intro established
+  rh->command = RELAY_COMMAND_INTRO_ESTABLISHED;
+  relay_header_pack(cell->payload, rh);
+  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  // Test rendezvous established
+  rh->command = RELAY_COMMAND_RENDEZVOUS_ESTABLISHED;
+  relay_header_pack(cell->payload, rh);
+  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
 
   // Test unknown command
   rh->command = 99;
