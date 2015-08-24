@@ -3881,6 +3881,9 @@ static void test_config_options_act(void *arg)
 
 static void test_config_options_act_Tor2webMode_err(void *arg)
 {
+    mark_logs_temp();
+    close_temp_logs();
+
     or_options_t *options, *old_options;
     old_options = options_new();
     options = get_options_mutable();
