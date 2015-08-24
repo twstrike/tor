@@ -337,7 +337,11 @@ test_relay_connection_edge_process_relay_cell(void *ignored)
   tt_int_op(circ->dirreq_id, OP_EQ, or_circ->p_chan->dirreq_id);
 
 
-
+  // Test unknown command
+  rh->command = 99;
+  relay_header_pack(cell->payload, rh);
+  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
 
  done:
   tor_free(rh);
