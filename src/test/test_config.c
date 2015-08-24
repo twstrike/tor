@@ -3917,6 +3917,41 @@ static void test_config_options_act_DirAuthority_line_err(void *arg)
     (void)arg;
 }
 
+static void test_config_options_act_Bridge(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    options->Bridges = tor_malloc_zero(sizeof(config_line_t));
+    options->Bridges->key = tor_strdup("Bridges");
+    options->Bridges->value = tor_strdup("192.0.2.1:4123");
+    options->Bridges->next = NULL;
+
+    tt_int_op(options_act(old_options),OP_EQ,0);
+  done:
+    (void)arg;
+}
+
+static void test_config_options_act_Bridge_err(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    options->Bridges = tor_malloc_zero(sizeof(config_line_t));
+    options->Bridges->key = tor_strdup("NotBridges");
+    options->Bridges->value = tor_strdup("some not correct format of Bridge");
+    options->Bridges->next = NULL;
+
+    tt_int_op(options_act(old_options),OP_EQ,-1);
+  done:
+    (void)arg;
+}
+
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -3935,5 +3970,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act, 0),
   CONFIG_TEST(options_act_Tor2webMode_err, 0),
   CONFIG_TEST(options_act_DirAuthority_line_err, 0),
+  CONFIG_TEST(options_act_Bridge, 0),
+  CONFIG_TEST(options_act_Bridge_err, 0),
   END_OF_TESTCASES
 };
