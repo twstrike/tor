@@ -7,6 +7,7 @@
 
 #define CONFIG_PRIVATE
 #define PT_PRIVATE
+#define ROUTER_PRIVATE
 #include "or.h"
 #include "addressmap.h"
 #include "config.h"
@@ -18,6 +19,7 @@
 #include "entrynodes.h"
 #include "transports.h"
 #include "routerlist.h"
+#include "router.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -3989,6 +3991,41 @@ static void test_config_options_act_ClientTransportPlugin_err(void *arg)
     (void)arg;
 }
 
+#define NS_MODULE status
+NS_DECL(int, server_mode, (const or_options_t *options));
+
+static int
+NS(server_mode)(const or_options_t *options)
+{
+  (void)options;
+
+  return 1;
+}
+
+static void test_config_options_act_ServerTransportPlugin_err(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    config_line_t *test_serverTransportPlugin = tor_malloc(sizeof(config_line_t));
+    memset(test_serverTransportPlugin, 0, sizeof(config_line_t));
+    test_serverTransportPlugin->key = tor_strdup("ServerTransportPlugin");
+    test_serverTransportPlugin->value = tor_strdup("some not correct format of ServerTransportPlugin");
+    options->ServerTransportPlugin = test_serverTransportPlugin;
+    NS_MOCK(server_mode);
+
+    tt_int_op(options_act(old_options),OP_EQ,-1);
+  done:
+    tor_free(test_serverTransportPlugin->key);
+    tor_free(test_serverTransportPlugin->value);
+    tor_free(test_serverTransportPlugin);
+    options->ServerTransportPlugin = NULL;
+    NS_UNMOCK(server_mode);
+    (void)arg;
+}
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4010,5 +4047,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_Bridge, 0),
   CONFIG_TEST(options_act_Bridge_err, 0),
   CONFIG_TEST(options_act_ClientTransportPlugin_err, 0),
+  CONFIG_TEST(options_act_ServerTransportPlugin_err, 0),
   END_OF_TESTCASES
 };
