@@ -3866,15 +3866,54 @@ test_config_parse_port_config__ports(void *data)
 
 static void test_config_options_act(void *arg)
 {
-    or_options_t *global_options, *old_options;
-    global_options = get_options_mutable();
-    old_options = get_options_mutable();
-    global_options->command = CMD_RUN_TOR;
-    global_options->DisableDebuggerAttachment = 0;
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    options->DisableDebuggerAttachment = 0;
     options_act(old_options);
 
     tt_int_op(options_act(old_options),OP_EQ,0);
   done:
+    (void)arg;
+}
+
+static void test_config_options_act_Tor2webMode_err(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    //Options should not have Tor2webMode without compiled as ENABLE_TOR2WEB_MODE
+    options->Tor2webMode = 1;
+    tt_int_op(options_act(old_options),OP_EQ,-1);
+  done:
+    (void)arg;
+}
+
+static void test_config_options_act_DirAuthority_line_err(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    config_line_t *test_dir_authority = tor_malloc(sizeof(config_line_t));
+    memset(test_dir_authority, 0, sizeof(config_line_t));
+    test_dir_authority->key = tor_strdup("DirAuthority");
+    test_dir_authority->value = tor_strdup("D0");
+    options->DirAuthorities = test_dir_authority;
+    options->DisableDebuggerAttachment = 0;
+
+    tt_int_op(options_act(old_options),OP_EQ,-1);
+  done:
+    tor_free(test_dir_authority->key);
+    tor_free(test_dir_authority->value);
+    tor_free(test_dir_authority);
+
+    options->DirAuthorities = NULL;
     (void)arg;
 }
 
@@ -3894,5 +3933,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(parse_port_config__listenaddress, 0),
   CONFIG_TEST(parse_port_config__ports, 0),
   CONFIG_TEST(options_act, 0),
+  CONFIG_TEST(options_act_Tor2webMode_err, 0),
+  CONFIG_TEST(options_act_DirAuthority_line_err, 0),
   END_OF_TESTCASES
 };
