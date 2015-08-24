@@ -24,7 +24,7 @@ static void connection_write_to_buf_mock(const char *string, size_t len,
 static tor_addr_t MOCK_TOR_ADDR;
 
 static void
-test_dir_directory_handle_command_get_bad_request(void *data)
+test_dir_handle_get_bad_request(void *data)
 {
   dir_connection_t *conn;
   char *sent = NULL;
@@ -47,7 +47,7 @@ test_dir_directory_handle_command_get_bad_request(void *data)
 }
 
 static void
-test_dir_handle_v1_get_command_without_disclaimer(void *data)
+test_dir_handle_get_v1_command_without_disclaimer(void *data)
 {
   dir_connection_t *conn;
   char *header = NULL;
@@ -80,7 +80,7 @@ mock_get_dirportfrontpage(void){
 }
 
 static void
-test_dir_handle_v1_get_command_returns_disclaimer(void *data)
+test_dir_handle_get_v1_command_returns_disclaimer(void *data)
 {
   dir_connection_t *conn;
   char *header = NULL;
@@ -114,7 +114,7 @@ test_dir_handle_v1_get_command_returns_disclaimer(void *data)
 }
 
 static void
-test_dir_directory_handle_command_get_handle_unknown_path(void *data)
+test_dir_handle_get_unknown_path(void *data)
 {
   dir_connection_t *conn;
   char *sent = NULL;
@@ -125,7 +125,7 @@ test_dir_directory_handle_command_get_handle_unknown_path(void *data)
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
   /* Unrecognized path */
-  tt_int_op(directory_handle_command_get(conn, "GET / HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, "GET /anything HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
                       NULL, NULL, 1000, 0);
 
@@ -137,14 +137,86 @@ test_dir_directory_handle_command_get_handle_unknown_path(void *data)
     tor_free(sent);
 }
 
-#define DIR(name,flags)                              \
-  { #name, test_dir_##name, (flags), NULL, NULL }
+static void
+test_dir_handle_get_robots_txt(void *data)
+{
+  dir_connection_t *conn;
+  char *header = NULL;
+  char *body = NULL;
+  size_t body_used = 0;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  /* Unrecognized path */
+  tt_int_op(directory_handle_command_get(conn, "GET /tor/robots.txt HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, 1000, 0);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Content-Length: 28\r\n"));
+
+  tt_int_op(body_used, OP_EQ, 28);
+  tt_str_op(body, OP_EQ, "User-agent: *\r\nDisallow: /\r\n");
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+    tor_free(body);
+}
+
+static void
+test_dir_handle_get_bytes_txt(void *data)
+{
+  dir_connection_t *conn;
+  char *header = NULL;
+  char *body = NULL;
+  size_t body_used = 0;
+  char buff[30];
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  /* Unrecognized path */
+  tt_int_op(directory_handle_command_get(conn, "GET /tor/bytes.txt HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, 1000, 0);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Pragma: no-cache\r\n"));
+  
+  sprintf(buff, "Content-Length: %ld\r\n", body_used);
+  tt_assert(strstr(header, buff));
+
+  tt_str_op(body, OP_EQ, directory_dump_request_log());
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+    tor_free(body);
+}
+
+
+#define DIR_HANDLE_CMD(name,flags)                              \
+  { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
 struct testcase_t dir_handle_get_tests[] = {
-  DIR(directory_handle_command_get_bad_request, 0),
-  DIR(handle_v1_get_command_without_disclaimer, 0),
-  DIR(handle_v1_get_command_returns_disclaimer, 0),
-  DIR(directory_handle_command_get_handle_unknown_path, 0),
+  DIR_HANDLE_CMD(bad_request, 0),
+  DIR_HANDLE_CMD(v1_command_without_disclaimer, 0),
+  DIR_HANDLE_CMD(v1_command_returns_disclaimer, 0),
+  DIR_HANDLE_CMD(unknown_path, 0),
+  DIR_HANDLE_CMD(robots_txt, 0),
+  DIR_HANDLE_CMD(bytes_txt, 0),
   END_OF_TESTCASES
 };
 
