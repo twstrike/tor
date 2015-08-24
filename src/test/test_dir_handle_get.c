@@ -3,11 +3,18 @@
  * Copyright (c) 2007-2015, The Tor Project, Inc. */
 /* See LICENSE for licensing information */
 
+#define RENDCOMMON_PRIVATE
+
 #include "or.h"
 #include "config.h"
 #include "directory.h"
 #include "test.h"
 #include "connection.h"
+#include "rendcommon.h"
+#include "rendcache.h"
+#include "router.h"
+#include "routerlist.h"
+#include "rend_test_helpers.h"
 
 #define NS_MODULE dir_handle_get
 
@@ -150,7 +157,6 @@ test_dir_handle_get_robots_txt(void *data)
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  /* Unrecognized path */
   tt_int_op(directory_handle_command_get(conn, "GET /tor/robots.txt HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       &body, &body_used, 1000, 0);
@@ -184,7 +190,6 @@ test_dir_handle_get_bytes_txt(void *data)
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  /* Unrecognized path */
   tt_int_op(directory_handle_command_get(conn, "GET /tor/bytes.txt HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       &body, &body_used, 1000, 0);
@@ -206,6 +211,57 @@ test_dir_handle_get_bytes_txt(void *data)
     tor_free(body);
 }
 
+static void
+test_dir_handle_get_rendezvous2_on_not_encrypted_conn(void *data)
+{
+  dir_connection_t *conn;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  // connection is not encrypted
+  tt_assert(!connection_dir_is_encrypted(conn))
+
+  tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1000, 0);
+
+  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
+static void
+test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id(void *data)
+{
+  dir_connection_t *conn;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  // connection is encrypted
+  TO_CONN(conn)->linked = 1;
+  tt_assert(connection_dir_is_encrypted(conn));
+
+  tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/invalid-desc-id HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1000, 0);
+
+  tt_str_op(header, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
 
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
@@ -217,6 +273,8 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(unknown_path, 0),
   DIR_HANDLE_CMD(robots_txt, 0),
   DIR_HANDLE_CMD(bytes_txt, 0),
+  DIR_HANDLE_CMD(rendezvous2_on_not_encrypted_conn, 0),
+  DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_with_invalid_desc_id, 0),
   END_OF_TESTCASES
 };
 

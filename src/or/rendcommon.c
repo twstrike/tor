@@ -76,7 +76,7 @@ rend_get_descriptor_id_bytes(char *descriptor_id_out,
  * <b>REND_DESC_COOKIE_LEN</b> which may also be <b>NULL</b> if no
  * descriptor_cookie shall be used, and <b>replica</b>, and write it to
  * <b>secret_id_part</b> of length DIGEST_LEN. */
-static void
+STATIC void
 get_secret_id_part_bytes(char *secret_id_part, uint32_t time_period,
                          const char *descriptor_cookie, uint8_t replica)
 {
@@ -95,7 +95,7 @@ get_secret_id_part_bytes(char *secret_id_part, uint32_t time_period,
 /** Return the time period for time <b>now</b> plus a potentially
  * intended <b>deviation</b> of one or more periods, based on the first byte
  * of <b>service_id</b>. */
-static uint32_t
+STATIC uint32_t
 get_time_period(time_t now, uint8_t deviation, const char *service_id)
 {
   /* The time period is the number of REND_TIME_PERIOD_V2_DESC_VALIDITY

@@ -67,5 +67,15 @@ rend_data_t *rend_data_service_create(const char *onion_address,
                                       const char *pk_digest,
                                       const uint8_t *cookie,
                                       rend_auth_type_t auth_type);
+
+#ifdef RENDCOMMON_PRIVATE
+STATIC void
+get_secret_id_part_bytes(char *secret_id_part, uint32_t time_period,
+                         const char *descriptor_cookie, uint8_t replica);
+
+STATIC uint32_t
+get_time_period(time_t now, uint8_t deviation, const char *service_id);
+#endif
+
 #endif
 
