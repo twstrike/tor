@@ -323,6 +323,13 @@ test_relay_connection_edge_process_relay_cell(void *ignored)
   tt_int_op(ret, OP_EQ, 0);
 
   circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
+  edgeconn->base_.marked_for_close = 0;
+  edgeconn->base_.type = CONN_TYPE_OR;
+  edgeconn->base_.state = OR_CONN_STATE_OPEN;
+  ret = connection_edge_process_relay_cell(cell, circ, edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
   int id_before = circ->dirreq_id;
   ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
