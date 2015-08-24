@@ -3780,10 +3780,10 @@ test_dir_directory_handle_command_get_bad_request(void *data)
 }
 
 static void
-test_dir_directory_handle_command_get_handle_v1(void *data)
+test_dir_handle_v1_get_command_without_disclaimer(void *data)
 {
   dir_connection_t *conn;
-  char *sent = NULL;
+  char *header = NULL;
   (void) data;
 
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
@@ -3794,17 +3794,56 @@ test_dir_directory_handle_command_get_handle_v1(void *data)
   tt_ptr_op(get_dirportfrontpage(), OP_EQ, NULL);
 
   /* V1 path */
-  tt_int_op(directory_handle_command_get(conn, "GET /tor/foo HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, "GET /tor/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
 
-  fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1000, 0);
 
-  tt_str_op(sent, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
     tor_free(conn);
-    tor_free(sent);
+    tor_free(header);
+}
+
+static const char*
+mock_get_dirportfrontpage(void){
+  return "HELLO FROM FRONTPAGE";
+}
+
+static void
+test_dir_handle_v1_get_command_returns_disclaimer(void *data)
+{
+  dir_connection_t *conn;
+  char *header = NULL;
+  char *body = NULL;
+  size_t body_used = 0;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+  MOCK(get_dirportfrontpage, mock_get_dirportfrontpage);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(directory_handle_command_get(conn, "GET /tor/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, 1000, 0);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/html\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Content-Length: 20\r\n"));
+
+  tt_int_op(body_used, OP_EQ, 20);
+  tt_str_op(body, OP_EQ, "HELLO FROM FRONTPAGE");
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    UNMOCK(get_dirportfrontpage);
+    tor_free(conn);
+    tor_free(header);
+    tor_free(body);
 }
 
 static void
@@ -3941,7 +3980,8 @@ struct testcase_t dir_tests[] = {
   DIR(should_init_request_to_dir_auths, TT_FORK),
   DIR(choose_compression_level, 0),
   DIR(directory_handle_command_get_bad_request, 0),
-  DIR(directory_handle_command_get_handle_v1, 0),
+  DIR(handle_v1_get_command_without_disclaimer, 0),
+  DIR(handle_v1_get_command_returns_disclaimer, 0),
   DIR(directory_handle_command_get_handle_unknown_path, 0),
   DIR(find_dl_schedule_and_len, 0),
   END_OF_TESTCASES
