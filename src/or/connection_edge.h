@@ -17,7 +17,7 @@
 #define connection_mark_unattached_ap(conn, endreason) \
   connection_mark_unattached_ap_((conn), (endreason), __LINE__, SHORT_FILE__)
 
-MOCK_DECL(void,connection_mark_unattached_ap_,
+MOCK_DECL(void, connection_mark_unattached_ap_,
           (entry_connection_t *conn, int endreason,
            int line, const char *file));
 int connection_edge_reached_eof(edge_connection_t *conn);
@@ -45,7 +45,7 @@ entry_connection_t  *connection_ap_make_link(connection_t *partner,
 void connection_ap_handshake_socks_reply(entry_connection_t *conn, char *reply,
                                          size_t replylen,
                                          int endreason);
-MOCK_DECL(void,connection_ap_handshake_socks_resolved,
+MOCK_DECL(void, connection_ap_handshake_socks_resolved,
           (entry_connection_t *conn,
            int answer_type,
            size_t answer_len,
