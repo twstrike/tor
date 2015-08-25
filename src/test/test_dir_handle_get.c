@@ -34,7 +34,7 @@ static tor_addr_t MOCK_TOR_ADDR;
 static void
 test_dir_handle_get_bad_request(void *data)
 {
-  dir_connection_t *conn;
+  dir_connection_t *conn = NULL;
   char *sent = NULL;
   (void) data;
 
@@ -44,7 +44,7 @@ test_dir_handle_get_bad_request(void *data)
   tt_int_op(directory_handle_command_get(conn, "", NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
-                      NULL, NULL, 1000, 0);
+                      NULL, NULL, 1, 0);
 
   tt_str_op(sent, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
 
@@ -57,7 +57,7 @@ test_dir_handle_get_bad_request(void *data)
 static void
 test_dir_handle_get_v1_command_without_disclaimer(void *data)
 {
-  dir_connection_t *conn;
+  dir_connection_t *conn = NULL;
   char *header = NULL;
   (void) data;
 
@@ -72,7 +72,7 @@ test_dir_handle_get_v1_command_without_disclaimer(void *data)
   tt_int_op(directory_handle_command_get(conn, "GET /tor/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      NULL, NULL, 1000, 0);
+                      NULL, NULL, 1, 0);
 
   tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
 
@@ -90,27 +90,34 @@ mock_get_dirportfrontpage(void){
 static void
 test_dir_handle_get_v1_command_returns_disclaimer(void *data)
 {
-  dir_connection_t *conn;
+  dir_connection_t *conn = NULL;
   char *header = NULL;
   char *body = NULL;
-  size_t body_used = 0;
+  size_t body_used = 0, body_len = 0;
+  const char *exp_body = NULL;
   (void) data;
 
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
   MOCK(get_dirportfrontpage, mock_get_dirportfrontpage);
 
+  exp_body = get_dirportfrontpage();
+  body_len = strlen(exp_body);
+
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   tt_int_op(directory_handle_command_get(conn, "GET /tor/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      &body, &body_used, 1000, 0);
+                      &body, &body_used, body_len+1, 0);
+
+  tt_assert(header);
+  tt_assert(body);
 
   tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
   tt_assert(strstr(header, "Content-Type: text/html\r\n"));
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
   tt_assert(strstr(header, "Content-Length: 20\r\n"));
 
-  tt_int_op(body_used, OP_EQ, 20);
+  tt_int_op(body_used, OP_EQ, body_len);
   tt_str_op(body, OP_EQ, "HELLO FROM FRONTPAGE");
 
   done:
@@ -124,7 +131,7 @@ test_dir_handle_get_v1_command_returns_disclaimer(void *data)
 static void
 test_dir_handle_get_unknown_path(void *data)
 {
-  dir_connection_t *conn;
+  dir_connection_t *conn = NULL;
   char *sent = NULL;
   (void) data;
 
@@ -135,7 +142,7 @@ test_dir_handle_get_unknown_path(void *data)
   /* Unrecognized path */
   tt_int_op(directory_handle_command_get(conn, "GET /anything HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
-                      NULL, NULL, 1000, 0);
+                      NULL, NULL, 1, 0);
 
   tt_str_op(sent, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
 
@@ -148,7 +155,7 @@ test_dir_handle_get_unknown_path(void *data)
 static void
 test_dir_handle_get_robots_txt(void *data)
 {
-  dir_connection_t *conn;
+  dir_connection_t *conn = NULL;
   char *header = NULL;
   char *body = NULL;
   size_t body_used = 0;
@@ -160,7 +167,10 @@ test_dir_handle_get_robots_txt(void *data)
 
   tt_int_op(directory_handle_command_get(conn, "GET /tor/robots.txt HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      &body, &body_used, 1000, 0);
+                      &body, &body_used, 29, 0);
+
+  tt_assert(header);
+  tt_assert(body);
 
   tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
   tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
@@ -180,12 +190,16 @@ test_dir_handle_get_robots_txt(void *data)
 static void
 test_dir_handle_get_bytes_txt(void *data)
 {
-  dir_connection_t *conn;
+  dir_connection_t *conn = NULL;
   char *header = NULL;
   char *body = NULL;
-  size_t body_used = 0;
+  size_t body_used = 0, body_len = 0;
   char buff[30];
+  char *exp_body = NULL;
   (void) data;
+
+  exp_body = directory_dump_request_log();
+  body_len = strlen(exp_body);
 
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
@@ -193,17 +207,21 @@ test_dir_handle_get_bytes_txt(void *data)
 
   tt_int_op(directory_handle_command_get(conn, "GET /tor/bytes.txt HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      &body, &body_used, 1000, 0);
+                      &body, &body_used, body_len+1, 0);
+
+  tt_assert(header);
+  tt_assert(body);
 
   tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
   tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
   tt_assert(strstr(header, "Pragma: no-cache\r\n"));
   
-  sprintf(buff, "Content-Length: %ld\r\n", body_used);
+  sprintf(buff, "Content-Length: %ld\r\n", body_len);
   tt_assert(strstr(header, buff));
 
-  tt_str_op(body, OP_EQ, directory_dump_request_log());
+  tt_int_op(body_used, OP_EQ, body_len);
+  tt_str_op(body, OP_EQ, exp_body);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -215,7 +233,7 @@ test_dir_handle_get_bytes_txt(void *data)
 static void
 test_dir_handle_get_rendezvous2_on_not_encrypted_conn(void *data)
 {
-  dir_connection_t *conn;
+  dir_connection_t *conn = NULL;
   char *header = NULL;
   (void) data;
 
@@ -228,7 +246,7 @@ test_dir_handle_get_rendezvous2_on_not_encrypted_conn(void *data)
 
   tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      NULL, NULL, 1000, 0);
+                      NULL, NULL, 1, 0);
 
   tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
 
@@ -241,7 +259,7 @@ test_dir_handle_get_rendezvous2_on_not_encrypted_conn(void *data)
 static void
 test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id(void *data)
 {
-  dir_connection_t *conn;
+  dir_connection_t *conn = NULL;
   char *header = NULL;
   (void) data;
 
@@ -254,7 +272,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id(void *dat
 
   tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/invalid-desc-id HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      NULL, NULL, 1000, 0);
+                      NULL, NULL, 1, 0);
 
   tt_str_op(header, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
 
@@ -267,7 +285,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id(void *dat
 static void
 test_dir_handle_get_rendezvous2_on_encrypted_conn_not_well_formed(void *data)
 {
-  dir_connection_t *conn;
+  dir_connection_t *conn = NULL;
   char *header = NULL;
   (void) data;
 
@@ -285,7 +303,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_well_formed(void *data)
 
   tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/1bababababababababababababababab HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      NULL, NULL, 1000, 0);
+                      NULL, NULL, 1, 0);
 
   tt_str_op(header, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
 
@@ -298,7 +316,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_well_formed(void *data)
 static void
 test_dir_handle_get_rendezvous2_on_encrypted_conn_not_present(void *data)
 {
-  dir_connection_t *conn;
+  dir_connection_t *conn = NULL;
   char *header = NULL;
   (void) data;
 
@@ -313,7 +331,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_present(void *data)
 
   tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/3xqunszqnaolrrfmtzgaki7mxelgvkje HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      NULL, NULL, 1000, 0);
+                      NULL, NULL, 1, 0);
 
   tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
 
