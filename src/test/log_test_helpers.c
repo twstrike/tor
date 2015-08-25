@@ -5,10 +5,10 @@
 static mock_saved_log_entry_t *saved_logs = NULL;
 
 int
-setup_capture_of_logs(void)
+setup_capture_of_logs(int new_level)
 {
   int previous_log = log_global_min_severity_;
-  log_global_min_severity_ = LOG_INFO;
+  log_global_min_severity_ = new_level;
   MOCK(logv, mock_saving_logv);
   return previous_log;
 }

@@ -620,7 +620,7 @@ test_relay_connection_edge_process_relay_cell__extended2(void *ignored)
   init_connection_lists();
   relay_connection_test_data_t *tdata = init_relay_connection_test_data();
 
-  int previous_log = setup_capture_of_logs();
+  int previous_log = setup_capture_of_logs(LOG_INFO);
 
   tdata->rh->command = RELAY_COMMAND_EXTENDED2;
   relay_header_pack(tdata->cell->payload, tdata->rh);
@@ -668,7 +668,7 @@ test_relay_connection_edge_process_relay_cell__sendme(void *ignored)
   init_connection_lists();
   relay_connection_test_data_t *tdata = init_relay_connection_test_data();
 
-  int previous_log = setup_capture_of_logs();
+  int previous_log = setup_capture_of_logs(LOG_INFO);
 
   tdata->rh->command = RELAY_COMMAND_SENDME;
   relay_header_pack(tdata->cell->payload, tdata->rh);
@@ -676,6 +676,33 @@ test_relay_connection_edge_process_relay_cell__sendme(void *ignored)
   tt_int_op(ret, OP_EQ, 0);
   tt_assert(mock_saved_logs());
   tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "sendme cell dropped, unknown stream (streamid 2).\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__truncate(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  int previous_log = setup_capture_of_logs(LOG_DEBUG);
+
+  tdata->rh->command = RELAY_COMMAND_TRUNCATE;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "'truncate' unsupported at origin. Dropping.\n");
+
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Processed 'truncate', replying.\n");
 
  done:
   teardown_capture_of_logs(previous_log);
@@ -797,6 +824,7 @@ struct testcase_t relay_tests[] = {
   RELAY_TEST(connection_edge_process_relay_cell__extended, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__extended2, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__sendme, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__truncate, TT_FORK),
   RELAY_COMMAND_TEST(establish_intro, TT_FORK, RELAY_COMMAND_ESTABLISH_INTRO),
   RELAY_COMMAND_TEST(establish_rendezvous, TT_FORK, RELAY_COMMAND_ESTABLISH_RENDEZVOUS),
   RELAY_COMMAND_TEST(introduce1, TT_FORK, RELAY_COMMAND_INTRODUCE1),
