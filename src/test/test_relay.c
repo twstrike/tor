@@ -479,6 +479,17 @@ test_relay_connection_edge_process_relay_cell__begin_dir(void *ignored)
 }
 
 
+/* case RELAY_COMMAND_CONNECTED: */
+/*     1695         [ #  # ]:          0 :       if (conn) { */
+/*     1696         [ #  # ]:          0 :         log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL, */
+/*     1697                 :            :                "'connected' unsupported while open. Closing circ."); */
+/*     1698                 :          0 :         return -END_CIRC_REASON_TORPROTOCOL; */
+/*     1699                 :            :       } */
+/*     1700                 :          0 :       log_info(domain, */
+/*     1701                 :            :                "'connected' received on circid %u for streamid %d, " */
+/*     1702                 :            :                "no conn attached anymore. Ignoring.", */
+/*     1703                 :            :                (unsigned)circ->n_circ_id, rh.stream_id); */
+/*     1704                 :          0 :       return 0; */
 
 static void
 test_relay_connection_edge_process_relay_cell__resolved(void *ignored)
@@ -498,6 +509,29 @@ test_relay_connection_edge_process_relay_cell__resolved(void *ignored)
   tdata->edgeconn->base_.state = OR_CONN_STATE_OPEN;
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
   tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__connected(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_CONNECTED;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_OR;
+  tdata->edgeconn->base_.state = OR_CONN_STATE_OPEN;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
+
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
 
  done:
   clean_relay_connection_test_data(tdata);
@@ -562,6 +596,7 @@ struct testcase_t relay_tests[] = {
   RELAY_TEST(connection_edge_process_relay_cell__begin, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__begin_dir, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__resolved, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__connected, TT_FORK),
   RELAY_COMMAND_TEST(establish_intro, TT_FORK, RELAY_COMMAND_ESTABLISH_INTRO),
   RELAY_COMMAND_TEST(establish_rendezvous, TT_FORK, RELAY_COMMAND_ESTABLISH_RENDEZVOUS),
   RELAY_COMMAND_TEST(introduce1, TT_FORK, RELAY_COMMAND_INTRODUCE1),
