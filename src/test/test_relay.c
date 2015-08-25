@@ -389,6 +389,12 @@ mocked_relay_send_command_from_edge_(streamid_t stream_id, circuit_t *circ,
   return 99;
 }
 
+static void mocked_circuit_mark_for_close_(circuit_t *circ, int reason, int line,
+                                           const char *file)
+{
+}
+
+
 static void
 test_relay_connection_edge_process_relay_cell__begin(void *ignored)
 {
@@ -559,6 +565,28 @@ test_relay_connection_edge_process_relay_cell__connected(void *ignored)
   clean_relay_connection_test_data(tdata);
 }
 
+static void
+test_relay_connection_edge_process_relay_cell__truncated(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_TRUNCATED;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  MOCK(circuit_mark_for_close_, mocked_circuit_mark_for_close_);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  UNMOCK(circuit_mark_for_close_);
+  clean_relay_connection_test_data(tdata);
+}
+
 
 typedef struct command_type_holder_t {
   uint8_t command;
@@ -620,6 +648,7 @@ struct testcase_t relay_tests[] = {
   RELAY_TEST(connection_edge_process_relay_cell__resolved, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__resolve, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__connected, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__truncated, TT_FORK),
   RELAY_COMMAND_TEST(establish_intro, TT_FORK, RELAY_COMMAND_ESTABLISH_INTRO),
   RELAY_COMMAND_TEST(establish_rendezvous, TT_FORK, RELAY_COMMAND_ESTABLISH_RENDEZVOUS),
   RELAY_COMMAND_TEST(introduce1, TT_FORK, RELAY_COMMAND_INTRODUCE1),
