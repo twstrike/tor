@@ -20,6 +20,7 @@
 #include "transports.h"
 #include "routerlist.h"
 #include "router.h"
+#include "util.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -4026,6 +4027,12 @@ static void test_config_options_act_ServerTransportPlugin_err(void *arg)
     (void)arg;
 }
 
+void
+mocked_finish_daemon(const char *desired_cwd)
+{
+  (void) desired_cwd;
+}
+
 static void test_config_options_act_RunAsDaemon(void *arg)
 {
     or_options_t *options, *old_options;
@@ -4033,9 +4040,11 @@ static void test_config_options_act_RunAsDaemon(void *arg)
     options = get_options_mutable();
     options_init(options);
     options->command = CMD_RUN_TOR;
+    MOCK(finish_daemon,mocked_finish_daemon);
     options->RunAsDaemon = 1;
     tt_int_op(options_act(old_options),OP_EQ,0);
   done:
+    UNMOCK(finish_daemon);
     options->RunAsDaemon = 0;
     (void)arg;
 }

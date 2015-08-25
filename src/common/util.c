@@ -3403,8 +3403,8 @@ start_daemon(void)
  * calls after the first are ignored.  Calls start_daemon first if it hasn't
  * been called already.)
  */
-void
-finish_daemon(const char *desired_cwd)
+MOCK_IMPL(void,
+finish_daemon,(const char *desired_cwd))
 {
   int nullfd;
   char c = '.';
