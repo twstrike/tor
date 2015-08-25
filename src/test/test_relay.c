@@ -587,6 +587,44 @@ test_relay_connection_edge_process_relay_cell__truncated(void *ignored)
   clean_relay_connection_test_data(tdata);
 }
 
+
+static void
+test_relay_connection_edge_process_relay_cell__extended(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_EXTENDED;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__extended2(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_EXTENDED2;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
 static void
 test_relay_connection_edge_process_relay_cell__end(void *ignored)
 {
@@ -726,6 +764,8 @@ struct testcase_t relay_tests[] = {
   RELAY_TEST(connection_edge_process_relay_cell__end, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__extend, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__extend2, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__extended, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__extended2, TT_FORK),
   RELAY_COMMAND_TEST(establish_intro, TT_FORK, RELAY_COMMAND_ESTABLISH_INTRO),
   RELAY_COMMAND_TEST(establish_rendezvous, TT_FORK, RELAY_COMMAND_ESTABLISH_RENDEZVOUS),
   RELAY_COMMAND_TEST(introduce1, TT_FORK, RELAY_COMMAND_INTRODUCE1),
