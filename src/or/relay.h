@@ -104,6 +104,7 @@ STATIC packed_cell_t *packed_cell_new(void);
 STATIC packed_cell_t *cell_queue_pop(cell_queue_t *queue);
 STATIC size_t cell_queues_get_total_allocation(void);
 STATIC int cell_queues_check_size(void);
+STATIC int relay_crypt_one_payload(crypto_cipher_t *cipher, uint8_t *in, int encrypt_mode);
 #endif
 
 #endif

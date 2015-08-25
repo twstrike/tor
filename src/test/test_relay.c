@@ -126,291 +126,418 @@ test_relay_append_cell_to_circuit_queue(void *arg)
   return;
 }
 
-static void
-test_relay_connection_edge_process_relay_cell(void *ignored)
-{
-  (void)ignored;
-
-  int ret;
+typedef struct relay_connection_test_data_t {
   cell_t *cell;
   circuit_t *circ;
   relay_header_t *rh;
   entry_connection_t *entryconn;
   edge_connection_t *edgeconn;
   crypt_path_t *layer_hint;
-  crypt_path_t *cpath1, *cpath2;
-  channel_tls_t *p_chan=NULL;
+  crypt_path_t *cpath1;
+  crypt_path_t *cpath2;
+  channel_tls_t *p_chan;
+  or_circuit_t *or_circ;
+} relay_connection_test_data_t;
 
-  init_connection_lists();
+static relay_connection_test_data_t *
+init_relay_connection_test_data()
+{
+  char iv[CIPHER_IV_LEN];
+  crypto_rand(iv, CIPHER_IV_LEN);
+  relay_connection_test_data_t *result = tor_malloc_zero(sizeof(relay_connection_test_data_t));
 
-  entryconn = entry_connection_new(CONN_TYPE_AP, AF_INET);
-  edgeconn = ENTRY_TO_EDGE_CONN(entryconn);
+  result->entryconn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  result->edgeconn = ENTRY_TO_EDGE_CONN(result->entryconn);
 
-  rh = tor_malloc_zero(sizeof(relay_header_t));
-  rh->command = RELAY_COMMAND_BEGIN;
-  rh->stream_id = 2;
-  rh->length = 100;
+  result->rh = tor_malloc_zero(sizeof(relay_header_t));
+  result->rh->command = RELAY_COMMAND_BEGIN;
+  result->rh->stream_id = 2;
+  result->rh->length = 100;
+  result->rh->recognized = 0;
 
-  cpath1 = tor_malloc(sizeof(crypt_path_t));
-  cpath2 = tor_malloc(sizeof(crypt_path_t));
+  result->cell = tor_malloc_zero(sizeof(cell_t));
+  result->cell->circ_id = 1;
+  result->cell->command = CELL_RELAY;
+  memset(result->cell->payload, 0, CELL_PAYLOAD_SIZE);
+  relay_header_pack(result->cell->payload, result->rh);
 
-  cpath1->magic = CRYPT_PATH_MAGIC;
-  cpath1->f_crypto = crypto_cipher_new(NULL);
-  cpath1->b_crypto = crypto_cipher_new(NULL);
-  cpath1->f_digest = crypto_digest_new();
-  cpath1->b_digest = crypto_digest_new();
-  cpath1->state = CPATH_STATE_OPEN;
+  crypto_digest_t *digest = crypto_digest_new();
+  char integrity[4];
 
-  cpath2->magic = CRYPT_PATH_MAGIC;
-  cpath2->f_crypto = crypto_cipher_new(NULL);
-  cpath2->b_crypto = crypto_cipher_new(NULL);
-  cpath2->f_digest = crypto_digest_new();
-  cpath2->b_digest = crypto_digest_new();
-  cpath2->state = CPATH_STATE_OPEN;
+  crypto_digest_add_bytes(digest, (char*)result->cell->payload, CELL_PAYLOAD_SIZE);
+  crypto_digest_get_digest(digest, integrity, 4);
+  memcpy(result->rh->integrity, integrity, 4);
+  relay_header_pack(result->cell->payload, result->rh);
 
-  cpath1->next = cpath2;
-  cpath2->next = cpath1;
+  result->cpath1 = tor_malloc(sizeof(crypt_path_t));
+  result->cpath2 = tor_malloc(sizeof(crypt_path_t));
 
-  cpath1->prev = cpath2;
-  cpath2->prev = cpath1;
+  result->cpath1->magic = CRYPT_PATH_MAGIC;
+  result->cpath1->f_crypto = crypto_cipher_new(NULL);
+  result->cpath1->b_crypto = crypto_cipher_new_with_iv(NULL, iv);
+  result->cpath1->f_digest = crypto_digest_new();
+  result->cpath1->b_digest = crypto_digest_new();
+  result->cpath1->state = CPATH_STATE_OPEN;
 
-  cell_t *cellx = tor_malloc(sizeof(cell_t));
-  or_circuit_t *or_circ = tor_malloc_zero(sizeof(or_circuit_t));
-  or_circ->base_.magic = OR_CIRCUIT_MAGIC;
-  or_circ->base_.purpose = CIRCUIT_PURPOSE_OR;
-  or_circ->p_crypto = crypto_cipher_new(NULL);
-  or_circ->n_crypto = crypto_cipher_new(NULL);
-  or_circ->p_digest = crypto_digest_new();
-  or_circ->n_digest = crypto_digest_new();
-  p_chan = tor_malloc_zero(sizeof(channel_tls_t));
-  p_chan->base_.global_identifier = 2;
-  or_circ->p_chan = &(p_chan->base_);
-  circ = TO_CIRCUIT(or_circ);
-  TO_ORIGIN_CIRCUIT(circ)->cpath = cpath1;
+  result->cpath2->magic = CRYPT_PATH_MAGIC;
+  result->cpath2->f_crypto = crypto_cipher_new(NULL);
+  result->cpath2->b_crypto = crypto_cipher_new(NULL);
+  result->cpath2->f_digest = crypto_digest_new();
+  result->cpath2->b_digest = crypto_digest_new();
+  result->cpath2->state = CPATH_STATE_OPEN;
+
+  result->cpath1->next = result->cpath2;
+  result->cpath2->next = result->cpath1;
+
+  result->cpath1->prev = result->cpath2;
+  result->cpath2->prev = result->cpath1;
+
+  result->or_circ = tor_malloc_zero(sizeof(or_circuit_t));
+  result->or_circ->base_.magic = OR_CIRCUIT_MAGIC;
+  result->or_circ->base_.purpose = CIRCUIT_PURPOSE_OR;
+  result->or_circ->p_crypto = crypto_cipher_new(NULL);
+  result->or_circ->n_crypto = crypto_cipher_new(NULL);
+  result->or_circ->p_digest = crypto_digest_new();
+  result->or_circ->n_digest = crypto_digest_new();
+  result->p_chan = tor_malloc_zero(sizeof(channel_tls_t));
+  result->p_chan->base_.global_identifier = 2;
+  result->or_circ->p_chan = &(result->p_chan->base_);
+  result->circ = TO_CIRCUIT(result->or_circ);
+  result->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
+  TO_ORIGIN_CIRCUIT(result->circ)->cpath = result->cpath1;
   char recognized = 0;
-  relay_crypt(circ, cellx, CELL_DIRECTION_IN, &layer_hint, &recognized);
+  crypto_cipher_t *local_b_crypt = crypto_cipher_new_with_iv(crypto_cipher_get_key(result->cpath1->b_crypto), iv);
+  relay_crypt_one_payload(local_b_crypt, result->cell->payload, 1);
+  relay_crypt(result->circ, result->cell, CELL_DIRECTION_IN, &result->layer_hint, &recognized);
+  return result;
+}
 
-  cell = tor_malloc_zero(sizeof(cell_t));
-  cell->circ_id = 1;
-  cell->command = CELL_RELAY;
-  memset(cell->payload, 0, CELL_PAYLOAD_SIZE);
-  relay_header_pack(cell->payload, rh);
+static void
+clean_relay_connection_test_data(relay_connection_test_data_t *data)
+{
+  tor_free(data->cell);
+  tor_free(data->circ);
+  tor_free(data->rh);
+  tor_free(data->entryconn);
+  tor_free(data->cpath1);
+  tor_free(data->cpath2);
+  tor_free(data->p_chan);
+  tor_free(data);
+}
 
-  // Test returns failure if the relay cell length is too long
-  rh->length = RELAY_PAYLOAD_SIZE + 1;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+static void
+test_relay_connection_edge_process_relay_cell__cell_length_too_long(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->length = RELAY_PAYLOAD_SIZE + 1;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
-  rh->length = 10;
+  tdata->rh->length = 10;
 
-  // Test if stream_id is zero and the relay command needs a stream
-  rh->stream_id = 0;
-  rh->command = RELAY_COMMAND_BEGIN;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__no_stream_id_with_relay_that_needs_stream(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->stream_id = 0;
+  tdata->rh->command = RELAY_COMMAND_BEGIN;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
-  rh->command = RELAY_COMMAND_CONNECTED;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tdata->rh->command = RELAY_COMMAND_CONNECTED;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
-  rh->command = RELAY_COMMAND_END;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tdata->rh->command = RELAY_COMMAND_END;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
-  rh->command = RELAY_COMMAND_RESOLVE;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tdata->rh->command = RELAY_COMMAND_RESOLVE;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
-  rh->command = RELAY_COMMAND_RESOLVED;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tdata->rh->command = RELAY_COMMAND_RESOLVED;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
-  rh->command = RELAY_COMMAND_BEGIN_DIR;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tdata->rh->command = RELAY_COMMAND_BEGIN_DIR;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
-  rh->command = RELAY_COMMAND_INTRODUCE_ACK;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test a closed connection
-  edgeconn->base_.type = CONN_TYPE_EXIT;
-  edgeconn->base_.state = EXIT_CONN_STATE_CONNECTING;
-  rh->command = RELAY_COMMAND_DATA;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, edgeconn, NULL);
-  tt_int_op(ret, OP_EQ, -1);
-
-  edgeconn->base_.state = EXIT_CONN_STATE_OPEN;
-  ret = connection_edge_process_relay_cell(cell, circ, edgeconn, NULL);
-  tt_int_op(ret, OP_EQ, -1);
-
-  edgeconn->base_.state = EXIT_CONN_STATE_CONNECTING;
-  rh->command = RELAY_COMMAND_INTRODUCE_ACK;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, edgeconn, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  edgeconn->base_.type = CONN_TYPE_AP;
-  rh->stream_id = 1;
-  rh->command = RELAY_COMMAND_DATA;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, edgeconn, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test an open connection
-  edgeconn->base_.marked_for_close = 0;
-  edgeconn->base_.type = CONN_TYPE_OR;
-  edgeconn->base_.state = OR_CONN_STATE_OPEN;
-  ret = connection_edge_process_relay_cell(cell, circ, edgeconn, NULL);
-  tt_int_op(ret, OP_EQ, -1);
-
-  // Test relay command drop
-  rh->command = RELAY_COMMAND_DROP;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test relay command begin
-  rh->command = RELAY_COMMAND_BEGIN;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, layer_hint);
-  tt_int_op(ret, OP_EQ, 0);
-
-  circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, layer_hint);
-  tt_int_op(ret, OP_EQ, 0);
-
-  circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
-  TO_ORIGIN_CIRCUIT(circ)->cpath->prev = layer_hint;
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, layer_hint);
-  TO_ORIGIN_CIRCUIT(circ)->cpath->prev = cpath2;
-  tt_int_op(ret, OP_EQ, 0);
-
-  circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
-  ret = connection_edge_process_relay_cell(cell, circ, edgeconn, layer_hint);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test relay command begin dir
-  rh->command = RELAY_COMMAND_BEGIN_DIR;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, layer_hint);
-  tt_int_op(ret, OP_EQ, 0);
-
-  circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, layer_hint);
-  tt_int_op(ret, OP_EQ, 0);
-
-  circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
-  TO_ORIGIN_CIRCUIT(circ)->cpath->prev = layer_hint;
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, layer_hint);
-  TO_ORIGIN_CIRCUIT(circ)->cpath->prev = cpath2;
-  tt_int_op(ret, OP_EQ, 0);
-
-  circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
-  edgeconn->base_.marked_for_close = 0;
-  edgeconn->base_.type = CONN_TYPE_OR;
-  edgeconn->base_.state = OR_CONN_STATE_OPEN;
-  ret = connection_edge_process_relay_cell(cell, circ, edgeconn, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
-  int id_before = circ->dirreq_id;
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-  tt_int_op(circ->dirreq_id, OP_GT, id_before);
-  tt_int_op(circ->dirreq_id, OP_EQ, or_circ->p_chan->dirreq_id);
-
-  // Test relay command resolved
-  rh->command = RELAY_COMMAND_RESOLVED;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  edgeconn->base_.marked_for_close = 0;
-  edgeconn->base_.type = CONN_TYPE_OR;
-  edgeconn->base_.state = OR_CONN_STATE_OPEN;
-  ret = connection_edge_process_relay_cell(cell, circ, edgeconn, NULL);
-  tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
-
-  // Test establish intro
-  rh->command = RELAY_COMMAND_ESTABLISH_INTRO;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test establish rendezvous
-  rh->command = RELAY_COMMAND_ESTABLISH_RENDEZVOUS;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test introduce1
-  rh->command = RELAY_COMMAND_INTRODUCE1;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test introduce2
-  rh->command = RELAY_COMMAND_INTRODUCE2;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test rendezvous 1
-  rh->command = RELAY_COMMAND_RENDEZVOUS1;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test rendezvous 2
-  rh->command = RELAY_COMMAND_RENDEZVOUS2;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test intro established
-  rh->command = RELAY_COMMAND_INTRO_ESTABLISHED;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test rendezvous established
-  rh->command = RELAY_COMMAND_RENDEZVOUS_ESTABLISHED;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-
-  // Test unknown command
-  rh->command = 99;
-  relay_header_pack(cell->payload, rh);
-  ret = connection_edge_process_relay_cell(cell, circ, NULL, NULL);
+  tdata->rh->command = RELAY_COMMAND_INTRODUCE_ACK;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
  done:
-  tor_free(rh);
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__closed_connection(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->edgeconn->base_.type = CONN_TYPE_EXIT;
+  tdata->edgeconn->base_.state = EXIT_CONN_STATE_CONNECTING;
+  tdata->rh->stream_id = 0;
+  tdata->rh->command = RELAY_COMMAND_DATA;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, -1);
+
+  tdata->edgeconn->base_.state = EXIT_CONN_STATE_OPEN;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, -1);
+
+  tdata->edgeconn->base_.state = EXIT_CONN_STATE_CONNECTING;
+  tdata->rh->command = RELAY_COMMAND_INTRODUCE_ACK;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->edgeconn->base_.type = CONN_TYPE_AP;
+  tdata->rh->stream_id = 1;
+  tdata->rh->command = RELAY_COMMAND_DATA;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__open_connection(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->stream_id = 1;
+  tdata->rh->command = RELAY_COMMAND_DATA;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_OR;
+  tdata->edgeconn->base_.state = OR_CONN_STATE_OPEN;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, -1);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__command_group(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_DROP;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__begin(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_BEGIN;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
+  TO_ORIGIN_CIRCUIT(tdata->circ)->cpath->prev = tdata->layer_hint;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  TO_ORIGIN_CIRCUIT(tdata->circ)->cpath->prev = tdata->cpath2;
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__begin_dir(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_BEGIN_DIR;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
+  TO_ORIGIN_CIRCUIT(tdata->circ)->cpath->prev = tdata->layer_hint;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  TO_ORIGIN_CIRCUIT(tdata->circ)->cpath->prev = tdata->cpath2;
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_OR;
+  tdata->edgeconn->base_.state = OR_CONN_STATE_OPEN;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
+  int id_before = tdata->circ->dirreq_id;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->circ->dirreq_id, OP_GT, id_before);
+  tt_int_op(tdata->circ->dirreq_id, OP_EQ, tdata->or_circ->p_chan->dirreq_id);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+
+
+static void
+test_relay_connection_edge_process_relay_cell__resolved(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_RESOLVED;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_OR;
+  tdata->edgeconn->base_.state = OR_CONN_STATE_OPEN;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+
+typedef struct command_type_holder_t {
+  uint8_t command;
+} command_type_holder_t;
+
+void *create_command_type_holder(const struct testcase_t *testcase)
+{
+  command_type_holder_t *env = tor_malloc_zero(sizeof(command_type_holder_t));
+  if (! env)
+    return NULL;
+  env->command = (intptr_t)testcase->setup_data;
+  return env;
+}
+
+int cleanup_command_type_holder(const struct testcase_t *tc, void *env_)
+{
+  command_type_holder_t *env = env_;
+  tor_free(env);
+  return 1;
+}
+
+struct testcase_setup_t env_setup = {
+  create_command_type_holder,
+  cleanup_command_type_holder
+};
+
+
+static void
+test_relay_connection_edge_process_relay_cell__command(void *command_type)
+{
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = ((command_type_holder_t *)command_type)->command;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  clean_relay_connection_test_data(tdata);
 }
 
 #define RELAY_TEST(name, flags)                     \
   { #name, test_relay_ ## name, flags, NULL, NULL }
 
+#define RELAY_COMMAND_TEST(name, flags, value)            \
+  { "connection_edge_process_relay_cell__" #name, test_relay_connection_edge_process_relay_cell__command, flags, &env_setup, (void *) value }
+
 struct testcase_t relay_tests[] = {
   RELAY_TEST(append_cell_to_circuit_queue, TT_FORK),
-  RELAY_TEST(connection_edge_process_relay_cell, 0),
+  RELAY_TEST(connection_edge_process_relay_cell__cell_length_too_long, 0),
+  RELAY_TEST(connection_edge_process_relay_cell__no_stream_id_with_relay_that_needs_stream, 0),
+  RELAY_TEST(connection_edge_process_relay_cell__closed_connection, 0),
+  RELAY_TEST(connection_edge_process_relay_cell__open_connection, 0),
+  RELAY_TEST(connection_edge_process_relay_cell__command_group, 0),
+  RELAY_TEST(connection_edge_process_relay_cell__begin, 0),
+  RELAY_TEST(connection_edge_process_relay_cell__begin_dir, 0),
+  RELAY_TEST(connection_edge_process_relay_cell__resolved, 0),
+  RELAY_COMMAND_TEST(establish_intro, 0, RELAY_COMMAND_ESTABLISH_INTRO),
+  RELAY_COMMAND_TEST(establish_rendezvous, 0, RELAY_COMMAND_ESTABLISH_RENDEZVOUS),
+  RELAY_COMMAND_TEST(introduce1, 0, RELAY_COMMAND_INTRODUCE1),
+  RELAY_COMMAND_TEST(introduce2, 0, RELAY_COMMAND_INTRODUCE2),
+  RELAY_COMMAND_TEST(rendezvous1, 0, RELAY_COMMAND_RENDEZVOUS1),
+  RELAY_COMMAND_TEST(rendezvous2, 0, RELAY_COMMAND_RENDEZVOUS2),
+  RELAY_COMMAND_TEST(intro_established, 0, RELAY_COMMAND_INTRO_ESTABLISHED),
+  RELAY_COMMAND_TEST(rendezvous_established, 0, RELAY_COMMAND_RENDEZVOUS_ESTABLISHED),
+  RELAY_COMMAND_TEST(unknown_command, 0, 99),
   END_OF_TESTCASES
 };

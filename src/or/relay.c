@@ -147,7 +147,7 @@ relay_digest_matches(crypto_digest_t *digest, cell_t *cell)
  *
  * Return -1 if the crypto fails, else return 0.
  */
-static int
+STATIC int
 relay_crypt_one_payload(crypto_cipher_t *cipher, uint8_t *in,
                         int encrypt_mode)
 {
