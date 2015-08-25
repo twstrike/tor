@@ -3,5 +3,6 @@ language: c
 install:
   - sh autogen.sh
   - ./configure --disable-asciidoc
-  - make
+
+script:
   - make test
