@@ -118,7 +118,7 @@ test_dir_handle_get_v1_command_returns_disclaimer(void *data)
   tt_assert(strstr(header, "Content-Length: 20\r\n"));
 
   tt_int_op(body_used, OP_EQ, body_len);
-  tt_str_op(body, OP_EQ, "HELLO FROM FRONTPAGE");
+  tt_str_op(body, OP_EQ, exp_body);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
