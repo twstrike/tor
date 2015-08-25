@@ -2,7 +2,6 @@ language: c
 
 install:
   - sh autogen.sh
-  - ./configure
+  - ./configure --disable-asciidoc
   - make
-  - make install
-  - make check
+  - make test
