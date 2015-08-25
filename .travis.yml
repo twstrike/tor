@@ -1,0 +1,8 @@
+language: c
+
+install:
+  - sh autogen.sh
+  - ./configure
+  - make
+  - make install
+  - make check
