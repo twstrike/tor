@@ -4092,6 +4092,20 @@ static void test_config_options_act_write_pidfile(void *arg)
     (void)arg;
 }
 
+static void test_config_options_act_BridgePassword(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    options->BridgePassword = "some password";
+    tt_int_op(options_act(old_options),OP_EQ,0);
+  done:
+    options->BridgePassword = NULL;
+    (void)arg;
+}
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4117,5 +4131,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_RunAsDaemon, 0),
   CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, 0),
   CONFIG_TEST(options_act_write_pidfile, 0),
+  CONFIG_TEST(options_act_BridgePassword, 0),
   END_OF_TESTCASES
 };
