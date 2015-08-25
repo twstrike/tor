@@ -3992,7 +3992,8 @@ static void test_config_options_act_ClientTransportPlugin_err(void *arg)
     (void)arg;
 }
 
-#define NS_MODULE status
+#define NS_MODULE server_mode
+#define NS_SUBMODULE ServerTransportPlugin_err
 NS_DECL(int, server_mode, (const or_options_t *options));
 
 static int
@@ -4026,6 +4027,8 @@ static void test_config_options_act_ServerTransportPlugin_err(void *arg)
     NS_UNMOCK(server_mode);
     (void)arg;
 }
+#undef NS_SUBMODULE
+#undef NS_MODULE
 
 void
 mocked_finish_daemon(const char *desired_cwd)
@@ -4127,6 +4130,35 @@ static void test_config_options_act_BridgeRelay(void *arg)
     (void)arg;
 }
 
+#define NS_MODULE public_server_mode
+#define NS_SUBMODULE Statistics
+NS_DECL(int, public_server_mode, (const or_options_t *options));
+
+static int
+NS(public_server_mode)(const or_options_t *options)
+{
+  (void)options;
+
+  return 0;
+}
+
+static void test_config_options_act_Statistics(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    options->CellStatistics = 1;
+    NS_MOCK(public_server_mode);
+    tt_int_op(options_act(old_options),OP_EQ,0);
+  done:
+    NS_UNMOCK(public_server_mode);
+    (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4154,5 +4186,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_write_pidfile, 0),
   CONFIG_TEST(options_act_BridgePassword, 0),
   CONFIG_TEST(options_act_BridgeRelay, 0),
+  CONFIG_TEST(options_act_Statistics, 0),
   END_OF_TESTCASES
 };
