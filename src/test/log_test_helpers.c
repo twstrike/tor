@@ -1,6 +1,25 @@
+#define LOG_PRIVATE
+#include "torlog.h"
 #include "log_test_helpers.h"
 
 static mock_saved_log_entry_t *saved_logs = NULL;
+
+int
+setup_capture_of_logs(void)
+{
+  int previous_log = log_global_min_severity_;
+  log_global_min_severity_ = LOG_INFO;
+  MOCK(logv, mock_saving_logv);
+  return previous_log;
+}
+
+void
+teardown_capture_of_logs(int prev)
+{
+  UNMOCK(logv);
+  log_global_min_severity_ = prev;
+  mock_clean_saved_logs();
+}
 
 void
 mock_clean_saved_logs(void)

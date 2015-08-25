@@ -617,12 +617,11 @@ test_relay_connection_edge_process_relay_cell__extended2(void *ignored)
 {
   (void)ignored;
   int ret;
-  int previous_log = log_global_min_severity_;
   init_connection_lists();
   relay_connection_test_data_t *tdata = init_relay_connection_test_data();
 
-  log_global_min_severity_ = LOG_INFO;
-  MOCK(logv, mock_saving_logv);
+  int previous_log = setup_capture_of_logs();
+
   tdata->rh->command = RELAY_COMMAND_EXTENDED2;
   relay_header_pack(tdata->cell->payload, tdata->rh);
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
@@ -631,9 +630,7 @@ test_relay_connection_edge_process_relay_cell__extended2(void *ignored)
   tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "'extended' unsupported at non-origin. Dropping.\n");
 
  done:
-  UNMOCK(logv);
-  log_global_min_severity_ = previous_log;
-  mock_clean_saved_logs();
+  teardown_capture_of_logs(previous_log);
   clean_relay_connection_test_data(tdata);
 }
 
@@ -660,6 +657,28 @@ test_relay_connection_edge_process_relay_cell__end(void *ignored)
   tt_int_op(ret, OP_EQ, 0);
 
  done:
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__sendme(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  int previous_log = setup_capture_of_logs();
+
+  tdata->rh->command = RELAY_COMMAND_SENDME;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "sendme cell dropped, unknown stream (streamid 2).\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
   clean_relay_connection_test_data(tdata);
 }
 
@@ -777,6 +796,7 @@ struct testcase_t relay_tests[] = {
   RELAY_TEST(connection_edge_process_relay_cell__extend2, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__extended, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__extended2, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__sendme, TT_FORK),
   RELAY_COMMAND_TEST(establish_intro, TT_FORK, RELAY_COMMAND_ESTABLISH_INTRO),
   RELAY_COMMAND_TEST(establish_rendezvous, TT_FORK, RELAY_COMMAND_ESTABLISH_RENDEZVOUS),
   RELAY_COMMAND_TEST(introduce1, TT_FORK, RELAY_COMMAND_INTRODUCE1),
