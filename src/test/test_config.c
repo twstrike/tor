@@ -4058,12 +4058,14 @@ static void test_config_options_act_options_transition_requires_fresh_tls_contex
     tt_int_op(public_server_mode(old_options),OP_EQ,public_server_mode(options));
     old_options->Logs = options->Logs;
     old_options->LogMessageDomains = options->LogMessageDomains;
-    options->TLSECGroup ="P256";
-    old_options->TLSECGroup ="P224";
+    options->TLSECGroup = "P256";
+    old_options->TLSECGroup = "P224";
     tt_int_op(options_act(old_options),OP_EQ,0);
   done:
     options->V3AuthoritativeDir = 0;
     old_options->V3AuthoritativeDir = 0;
+    options->TLSECGroup = NULL;
+    old_options->TLSECGroup = NULL;
     (void)arg;
 }
 
