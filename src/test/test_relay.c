@@ -615,6 +615,53 @@ test_relay_connection_edge_process_relay_cell__end(void *ignored)
 }
 
 
+static void
+test_relay_connection_edge_process_relay_cell__extend(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_EXTEND;
+  tdata->rh->stream_id = 1;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->rh->stream_id = 0;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+static void
+test_relay_connection_edge_process_relay_cell__extend2(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_EXTEND2;
+  tdata->rh->stream_id = 1;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->rh->stream_id = 0;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  clean_relay_connection_test_data(tdata);
+}
+
+
 typedef struct command_type_holder_t {
   uint8_t command;
 } command_type_holder_t;
@@ -677,6 +724,8 @@ struct testcase_t relay_tests[] = {
   RELAY_TEST(connection_edge_process_relay_cell__connected, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__truncated, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__end, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__extend, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__extend2, TT_FORK),
   RELAY_COMMAND_TEST(establish_intro, TT_FORK, RELAY_COMMAND_ESTABLISH_INTRO),
   RELAY_COMMAND_TEST(establish_rendezvous, TT_FORK, RELAY_COMMAND_ESTABLISH_RENDEZVOUS),
   RELAY_COMMAND_TEST(introduce1, TT_FORK, RELAY_COMMAND_INTRODUCE1),
