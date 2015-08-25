@@ -15,6 +15,14 @@
 #include "router.h"
 #include "routerlist.h"
 #include "rend_test_helpers.h"
+#include "microdesc.h"
+
+#ifdef _WIN32
+/* For mkdir() */
+#include <direct.h>
+#else
+#include <dirent.h>
+#endif
 
 #define NS_MODULE dir_handle_get
 
@@ -430,6 +438,110 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_success(void *data)
     rend_cache_free_all();
 }
 
+static void
+test_dir_handle_get_micro_d_missing_fingerprints(void *data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  #define B64_256_1 "8/Pz8/u7vz8/Pz+7vz8/Pz+7u/Pz8/P7u/Pz8/P7u78"
+  #define B64_256_2 "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMw"
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(directory_handle_command_get(conn, "GET /tor/micro/d/" B64_256_1 "-" B64_256_2 " HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+
+  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+
+    tor_free(conn);
+    tor_free(header);
+}
+
+static const char microdesc[] =
+  "onion-key\n"
+  "-----BEGIN RSA PUBLIC KEY-----\n"
+  "MIGJAoGBAMjlHH/daN43cSVRaHBwgUfnszzAhg98EvivJ9Qxfv51mvQUxPjQ07es\n"
+  "gV/3n8fyh3Kqr/ehi9jxkdgSRfSnmF7giaHL1SLZ29kA7KtST+pBvmTpDtHa3ykX\n"
+  "Xorc7hJvIyTZoc1HU+5XSynj3gsBE5IGK1ZRzrNS688LnuZMVp1tAgMBAAE=\n"
+  "-----END RSA PUBLIC KEY-----\n";
+
+static void
+test_dir_handle_get_micro_d_finds_fingerprints(void *data)
+{
+  or_options_t *options = NULL;
+  dir_connection_t *conn = NULL;
+  microdesc_cache_t *mc = NULL ;
+  smartlist_t *list = NULL;
+  char digest[DIGEST256_LEN];
+  char digest_base64[128];
+  char path[80];
+  char *header = NULL;
+  char *body = NULL;
+  size_t body_used = 0;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  /* SETUP */
+  options = get_options_mutable();
+  tt_assert(options);
+  tor_free(options->DataDirectory);
+  options->DataDirectory = tor_strdup(get_fname("dir_datadir_test"));
+#ifdef _WIN32
+  tt_int_op(0, OP_EQ, mkdir(options->DataDirectory));
+#else
+  tt_int_op(0, OP_EQ, mkdir(options->DataDirectory, 0700));
+#endif
+
+  /* Add microdesc to cache */
+  crypto_digest256(digest, microdesc, strlen(microdesc), DIGEST_SHA256);
+  base64_encode(digest_base64, sizeof(digest_base64), digest, DIGEST256_LEN, 0);
+
+  //replace the padding = by 0
+  digest_base64[43] = 0;
+
+  mc = get_microdesc_cache();
+  list = microdescs_add_to_cache(mc, microdesc, NULL, SAVED_NOWHERE, 0,
+                                  time(NULL), NULL);
+  tt_int_op(1, OP_EQ, smartlist_len(list));
+
+
+  /* Make the request */
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  sprintf(path, "GET /tor/micro/d/%s HTTP/1.0\r\n\r\n", digest_base64);
+  tt_int_op(directory_handle_command_get(conn, path, NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, strlen(microdesc)+1, 0);
+
+  tt_assert(header);
+  tt_assert(body);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+
+  tt_str_op(body, OP_EQ, microdesc);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+
+    tor_free(conn);
+    tor_free(header);
+    tor_free(body);
+    tor_free(mc);
+    tor_free(options);
+    smartlist_free(list);
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -445,6 +557,7 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_well_formed, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_present, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_success, 0),
+  DIR_HANDLE_CMD(micro_d_missing_fingerprints, TT_FORK),
+  DIR_HANDLE_CMD(micro_d_finds_fingerprints, TT_FORK),
   END_OF_TESTCASES
 };
-
