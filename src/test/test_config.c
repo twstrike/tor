@@ -4026,6 +4026,20 @@ static void test_config_options_act_ServerTransportPlugin_err(void *arg)
     (void)arg;
 }
 
+static void test_config_options_act_RunAsDaemon(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    options->RunAsDaemon = 1;
+    tt_int_op(options_act(old_options),OP_EQ,0);
+  done:
+    options->RunAsDaemon = 0;
+    (void)arg;
+}
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4048,5 +4062,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_Bridge_err, 0),
   CONFIG_TEST(options_act_ClientTransportPlugin_err, 0),
   CONFIG_TEST(options_act_ServerTransportPlugin_err, 0),
+  CONFIG_TEST(options_act_RunAsDaemon, 0),
   END_OF_TESTCASES
 };
