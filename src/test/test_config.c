@@ -4040,6 +4040,33 @@ static void test_config_options_act_RunAsDaemon(void *arg)
     (void)arg;
 }
 
+static void test_config_options_act_options_transition_requires_fresh_tls_context(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    options->V3AuthoritativeDir = 0;
+    old_options->V3AuthoritativeDir = 1;
+    old_options->DataDirectory = options->DataDirectory;
+    old_options->NumCPUs = options->NumCPUs;
+    old_options->ORPort_lines = options->ORPort_lines;
+    old_options->ServerDNSSearchDomains = options->ServerDNSSearchDomains;
+    old_options->SafeLogging_ = options->SafeLogging_;
+    old_options->ClientOnly = options->ClientOnly;
+    tt_int_op(public_server_mode(old_options),OP_EQ,public_server_mode(options));
+    old_options->Logs = options->Logs;
+    old_options->LogMessageDomains = options->LogMessageDomains;
+    options->TLSECGroup ="P256";
+    old_options->TLSECGroup ="P224";
+    tt_int_op(options_act(old_options),OP_EQ,0);
+  done:
+    options->V3AuthoritativeDir = 0;
+    old_options->V3AuthoritativeDir = 0;
+    (void)arg;
+}
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4063,5 +4090,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_ClientTransportPlugin_err, 0),
   CONFIG_TEST(options_act_ServerTransportPlugin_err, 0),
   CONFIG_TEST(options_act_RunAsDaemon, 0),
+  CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, 0),
   END_OF_TESTCASES
 };
