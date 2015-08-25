@@ -11,6 +11,7 @@
 #define TOR_CHANNEL_INTERNAL_
 #include "channel.h"
 #include "channeltls.h"
+#include "config.h"
 
 /* For init/free stuff */
 #include "scheduler.h"
@@ -139,6 +140,12 @@ typedef struct relay_connection_test_data_t {
   or_circuit_t *or_circ;
 } relay_connection_test_data_t;
 
+const char *
+fake_get_remote_descr(channel_t *conn, int flags)
+{
+  return "127.0.0.1";
+}
+
 static relay_connection_test_data_t *
 init_relay_connection_test_data()
 {
@@ -148,6 +155,8 @@ init_relay_connection_test_data()
 
   result->entryconn = entry_connection_new(CONN_TYPE_AP, AF_INET);
   result->edgeconn = ENTRY_TO_EDGE_CONN(result->entryconn);
+  result->edgeconn->base_.magic = EDGE_CONNECTION_MAGIC;
+  result->edgeconn->base_.purpose = EXIT_PURPOSE_CONNECT;
 
   result->rh = tor_malloc_zero(sizeof(relay_header_t));
   result->rh->command = RELAY_COMMAND_BEGIN;
@@ -200,9 +209,11 @@ init_relay_connection_test_data()
   result->or_circ->p_digest = crypto_digest_new();
   result->or_circ->n_digest = crypto_digest_new();
   result->p_chan = tor_malloc_zero(sizeof(channel_tls_t));
+  result->p_chan->base_.get_remote_descr = fake_get_remote_descr;
   result->p_chan->base_.global_identifier = 2;
   result->or_circ->p_chan = &(result->p_chan->base_);
   result->circ = TO_CIRCUIT(result->or_circ);
+  result->circ->magic = ORIGIN_CIRCUIT_MAGIC;
   result->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
   TO_ORIGIN_CIRCUIT(result->circ)->cpath = result->cpath1;
   char recognized = 0;
@@ -211,6 +222,7 @@ init_relay_connection_test_data()
   relay_crypt(result->circ, result->cell, CELL_DIRECTION_IN, &result->layer_hint, &recognized);
   return result;
 }
+
 
 static void
 clean_relay_connection_test_data(relay_connection_test_data_t *data)
@@ -237,7 +249,6 @@ test_relay_connection_edge_process_relay_cell__cell_length_too_long(void *ignore
   relay_header_pack(tdata->cell->payload, tdata->rh);
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
-  tdata->rh->length = 10;
 
  done:
   clean_relay_connection_test_data(tdata);
@@ -335,6 +346,9 @@ test_relay_connection_edge_process_relay_cell__open_connection(void *ignored)
   int ret;
   init_connection_lists();
   relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+  tdata->edgeconn->base_.magic = OR_CONNECTION_MAGIC;
+  tdata->edgeconn->base_.purpose = 0;
+  tdata->edgeconn->base_.address = tor_strdup("127.0.0.1");
 
   tdata->rh->stream_id = 1;
   tdata->rh->command = RELAY_COMMAND_DATA;
@@ -366,6 +380,15 @@ test_relay_connection_edge_process_relay_cell__command_group(void *ignored)
   clean_relay_connection_test_data(tdata);
 }
 
+static int
+mocked_relay_send_command_from_edge_(streamid_t stream_id, circuit_t *circ,
+                                     uint8_t relay_command, const char *payload,
+                                     size_t payload_len, crypt_path_t *cpath_layer,
+                                     const char *filename, int lineno)
+{
+  return 99;
+}
+
 static void
 test_relay_connection_edge_process_relay_cell__begin(void *ignored)
 {
@@ -374,6 +397,7 @@ test_relay_connection_edge_process_relay_cell__begin(void *ignored)
   init_connection_lists();
   relay_connection_test_data_t *tdata = init_relay_connection_test_data();
 
+  MOCK(relay_send_command_from_edge_, mocked_relay_send_command_from_edge_);
   tdata->rh->command = RELAY_COMMAND_BEGIN;
   relay_header_pack(tdata->cell->payload, tdata->rh);
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
@@ -383,21 +407,28 @@ test_relay_connection_edge_process_relay_cell__begin(void *ignored)
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
   tt_int_op(ret, OP_EQ, 0);
 
-  tdata->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
+  tdata->circ->magic = OR_CIRCUIT_MAGIC;
+  tdata->circ->purpose = CIRCUIT_PURPOSE_OR;
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
+  tdata->circ->magic = ORIGIN_CIRCUIT_MAGIC;
   tdata->circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
   TO_ORIGIN_CIRCUIT(tdata->circ)->cpath->prev = tdata->layer_hint;
-  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_OR;
+  tdata->edgeconn->base_.state = OR_CONN_STATE_OPEN;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, tdata->layer_hint);
   TO_ORIGIN_CIRCUIT(tdata->circ)->cpath->prev = tdata->cpath2;
   tt_int_op(ret, OP_EQ, 0);
 
-  tdata->circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
-  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, tdata->layer_hint);
+  tdata->circ->magic = OR_CIRCUIT_MAGIC;
+  tdata->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
  done:
+  UNMOCK(relay_send_command_from_edge_);
   clean_relay_connection_test_data(tdata);
 }
 
@@ -418,16 +449,23 @@ test_relay_connection_edge_process_relay_cell__begin_dir(void *ignored)
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
   tt_int_op(ret, OP_EQ, 0);
 
-  tdata->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
+  MOCK(relay_send_command_from_edge_, mocked_relay_send_command_from_edge_);
+  tdata->circ->magic = OR_CIRCUIT_MAGIC;
+  tdata->circ->purpose = CIRCUIT_PURPOSE_OR;
+  int id_before = tdata->circ->dirreq_id;
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->circ->dirreq_id, OP_GT, id_before);
+  tt_int_op(tdata->circ->dirreq_id, OP_EQ, tdata->or_circ->p_chan->dirreq_id);
 
+  tdata->circ->magic = ORIGIN_CIRCUIT_MAGIC;
   tdata->circ->purpose = CIRCUIT_PURPOSE_S_REND_JOINED;
   TO_ORIGIN_CIRCUIT(tdata->circ)->cpath->prev = tdata->layer_hint;
-  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, tdata->layer_hint);
   TO_ORIGIN_CIRCUIT(tdata->circ)->cpath->prev = tdata->cpath2;
   tt_int_op(ret, OP_EQ, 0);
 
+  tdata->circ->magic = OR_CIRCUIT_MAGIC;
   tdata->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
   tdata->edgeconn->base_.marked_for_close = 0;
   tdata->edgeconn->base_.type = CONN_TYPE_OR;
@@ -435,14 +473,8 @@ test_relay_connection_edge_process_relay_cell__begin_dir(void *ignored)
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
-  tdata->circ->purpose = CIRCUIT_PURPOSE_S_INTRO;
-  int id_before = tdata->circ->dirreq_id;
-  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
-  tt_int_op(ret, OP_EQ, 0);
-  tt_int_op(tdata->circ->dirreq_id, OP_GT, id_before);
-  tt_int_op(tdata->circ->dirreq_id, OP_EQ, tdata->or_circ->p_chan->dirreq_id);
-
  done:
+  UNMOCK(relay_send_command_from_edge_);
   clean_relay_connection_test_data(tdata);
 }
 
@@ -522,22 +554,22 @@ test_relay_connection_edge_process_relay_cell__command(void *command_type)
 
 struct testcase_t relay_tests[] = {
   RELAY_TEST(append_cell_to_circuit_queue, TT_FORK),
-  RELAY_TEST(connection_edge_process_relay_cell__cell_length_too_long, 0),
-  RELAY_TEST(connection_edge_process_relay_cell__no_stream_id_with_relay_that_needs_stream, 0),
-  RELAY_TEST(connection_edge_process_relay_cell__closed_connection, 0),
-  RELAY_TEST(connection_edge_process_relay_cell__open_connection, 0),
-  RELAY_TEST(connection_edge_process_relay_cell__command_group, 0),
-  RELAY_TEST(connection_edge_process_relay_cell__begin, 0),
-  RELAY_TEST(connection_edge_process_relay_cell__begin_dir, 0),
-  RELAY_TEST(connection_edge_process_relay_cell__resolved, 0),
-  RELAY_COMMAND_TEST(establish_intro, 0, RELAY_COMMAND_ESTABLISH_INTRO),
-  RELAY_COMMAND_TEST(establish_rendezvous, 0, RELAY_COMMAND_ESTABLISH_RENDEZVOUS),
-  RELAY_COMMAND_TEST(introduce1, 0, RELAY_COMMAND_INTRODUCE1),
-  RELAY_COMMAND_TEST(introduce2, 0, RELAY_COMMAND_INTRODUCE2),
-  RELAY_COMMAND_TEST(rendezvous1, 0, RELAY_COMMAND_RENDEZVOUS1),
-  RELAY_COMMAND_TEST(rendezvous2, 0, RELAY_COMMAND_RENDEZVOUS2),
-  RELAY_COMMAND_TEST(intro_established, 0, RELAY_COMMAND_INTRO_ESTABLISHED),
-  RELAY_COMMAND_TEST(rendezvous_established, 0, RELAY_COMMAND_RENDEZVOUS_ESTABLISHED),
-  RELAY_COMMAND_TEST(unknown_command, 0, 99),
+  RELAY_TEST(connection_edge_process_relay_cell__cell_length_too_long, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__no_stream_id_with_relay_that_needs_stream, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__closed_connection, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__open_connection, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__command_group, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__begin, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__begin_dir, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__resolved, TT_FORK),
+  RELAY_COMMAND_TEST(establish_intro, TT_FORK, RELAY_COMMAND_ESTABLISH_INTRO),
+  RELAY_COMMAND_TEST(establish_rendezvous, TT_FORK, RELAY_COMMAND_ESTABLISH_RENDEZVOUS),
+  RELAY_COMMAND_TEST(introduce1, TT_FORK, RELAY_COMMAND_INTRODUCE1),
+  RELAY_COMMAND_TEST(introduce2, TT_FORK, RELAY_COMMAND_INTRODUCE2),
+  RELAY_COMMAND_TEST(rendezvous1, TT_FORK, RELAY_COMMAND_RENDEZVOUS1),
+  RELAY_COMMAND_TEST(rendezvous2, TT_FORK, RELAY_COMMAND_RENDEZVOUS2),
+  RELAY_COMMAND_TEST(intro_established, TT_FORK, RELAY_COMMAND_INTRO_ESTABLISHED),
+  RELAY_COMMAND_TEST(rendezvous_established, TT_FORK, RELAY_COMMAND_RENDEZVOUS_ESTABLISHED),
+  RELAY_COMMAND_TEST(unknown_command, TT_FORK, 99),
   END_OF_TESTCASES
 };

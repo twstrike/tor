@@ -110,7 +110,6 @@ test_rend_cache_store_v2_desc_as_client(void *data)
   tt_int_op(entry->len, OP_EQ, strlen(desc_holder->desc_str));
   tt_str_op(entry->desc, OP_EQ, desc_holder->desc_str);
 
-
   // Test various failure modes
 
   // TODO: a too long desc_id_base32 argument crashes the function
@@ -118,8 +117,11 @@ test_rend_cache_store_v2_desc_as_client(void *data)
   /* tt_int_op(ret, OP_EQ, RCS_BADDESC); */
 
   // Test bad base32 failure
+  // This causes an assertion failure if we're running with assertions. But when doing coverage, we can test it.
+#ifdef TOR_COVERAGE
   ret = rend_cache_store_v2_desc_as_client(desc_holder->desc_str, "!xqunszqnaolrrfmtzgaki7mxelgvkj", &mock_rend_query, NULL);
   tt_int_op(ret, OP_EQ, RCS_BADDESC);
+#endif
 
   // Test invalid descriptor
   ret = rend_cache_store_v2_desc_as_client("invalid descriptor", "3xqunszqnaolrrfmtzgaki7mxelgvkje", &mock_rend_query, NULL);
@@ -1146,7 +1148,7 @@ struct testcase_t rend_cache_tests[] = {
   { "init", test_rend_cache_init, 0, NULL, NULL },
   { "decrement_allocation", test_rend_cache_decrement_allocation, 0, NULL, NULL },
   { "increment_allocation", test_rend_cache_increment_allocation, 0, NULL, NULL },
-  { "clean", test_rend_cache_clean, 0, NULL, NULL },
+  { "clean", test_rend_cache_clean, TT_FORK, NULL, NULL },
   { "clean_v2_descs_as_dir", test_rend_cache_clean_v2_descs_as_dir, 0, NULL, NULL },
   { "entry_allocation", test_rend_cache_entry_allocation, 0, NULL, NULL },
   { "entry_free", test_rend_cache_entry_free, 0, NULL, NULL },
