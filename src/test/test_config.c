@@ -4106,6 +4106,27 @@ static void test_config_options_act_BridgePassword(void *arg)
     (void)arg;
 }
 
+static void test_config_options_act_BridgeRelay(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = get_options_mutable();
+    options_init(options);
+    options->command = CMD_RUN_TOR;
+    int tempIsBridgeRelay = options->BridgeRelay;
+    //New option is BridgeRelay
+    options->BridgeRelay = 1;
+    old_options->BridgeRelay = !options->BridgeRelay;
+    tt_int_op(options_act(old_options),OP_EQ,0);
+    //New option is BridgeRelay
+    options->BridgeRelay = 0;
+    old_options->BridgeRelay = !options->BridgeRelay;
+    tt_int_op(options_act(old_options),OP_EQ,0);
+  done:
+    options->BridgeRelay = tempIsBridgeRelay;
+    (void)arg;
+}
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4132,5 +4153,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, 0),
   CONFIG_TEST(options_act_write_pidfile, 0),
   CONFIG_TEST(options_act_BridgePassword, 0),
+  CONFIG_TEST(options_act_BridgeRelay, 0),
   END_OF_TESTCASES
 };
