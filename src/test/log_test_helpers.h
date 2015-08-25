@@ -1,0 +1,22 @@
+/* Copyright (c) 2014-2015, The Tor Project, Inc. */
+/* See LICENSE for licensing information */
+
+#include "or.h"
+
+#ifndef TOR_LOG_TEST_HELPERS_H
+#define TOR_LOG_TEST_HELPERS_H
+
+typedef struct mock_saved_log_entry_t {
+  int severity;
+  const char *funcname;
+  const char *suffix;
+  const char *format;
+  const char *generated_msg;
+  struct mock_saved_log_entry_t *next;
+} mock_saved_log_entry_t;
+
+void mock_saving_logv(int severity, log_domain_mask_t domain, const char *funcname, const char *suffix, const char *format, va_list ap);
+void mock_clean_saved_logs(void);
+const mock_saved_log_entry_t *mock_saved_logs(void);
+
+#endif

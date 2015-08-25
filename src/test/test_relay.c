@@ -1,6 +1,8 @@
 /* Copyright (c) 2014-2015, The Tor Project, Inc. */
 /* See LICENSE for licensing information */
 
+#define LOG_PRIVATE
+#include "torlog.h"
 #include "or.h"
 #define CIRCUITBUILD_PRIVATE
 #include "circuitbuild.h"
@@ -21,6 +23,8 @@
 /* Test suite stuff */
 #include "test.h"
 #include "fakechans.h"
+
+#include "log_test_helpers.h"
 
 static or_circuit_t * new_fake_orcirc(channel_t *nchan, channel_t *pchan);
 
@@ -613,15 +617,23 @@ test_relay_connection_edge_process_relay_cell__extended2(void *ignored)
 {
   (void)ignored;
   int ret;
+  int previous_log = log_global_min_severity_;
   init_connection_lists();
   relay_connection_test_data_t *tdata = init_relay_connection_test_data();
 
+  log_global_min_severity_ = LOG_INFO;
+  MOCK(logv, mock_saving_logv);
   tdata->rh->command = RELAY_COMMAND_EXTENDED2;
   relay_header_pack(tdata->cell->payload, tdata->rh);
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "'extended' unsupported at non-origin. Dropping.\n");
 
  done:
+  UNMOCK(logv);
+  log_global_min_severity_ = previous_log;
+  mock_clean_saved_logs();
   clean_relay_connection_test_data(tdata);
 }
 
@@ -648,7 +660,6 @@ test_relay_connection_edge_process_relay_cell__end(void *ignored)
   tt_int_op(ret, OP_EQ, 0);
 
  done:
-  UNMOCK(circuit_mark_for_close_);
   clean_relay_connection_test_data(tdata);
 }
 
