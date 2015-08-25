@@ -25,6 +25,7 @@ static void connection_write_to_buf_mock(const char *string, size_t len,
 
   tor_assert(string);
   tor_assert(conn);
+
   write_to_buf(string, len, conn->outbuf);
 }
 
@@ -277,7 +278,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_well_formed(void *data)
   TO_CONN(conn)->linked = 1;
   tt_assert(connection_dir_is_encrypted(conn));
 
-  //FIXME: this cant be reached because rend_valid_descriptor_id() prevents this
+  //TODO: this cant be reached because rend_valid_descriptor_id() prevents this
   //case to happen. This test is the same as 
   //test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id
   //We should refactor to remove the case from the switch.
@@ -323,6 +324,94 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_present(void *data)
     rend_cache_free_all();
 }
 
+NS_DECL(const routerinfo_t *, router_get_my_routerinfo, (void));
+NS_DECL(int, hid_serv_responsible_for_desc_id, (const char *id));
+
+static routerinfo_t *mock_routerinfo;
+static int hid_serv_responsible_for_desc_id_response;
+
+static const routerinfo_t *
+NS(router_get_my_routerinfo)(void)
+{
+  if(!mock_routerinfo) {
+    mock_routerinfo = tor_malloc(sizeof(routerinfo_t));
+  }
+
+  return mock_routerinfo;
+}
+
+static int
+NS(hid_serv_responsible_for_desc_id)(const char *id)
+{
+  return hid_serv_responsible_for_desc_id_response;
+}
+
+static void
+test_dir_handle_get_rendezvous2_on_encrypted_conn_success(void *data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  char *body = NULL;
+  size_t body_used = 0;
+  char buff[30];
+  char req[70];
+  rend_encoded_v2_service_descriptor_t *desc_holder = NULL;
+  char *service_id = NULL;
+  char desc_id_base32[REND_DESC_ID_V2_LEN_BASE32 + 1];
+  size_t body_len = 0;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+  NS_MOCK(router_get_my_routerinfo);
+  NS_MOCK(hid_serv_responsible_for_desc_id);
+
+  rend_cache_init();
+  hid_serv_responsible_for_desc_id_response = 1;
+
+  /* create a valid rend service descriptor */
+  #define RECENT_TIME -10
+  generate_desc(RECENT_TIME, &desc_holder, &service_id, 3);
+
+  tt_int_op(rend_cache_store_v2_desc_as_dir(desc_holder->desc_str), OP_EQ, RCS_OKAY);
+  base32_encode(desc_id_base32, sizeof(desc_id_base32), desc_holder->desc_id, DIGEST_LEN);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  // connection is encrypted
+  TO_CONN(conn)->linked = 1;
+  tt_assert(connection_dir_is_encrypted(conn));
+
+  sprintf(req, "GET /tor/rendezvous2/%s HTTP/1.0\r\n\r\n", desc_id_base32);
+
+  tt_int_op(directory_handle_command_get(conn, req, NULL, 0), OP_EQ, 0);
+
+  body_len = strlen(desc_holder->desc_str);
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, body_len+1, 0);
+
+  tt_assert(header);
+  tt_assert(body);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Pragma: no-cache\r\n"));
+  sprintf(buff, "Content-Length: %ld\r\n", body_len);
+  tt_assert(strstr(header, buff));
+
+  tt_str_op(body, OP_EQ, desc_holder->desc_str);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    NS_UNMOCK(router_get_my_routerinfo);
+    NS_UNMOCK(hid_serv_responsible_for_desc_id);
+
+    tor_free(conn);
+    tor_free(header);
+    tor_free(body);
+    rend_cache_free_all();
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -337,6 +426,7 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_with_invalid_desc_id, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_well_formed, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_present, 0),
+  DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_success, 0),
   END_OF_TESTCASES
 };
 
