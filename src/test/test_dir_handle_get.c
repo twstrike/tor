@@ -464,6 +464,21 @@ test_dir_handle_get_micro_d_missing_fingerprints(void *data)
     tor_free(header);
 }
 
+static or_options_t *mock_options = NULL;
+static void
+init_mock_options(void){
+  mock_options = malloc(sizeof(or_options_t));
+  memset(mock_options, 0, sizeof(or_options_t));
+  mock_options->TestingTorNetwork = 1;
+}
+
+static const or_options_t *
+mock_get_options(void)
+{
+  tor_assert(mock_options);
+  return mock_options;
+}
+
 static const char microdesc[] =
   "onion-key\n"
   "-----BEGIN RSA PUBLIC KEY-----\n"
