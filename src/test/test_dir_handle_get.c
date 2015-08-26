@@ -17,6 +17,8 @@
 #include "rend_test_helpers.h"
 #include "microdesc.h"
 #include "test_helpers.h"
+#include "nodelist.h"
+#include "entrynodes.h"
 
 #ifdef _WIN32
 /* For mkdir() */
@@ -764,7 +766,7 @@ test_dir_handle_get_server_descriptors_invalid_req(void* data)
 }
 
 
-static const char
+static char
 TEST_DESCRIPTOR[] =
 "@uploaded-at 2014-06-08 19:20:11\n"
 "@source \"127.0.0.1\"\n"
@@ -861,6 +863,10 @@ test_dir_handle_get_server_descriptors_all(void* data)
     tor_free(mock_routerinfo);
     tor_free(conn);
     tor_free(header);
+
+    routerlist_free_all();
+    nodelist_free_all();
+    entry_guards_free_all();
 }
 
 #define DIR_HANDLE_CMD(name,flags)                              \
@@ -885,6 +891,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(networkstatus_bridges_basic_auth, 0),
   DIR_HANDLE_CMD(networkstatus_bridges_different_digest, 0),
   DIR_HANDLE_CMD(server_descriptors_invalid_req, 0),
-  DIR_HANDLE_CMD(server_descriptors_all, 0),
+  DIR_HANDLE_CMD(server_descriptors_all, TT_FORK),
   END_OF_TESTCASES
 };
