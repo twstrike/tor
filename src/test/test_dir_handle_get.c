@@ -173,7 +173,8 @@ test_dir_handle_get_robots_txt(void *data)
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  tt_int_op(directory_handle_command_get(conn, "GET /tor/robots.txt HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  #define ROBOTS_TXT_PATH "/tor/robots.txt"
+  tt_int_op(directory_handle_command_get(conn, "GET " ROBOTS_TXT_PATH " HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       &body, &body_used, 29, 0);
 
@@ -213,7 +214,8 @@ test_dir_handle_get_bytes_txt(void *data)
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  tt_int_op(directory_handle_command_get(conn, "GET /tor/bytes.txt HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  #define BYTES_TXT_PATH "/tor/bytes.txt"
+  tt_int_op(directory_handle_command_get(conn, "GET " BYTES_TXT_PATH " HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       &body, &body_used, body_len+1, 0);
 
@@ -238,6 +240,7 @@ test_dir_handle_get_bytes_txt(void *data)
     tor_free(body);
 }
 
+#define RENDEZVOUS2_PATH "/tor/rendezvous2"
 static void
 test_dir_handle_get_rendezvous2_on_not_encrypted_conn(void *data)
 {
@@ -252,7 +255,7 @@ test_dir_handle_get_rendezvous2_on_not_encrypted_conn(void *data)
   // connection is not encrypted
   tt_assert(!connection_dir_is_encrypted(conn))
 
-  tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, "GET " RENDEZVOUS2_PATH "/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
@@ -278,7 +281,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id(void *dat
   TO_CONN(conn)->linked = 1;
   tt_assert(connection_dir_is_encrypted(conn));
 
-  tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/invalid-desc-id HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, "GET " RENDEZVOUS2_PATH "/invalid-desc-id HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
@@ -309,7 +312,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_well_formed(void *data)
   //test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id
   //We should refactor to remove the case from the switch.
 
-  tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/1bababababababababababababababab HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, "GET " RENDEZVOUS2_PATH "/1bababababababababababababababab HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
@@ -337,7 +340,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_present(void *data)
   TO_CONN(conn)->linked = 1;
   tt_assert(connection_dir_is_encrypted(conn));
 
-  tt_int_op(directory_handle_command_get(conn, "GET /tor/rendezvous2/3xqunszqnaolrrfmtzgaki7mxelgvkje HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, "GET " RENDEZVOUS2_PATH "/3xqunszqnaolrrfmtzgaki7mxelgvkje HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
@@ -407,7 +410,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_success(void *data)
   TO_CONN(conn)->linked = 1;
   tt_assert(connection_dir_is_encrypted(conn));
 
-  sprintf(req, "GET /tor/rendezvous2/%s HTTP/1.0\r\n\r\n", desc_id_base32);
+  sprintf(req, "GET " RENDEZVOUS2_PATH "/%s HTTP/1.0\r\n\r\n", desc_id_base32);
 
   tt_int_op(directory_handle_command_get(conn, req, NULL, 0), OP_EQ, 0);
 
@@ -438,6 +441,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_success(void *data)
     rend_cache_free_all();
 }
 
+#define MICRODESC_PATH "/tor/micro/d/"
 static void
 test_dir_handle_get_micro_d_missing_fingerprints(void *data)
 {
@@ -450,7 +454,7 @@ test_dir_handle_get_micro_d_missing_fingerprints(void *data)
   #define B64_256_1 "8/Pz8/u7vz8/Pz+7vz8/Pz+7u/Pz8/P7u/Pz8/P7u78"
   #define B64_256_2 "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMw"
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
-  tt_int_op(directory_handle_command_get(conn, "GET /tor/micro/d/" B64_256_1 "-" B64_256_2 " HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, "GET " MICRODESC_PATH B64_256_1 "-" B64_256_2 " HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
@@ -530,7 +534,7 @@ test_dir_handle_get_micro_d_finds_fingerprints(void *data)
   /* Make the request */
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  sprintf(path, "GET /tor/micro/d/%s HTTP/1.0\r\n\r\n", digest_base64);
+  sprintf(path, "GET " MICRODESC_PATH "%s HTTP/1.0\r\n\r\n", digest_base64);
   tt_int_op(directory_handle_command_get(conn, path, NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
@@ -601,7 +605,7 @@ test_dir_handle_get_micro_d_server_busy(void *data)
   /* Make the request */
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  sprintf(path, "GET /tor/micro/d/%s HTTP/1.0\r\n\r\n", digest_base64);
+  sprintf(path, "GET " MICRODESC_PATH "%s HTTP/1.0\r\n\r\n", digest_base64);
   tt_int_op(directory_handle_command_get(conn, path, NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
@@ -621,6 +625,7 @@ test_dir_handle_get_micro_d_server_busy(void *data)
     microdesc_free_all();
 }
 
+#define BRIDGES_PATH "/tor/networkstatus-bridges"
 static void
 test_dir_handle_get_networkstatus_bridges_bad_header(void *data)
 {
@@ -639,7 +644,7 @@ test_dir_handle_get_networkstatus_bridges_bad_header(void *data)
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   TO_CONN(conn)->linked = 1;
 
-  const char *path = "GET /tor/networkstatus-bridges HTTP/1.0\r\n\r\n";
+  const char *path = "GET " BRIDGES_PATH  " HTTP/1.0\r\n\r\n";
   tt_int_op(directory_handle_command_get(conn, path, NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
@@ -675,7 +680,7 @@ test_dir_handle_get_networkstatus_bridges_basic_auth(void *data)
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   TO_CONN(conn)->linked = 1;
 
-  const char *req_header = "GET /tor/networkstatus-bridges HTTP/1.0\r\nAuthorization: Basic abcdefghijklm12345\r\n\r\n";
+  const char *req_header = "GET " BRIDGES_PATH " HTTP/1.0\r\nAuthorization: Basic abcdefghijklm12345\r\n\r\n";
   tt_int_op(directory_handle_command_get(conn, req_header, NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
@@ -714,7 +719,7 @@ test_dir_handle_get_networkstatus_bridges_different_digest(void *data)
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   TO_CONN(conn)->linked = 1;
 
-  const char *req_header = "GET /tor/networkstatus-bridges HTTP/1.0\r\nAuthorization: Basic NOTSAMEDIGEST\r\n\r\n";
+  const char *req_header = "GET " BRIDGES_PATH " HTTP/1.0\r\nAuthorization: Basic NOTSAMEDIGEST\r\n\r\n";
   tt_int_op(directory_handle_command_get(conn, req_header, NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
