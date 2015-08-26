@@ -3495,6 +3495,10 @@ connection_dirserv_add_servers_to_outbuf(dir_connection_t *conn)
         conn->zlib_state = NULL;
       }
     } else {
+      //TODO: this should probably be strlen(body) rather than
+      //sd->signed_descriptor_len because this len includes the annotations
+      //and depending on how we got here, body might not include the
+      //annotations.
       connection_write_to_buf(body,
                               sd->signed_descriptor_len,
                               TO_CONN(conn));
