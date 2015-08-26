@@ -3869,12 +3869,6 @@ test_config_parse_port_config__ports(void *data)
 //Mock get_options_mutable
 static or_options_t * mock_global_options = NULL;
 
-void
-init_mock_global_options(void){
-    or_options_t *current = get_options_mutable();
-    mock_global_options = tor_memdup(current,sizeof(or_options_t));
-}
-
 or_options_t *
 mock_get_options_mutable(void)
 {
@@ -3882,12 +3876,18 @@ mock_get_options_mutable(void)
     return mock_global_options;
 }
 
+void
+init_mock_global_options(void){
+    or_options_t *current = get_options_mutable();
+    mock_global_options = tor_memdup(current,sizeof(or_options_t));
+    MOCK(get_options_mutable,mock_get_options_mutable);
+}
+
 static void test_config_options_act(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     options->DisableDebuggerAttachment = 0;
@@ -3907,7 +3907,6 @@ static void test_config_options_act_Tor2webMode_err(void *arg)
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     //Options should not have Tor2webMode without compiled as ENABLE_TOR2WEB_MODE
@@ -3924,7 +3923,6 @@ static void test_config_options_act_DirAuthority_line_err(void *arg)
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     config_line_t *test_dir_authority = tor_malloc(sizeof(config_line_t));
@@ -3950,7 +3948,6 @@ static void test_config_options_act_Bridge(void *arg)
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     config_line_t *test_bridges = tor_malloc(sizeof(config_line_t));
@@ -3975,7 +3972,6 @@ static void test_config_options_act_Bridge_err(void *arg)
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     config_line_t *test_bridges = tor_malloc(sizeof(config_line_t));
@@ -4000,7 +3996,6 @@ static void test_config_options_act_ClientTransportPlugin_err(void *arg)
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     config_line_t *test_clientTransportPlugin = tor_malloc(sizeof(config_line_t));
@@ -4036,7 +4031,6 @@ static void test_config_options_act_ServerTransportPlugin_err(void *arg)
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     config_line_t *test_serverTransportPlugin = tor_malloc(sizeof(config_line_t));
@@ -4070,7 +4064,6 @@ static void test_config_options_act_RunAsDaemon(void *arg)
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     MOCK(finish_daemon,mocked_finish_daemon);
@@ -4088,7 +4081,6 @@ static void test_config_options_act_options_transition_requires_fresh_tls_contex
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     options->V3AuthoritativeDir = 0;
@@ -4119,7 +4111,6 @@ static void test_config_options_act_write_pidfile(void *arg)
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     options->PidFile = "tmp/tor_test_PidFile";
@@ -4135,7 +4126,6 @@ static void test_config_options_act_BridgePassword(void *arg)
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     options->BridgePassword = "some password";
@@ -4151,7 +4141,6 @@ static void test_config_options_act_BridgeRelay(void *arg)
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     int tempIsBridgeRelay = options->BridgeRelay;
