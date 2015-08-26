@@ -655,6 +655,45 @@ test_dir_handle_get_networkstatus_bridges_bad_header(void *data)
     tor_free(header);
 }
 
+static void
+test_dir_handle_get_networkstatus_bridges_basic_auth(void *data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(get_options, mock_get_options);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  /* SETUP */
+  init_mock_options();
+  mock_options->BridgeAuthoritativeDir = 1;
+  mock_options->BridgePassword_AuthDigest_ = tor_malloc(DIGEST256_LEN);
+  crypto_digest256(mock_options->BridgePassword_AuthDigest_,
+                     "abcdefghijklm12345", 18, DIGEST_SHA256);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  TO_CONN(conn)->linked = 1;
+
+  const char *req_header = "GET /tor/networkstatus-bridges HTTP/1.0\r\nAuthorization: Basic abcdefghijklm12345\r\n\r\n";
+  tt_int_op(directory_handle_command_get(conn, req_header, NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Content-Length: 0\r\n"));
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(mock_options);
+    tor_free(conn);
+    tor_free(header);
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -674,5 +713,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(micro_d_finds_fingerprints, 0),
   DIR_HANDLE_CMD(micro_d_server_busy, 0),
   DIR_HANDLE_CMD(networkstatus_bridges_bad_header, 0),
+  DIR_HANDLE_CMD(networkstatus_bridges_basic_auth, 0),
   END_OF_TESTCASES
 };
