@@ -490,7 +490,6 @@ static const char microdesc[] =
 static void
 test_dir_handle_get_micro_d_finds_fingerprints(void *data)
 {
-  or_options_t *options = NULL;
   dir_connection_t *conn = NULL;
   microdesc_cache_t *mc = NULL ;
   smartlist_t *list = NULL;
@@ -502,17 +501,17 @@ test_dir_handle_get_micro_d_finds_fingerprints(void *data)
   size_t body_used = 0;
   (void) data;
 
+  MOCK(get_options, mock_get_options);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   /* SETUP */
-  options = get_options_mutable();
-  tt_assert(options);
-  tor_free(options->DataDirectory);
-  options->DataDirectory = tor_strdup(get_fname("dir_datadir_test"));
+  init_mock_options();
+  mock_options->DataDirectory = tor_strdup(get_fname("dir_handle_datadir_test1"));
+
 #ifdef _WIN32
-  tt_int_op(0, OP_EQ, mkdir(options->DataDirectory));
+  tt_int_op(0, OP_EQ, mkdir(mock_options->DataDirectory));
 #else
-  tt_int_op(0, OP_EQ, mkdir(options->DataDirectory, 0700));
+  tt_int_op(0, OP_EQ, mkdir(mock_options->DataDirectory, 0700));
 #endif
 
   /* Add microdesc to cache */
@@ -547,14 +546,16 @@ test_dir_handle_get_micro_d_finds_fingerprints(void *data)
   tt_str_op(body, OP_EQ, microdesc);
 
   done:
+    UNMOCK(get_options);
     UNMOCK(connection_write_to_buf_impl_);
 
+    if (mock_options)
+      tor_free(mock_options->DataDirectory);
     tor_free(conn);
     tor_free(header);
     tor_free(body);
-    tor_free(mc);
-    tor_free(options);
     smartlist_free(list);
+    microdesc_free_all();
 }
 
 #define DIR_HANDLE_CMD(name,flags)                              \
@@ -572,7 +573,7 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_well_formed, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_present, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_success, 0),
-  DIR_HANDLE_CMD(micro_d_missing_fingerprints, TT_FORK),
-  DIR_HANDLE_CMD(micro_d_finds_fingerprints, TT_FORK),
+  DIR_HANDLE_CMD(micro_d_missing_fingerprints, 0),
+  DIR_HANDLE_CMD(micro_d_finds_fingerprints, 0),
   END_OF_TESTCASES
 };
