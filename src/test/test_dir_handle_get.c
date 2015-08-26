@@ -734,6 +734,34 @@ test_dir_handle_get_networkstatus_bridges_different_digest(void *data)
     tor_free(header);
 }
 
+#define SERVER_DESC_PATH "/tor/server"
+static void
+test_dir_handle_get_server_descriptors_invalid_req(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  const char *req_header = "GET " SERVER_DESC_PATH "/invalid HTTP/1.0\r\n\r\n";
+  tt_int_op(directory_handle_command_get(conn, req_header, NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+
+  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(mock_options);
+    tor_free(conn);
+    tor_free(header);
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -755,5 +783,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(networkstatus_bridges_bad_header, 0),
   DIR_HANDLE_CMD(networkstatus_bridges_basic_auth, 0),
   DIR_HANDLE_CMD(networkstatus_bridges_different_digest, 0),
+  DIR_HANDLE_CMD(server_descriptors_invalid_req, 0),
   END_OF_TESTCASES
 };
