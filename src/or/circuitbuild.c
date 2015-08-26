@@ -843,8 +843,8 @@ circuit_pick_extend_handshake(uint8_t *cell_type_out,
  *
  * Return -reason if we want to tear down circ, else return 0.
  */
-int
-circuit_send_next_onion_skin(origin_circuit_t *circ)
+MOCK_IMPL(int, circuit_send_next_onion_skin,
+          (origin_circuit_t *circ))
 {
   crypt_path_t *hop;
   const node_t *node;
@@ -1251,9 +1251,8 @@ circuit_init_cpath_crypto(crypt_path_t *cpath, const char *key_data,
  *
  * Return - reason if we want to mark circ for close, else return 0.
  */
-int
-circuit_finish_handshake(origin_circuit_t *circ,
-                         const created_cell_t *reply)
+MOCK_IMPL(int, circuit_finish_handshake, (origin_circuit_t *circ,
+                                          const created_cell_t *reply))
 {
   char keys[CPATH_KEY_MATERIAL_LEN];
   crypt_path_t *hop;
@@ -2402,4 +2401,3 @@ build_state_get_exit_nickname(cpath_build_state_t *state)
     return NULL;
   return state->chosen_exit->nickname;
 }
-

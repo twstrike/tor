@@ -5011,4 +5011,3 @@ connection_free_all(void)
     bufferevent_rate_limit_group_free(global_rate_limit);
 #endif
 }
-

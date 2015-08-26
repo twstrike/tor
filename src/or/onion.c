@@ -1175,4 +1175,3 @@ extended_cell_format(uint8_t *command_out, uint16_t *len_out,
 
   return 0;
 }
-

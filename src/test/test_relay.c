@@ -14,6 +14,9 @@
 #include "channel.h"
 #include "channeltls.h"
 #include "config.h"
+#include "onion.h"
+#include "onion_tap.h"
+#include "networkstatus.h"
 
 /* For init/free stuff */
 #include "scheduler.h"
@@ -137,6 +140,7 @@ typedef struct relay_connection_test_data_t {
   relay_header_t *rh;
   entry_connection_t *entryconn;
   edge_connection_t *edgeconn;
+  or_connection_t *orconn;
   crypt_path_t *layer_hint;
   crypt_path_t *cpath1;
   crypt_path_t *cpath2;
@@ -161,6 +165,8 @@ init_relay_connection_test_data()
   result->edgeconn = ENTRY_TO_EDGE_CONN(result->entryconn);
   result->edgeconn->base_.magic = EDGE_CONNECTION_MAGIC;
   result->edgeconn->base_.purpose = EXIT_PURPOSE_CONNECT;
+  result->orconn = or_connection_new(CONN_TYPE_EXT_OR, AF_INET);
+  result->orconn->base_.magic = OR_CONNECTION_MAGIC;
 
   result->rh = tor_malloc_zero(sizeof(relay_header_t));
   result->rh->command = RELAY_COMMAND_BEGIN;
@@ -235,6 +241,7 @@ clean_relay_connection_test_data(relay_connection_test_data_t *data)
   tor_free(data->circ);
   tor_free(data->rh);
   tor_free(data->entryconn);
+  tor_free(data->orconn);
   tor_free(data->cpath1);
   tor_free(data->cpath2);
   tor_free(data->p_chan);
@@ -591,12 +598,40 @@ test_relay_connection_edge_process_relay_cell__truncated(void *ignored)
   clean_relay_connection_test_data(tdata);
 }
 
+static int fixed_circuit_finish_handshake_result = 0;
+static int fixed_circuit_send_next_onion_skin_result = 0;
+
+static int
+fixed_circuit_finish_handshake(origin_circuit_t *circ, const created_cell_t *reply)
+{
+  (void)circ;
+  (void)reply;
+  return fixed_circuit_finish_handshake_result;
+}
+
+static void
+ignore_circuit_mark_for_close_(circuit_t *circ, int reason, int line, const char *file)
+{
+  (void)circ;
+  (void)reason;
+  (void)line;
+  (void)file;
+}
+
+static int
+fixed_circuit_send_next_onion_skin(origin_circuit_t *circ)
+{
+  return fixed_circuit_send_next_onion_skin_result;
+}
 
 static void
 test_relay_connection_edge_process_relay_cell__extended(void *ignored)
 {
   (void)ignored;
   int ret;
+  uint8_t command;
+  uint16_t len;
+  extended_cell_t *ec;
   init_connection_lists();
   relay_connection_test_data_t *tdata = init_relay_connection_test_data();
 
@@ -608,7 +643,35 @@ test_relay_connection_edge_process_relay_cell__extended(void *ignored)
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
   tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
 
+  MOCK(circuit_finish_handshake, fixed_circuit_finish_handshake);
+  MOCK(circuit_mark_for_close_, ignore_circuit_mark_for_close_);
+  MOCK(circuit_send_next_onion_skin, fixed_circuit_send_next_onion_skin);
+  fixed_circuit_finish_handshake_result = -1;
+  command=0;
+  len=0;
+  ec = tor_malloc_zero(sizeof(extended_cell_t));
+  ec->cell_type = RELAY_COMMAND_EXTENDED;
+  ec->created_cell.cell_type = CELL_CREATED;
+  ec->created_cell.handshake_len = TAP_ONIONSKIN_REPLY_LEN;
+  extended_cell_format(&command, &len, (uint8_t *)tdata->cell->payload+RELAY_HEADER_SIZE, ec);
+  tdata->rh->length = len;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+
+  fixed_circuit_send_next_onion_skin_result = -99;
+  fixed_circuit_finish_handshake_result = 0;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, -99);
+
+  fixed_circuit_send_next_onion_skin_result = 99;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+
  done:
+  UNMOCK(circuit_send_next_onion_skin);
+  UNMOCK(circuit_mark_for_close_);
+  UNMOCK(circuit_finish_handshake);
   clean_relay_connection_test_data(tdata);
 }
 
@@ -634,6 +697,8 @@ test_relay_connection_edge_process_relay_cell__extended2(void *ignored)
   clean_relay_connection_test_data(tdata);
 }
 
+extern smartlist_t *closeable_connection_lst;
+
 static void
 test_relay_connection_edge_process_relay_cell__end(void *ignored)
 {
@@ -656,8 +721,35 @@ test_relay_connection_edge_process_relay_cell__end(void *ignored)
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
+  smartlist_clear(closeable_connection_lst);
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_EXIT;
+  tdata->edgeconn->base_.magic = EDGE_CONNECTION_MAGIC;
+  tdata->edgeconn->base_.state = EXIT_CONN_STATE_OPEN;
+  tdata->edgeconn->base_.purpose = EXIT_PURPOSE_CONNECT;
+  tdata->edgeconn->base_.hold_open_until_flushed = 0;
+  tdata->entryconn->socks_request->has_finished = 1;
+  tdata->edgeconn->cpath_layer = tdata->layer_hint;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
  done:
   clean_relay_connection_test_data(tdata);
+}
+
+static int is_reading = 1;
+
+static void
+note_read_started(connection_t *conn)
+{
+  (void)conn;
+  is_reading=1;
+}
+
+static void
+mess_with_connection(connection_t *conn)
+{
+  conn->marked_for_close = 1;
 }
 
 static void
@@ -668,7 +760,7 @@ test_relay_connection_edge_process_relay_cell__sendme(void *ignored)
   init_connection_lists();
   relay_connection_test_data_t *tdata = init_relay_connection_test_data();
 
-  int previous_log = setup_capture_of_logs(LOG_INFO);
+  int previous_log = setup_capture_of_logs(LOG_DEBUG);
 
   tdata->rh->command = RELAY_COMMAND_SENDME;
   relay_header_pack(tdata->cell->payload, tdata->rh);
@@ -677,7 +769,66 @@ test_relay_connection_edge_process_relay_cell__sendme(void *ignored)
   tt_assert(mock_saved_logs());
   tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "sendme cell dropped, unknown stream (streamid 2).\n");
 
+  tdata->rh->stream_id = 0;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  tdata->layer_hint->package_window = 901;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Unexpected sendme cell from exit relay. Closing circ.\n");
+
+  tdata->layer_hint->package_window = 1;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_logs()->next->generated_msg, OP_EQ, "circ-level sendme at origin, packagewindow 101.\n");
+  tt_int_op(tdata->layer_hint->package_window, OP_EQ, 101);
+
+  tdata->circ->package_window = 901;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Unexpected sendme cell from client. Closing circ (window 901).\n");
+
+  tdata->circ->package_window = 2;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_logs()->next->generated_msg, OP_EQ, "circ-level sendme at non-origin, packagewindow 102.\n");
+  tt_int_op(tdata->circ->package_window, OP_EQ, 102);
+
+  tdata->rh->stream_id = 2;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_EXT_OR;
+  tdata->edgeconn->base_.magic = OR_CONNECTION_MAGIC;
+  tdata->edgeconn->base_.purpose = 0;
+  tdata->edgeconn->base_.state = EXT_OR_CONN_STATE_OPEN;
+  is_reading = 0;
+  MOCK(connection_start_reading, note_read_started);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(is_reading, OP_EQ, 1);
+
+  tdata->circ->streams_blocked_on_n_chan = 1;
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_OR;
+  tdata->edgeconn->base_.magic = OR_CONNECTION_MAGIC;
+  tdata->edgeconn->base_.purpose = 0;
+  tdata->edgeconn->base_.address = tor_strdup("127.0.0.1");
+  tdata->edgeconn->base_.state = OR_CONN_STATE_OPEN;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->circ->streams_blocked_on_n_chan = 0;
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_OR;
+  tdata->edgeconn->base_.magic = OR_CONNECTION_MAGIC;
+  tdata->edgeconn->base_.purpose = 0;
+  tdata->edgeconn->base_.address = tor_strdup("127.0.0.1");
+  tdata->edgeconn->base_.state = OR_CONN_STATE_OPEN;
+  MOCK(connection_start_reading, mess_with_connection);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
  done:
+  UNMOCK(connection_start_reading);
   teardown_capture_of_logs(previous_log);
   clean_relay_connection_test_data(tdata);
 }
@@ -687,6 +838,7 @@ test_relay_connection_edge_process_relay_cell__truncate(void *ignored)
 {
   (void)ignored;
   int ret;
+  channel_t *nchan = NULL;
   init_connection_lists();
   relay_connection_test_data_t *tdata = init_relay_connection_test_data();
 
@@ -704,11 +856,40 @@ test_relay_connection_edge_process_relay_cell__truncate(void *ignored)
   tt_assert(mock_saved_logs());
   tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Processed 'truncate', replying.\n");
 
+  nchan = new_fake_channel();
+
+  tdata->circ->n_chan = nchan;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Processed 'truncate', replying.\n");
+
+  tdata->circ->n_chan = NULL;
+  tdata->circ->n_hop = tor_malloc_zero(sizeof(extend_info_t));
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Processed 'truncate', replying.\n");
+
+  tdata->circ->n_chan = nchan;
+  tdata->circ->n_hop = tor_malloc_zero(sizeof(extend_info_t));
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Processed 'truncate', replying.\n");
+
  done:
+  tor_free(nchan);
   teardown_capture_of_logs(previous_log);
   clean_relay_connection_test_data(tdata);
 }
 
+static networkstatus_t *fixed_networkstatus_get_latest_consensus_result = NULL;
+static networkstatus_t *
+fixed_networkstatus_get_latest_consensus(void)
+{
+   return fixed_networkstatus_get_latest_consensus_result;
+}
 
 static void
 test_relay_connection_edge_process_relay_cell__extend(void *ignored)
@@ -729,7 +910,29 @@ test_relay_connection_edge_process_relay_cell__extend(void *ignored)
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
+  tdata->cell->command = CELL_RELAY_EARLY;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, -1);
+
+
+  MOCK(networkstatus_get_latest_consensus, fixed_networkstatus_get_latest_consensus);
+  fixed_networkstatus_get_latest_consensus_result = tor_malloc_zero(sizeof(networkstatus_t));
+  fixed_networkstatus_get_latest_consensus_result->net_params = smartlist_new();
+  smartlist_add(fixed_networkstatus_get_latest_consensus_result->net_params, "AllowNonearlyExtend=1");
+
+  tdata->cell->command = CELL_RELAY;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, -1);
+
+  smartlist_set(fixed_networkstatus_get_latest_consensus_result->net_params, 0, "AllowNonearlyExtend=0");
+  tdata->cell->command = CELL_VERSIONS;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
  done:
+  smartlist_free(fixed_networkstatus_get_latest_consensus_result->net_params);
+  tor_free(fixed_networkstatus_get_latest_consensus_result);
+  UNMOCK(networkstatus_get_latest_consensus);
   clean_relay_connection_test_data(tdata);
 }
 

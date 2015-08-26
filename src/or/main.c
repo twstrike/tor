@@ -148,7 +148,7 @@ static unsigned newnym_epoch = 0;
 static smartlist_t *connection_array = NULL;
 /** List of connections that have been marked for close and need to be freed
  * and removed from connection_array. */
-static smartlist_t *closeable_connection_lst = NULL;
+STATIC smartlist_t *closeable_connection_lst = NULL;
 /** List of linked connections that are currently reading data into their
  * inbuf from their partner's outbuf. */
 static smartlist_t *active_linked_connection_lst = NULL;
@@ -3288,4 +3288,3 @@ tor_main(int argc, char *argv[])
   tor_cleanup();
   return result;
 }
-

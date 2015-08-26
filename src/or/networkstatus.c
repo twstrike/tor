@@ -1004,8 +1004,8 @@ consensus_is_waiting_for_certs(void)
 
 /** Return the most recent consensus that we have downloaded, or NULL if we
  * don't have one. */
-networkstatus_t *
-networkstatus_get_latest_consensus(void)
+MOCK_IMPL(networkstatus_t *,
+          networkstatus_get_latest_consensus,(void))
 {
   return current_consensus;
 }
@@ -1970,4 +1970,3 @@ networkstatus_free_all(void)
   strmap_free(named_server_map, tor_free_);
   strmap_free(unnamed_server_map, NULL);
 }
-
