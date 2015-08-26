@@ -558,6 +558,69 @@ test_dir_handle_get_micro_d_finds_fingerprints(void *data)
     microdesc_free_all();
 }
 
+static void
+test_dir_handle_get_micro_d_server_busy(void *data)
+{
+  dir_connection_t *conn = NULL;
+  microdesc_cache_t *mc = NULL ;
+  smartlist_t *list = NULL;
+  char digest[DIGEST256_LEN];
+  char digest_base64[128];
+  char path[80];
+  char *header = NULL;
+  (void) data;
+
+  MOCK(get_options, mock_get_options);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  /* SETUP */
+  init_mock_options();
+  mock_options->DataDirectory = tor_strdup(get_fname("dir_handle_datadir_test2"));
+
+#ifdef _WIN32
+  tt_int_op(0, OP_EQ, mkdir(mock_options->DataDirectory));
+#else
+  tt_int_op(0, OP_EQ, mkdir(mock_options->DataDirectory, 0700));
+#endif
+
+  /* Add microdesc to cache */
+  crypto_digest256(digest, microdesc, strlen(microdesc), DIGEST_SHA256);
+  base64_encode(digest_base64, sizeof(digest_base64), digest, DIGEST256_LEN, 0);
+
+  //replace the padding = by 0
+  digest_base64[43] = 0;
+
+  mc = get_microdesc_cache();
+  list = microdescs_add_to_cache(mc, microdesc, NULL, SAVED_NOWHERE, 0,
+                                  time(NULL), NULL);
+  tt_int_op(1, OP_EQ, smartlist_len(list));
+
+  //Make it busy
+  mock_options->CountPrivateBandwidth = 1;
+
+  /* Make the request */
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  sprintf(path, "GET /tor/micro/d/%s HTTP/1.0\r\n\r\n", digest_base64);
+  tt_int_op(directory_handle_command_get(conn, path, NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+
+  tt_str_op(header, OP_EQ, "HTTP/1.0 503 Directory busy, try again later\r\n\r\n");
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(connection_write_to_buf_impl_);
+
+    if (mock_options)
+      tor_free(mock_options->DataDirectory);
+    tor_free(conn);
+    tor_free(header);
+    smartlist_free(list);
+    microdesc_free_all();
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -575,5 +638,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_success, 0),
   DIR_HANDLE_CMD(micro_d_missing_fingerprints, 0),
   DIR_HANDLE_CMD(micro_d_finds_fingerprints, 0),
+  DIR_HANDLE_CMD(micro_d_server_busy, 0),
   END_OF_TESTCASES
 };
