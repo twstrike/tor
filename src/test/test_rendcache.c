@@ -982,7 +982,9 @@ static void
 test_rend_cache_clean_v2_descs_as_dir(void *data)
 {
   rend_cache_entry_t *e;
+  time_t now;
   rend_service_descriptor_t *desc;
+  now = time(NULL);
 
   (void)data;
 
@@ -990,64 +992,64 @@ test_rend_cache_clean_v2_descs_as_dir(void *data)
   rend_cache_init();
 
   // Test running with an empty cache
-  rend_cache_clean_v2_descs_as_dir(time(NULL), 0);
+  rend_cache_clean_v2_descs_as_dir(now, 0);
   tt_int_op(digestmap_size(rend_cache_v2_dir), OP_EQ, 0);
 
   // Test with only one new entry
   e = tor_malloc_zero(sizeof(rend_cache_entry_t));
-  e->last_served = time(NULL);
+  e->last_served = now;
   desc = tor_malloc_zero(sizeof(rend_service_descriptor_t));
-  desc->timestamp = time(NULL);
+  desc->timestamp = now;
   desc->pk = pk_generate(0);
   e->parsed = desc;
   digestmap_set(rend_cache_v2_dir, "abcde", e);
 
   hid_serv_responsible_for_desc_id_response = 1;
-  rend_cache_clean_v2_descs_as_dir(time(NULL), 0);
+  rend_cache_clean_v2_descs_as_dir(now, 0);
   tt_int_op(digestmap_size(rend_cache_v2_dir), OP_EQ, 1);
 
   // Test with one old entry
-  desc->timestamp = time(NULL) - (REND_CACHE_MAX_AGE + REND_CACHE_MAX_SKEW + 1000);
-  rend_cache_clean_v2_descs_as_dir(time(NULL), 0);
+  desc->timestamp = now - (REND_CACHE_MAX_AGE + REND_CACHE_MAX_SKEW + 1000);
+  rend_cache_clean_v2_descs_as_dir(now, 0);
   tt_int_op(digestmap_size(rend_cache_v2_dir), OP_EQ, 0);
 
   // Test with one entry that is not under the responsibility of this hidden service
   e = tor_malloc_zero(sizeof(rend_cache_entry_t));
-  e->last_served = time(NULL);
+  e->last_served = now;
   desc = tor_malloc_zero(sizeof(rend_service_descriptor_t));
-  desc->timestamp = time(NULL);
+  desc->timestamp = now;
   desc->pk = pk_generate(0);
   e->parsed = desc;
   digestmap_set(rend_cache_v2_dir, "abcde", e);
 
   hid_serv_responsible_for_desc_id_response = 0;
-  rend_cache_clean_v2_descs_as_dir(time(NULL), 0);
+  rend_cache_clean_v2_descs_as_dir(now, 0);
   tt_int_op(digestmap_size(rend_cache_v2_dir), OP_EQ, 0);
 
   // Test with one entry that has an old last served
   e = tor_malloc_zero(sizeof(rend_cache_entry_t));
-  e->last_served = time(NULL) - (REND_CACHE_MAX_AGE + REND_CACHE_MAX_SKEW + 1000);
+  e->last_served = now - (REND_CACHE_MAX_AGE + REND_CACHE_MAX_SKEW + 1000);
   desc = tor_malloc_zero(sizeof(rend_service_descriptor_t));
-  desc->timestamp = time(NULL);
+  desc->timestamp = now;
   desc->pk = pk_generate(0);
   e->parsed = desc;
   digestmap_set(rend_cache_v2_dir, "abcde", e);
 
   hid_serv_responsible_for_desc_id_response = 1;
-  rend_cache_clean_v2_descs_as_dir(time(NULL), 0);
+  rend_cache_clean_v2_descs_as_dir(now, 0);
   tt_int_op(digestmap_size(rend_cache_v2_dir), OP_EQ, 0);
 
   // Test a run through asking for a large force_remove
   e = tor_malloc_zero(sizeof(rend_cache_entry_t));
-  e->last_served = time(NULL);
+  e->last_served = now;
   desc = tor_malloc_zero(sizeof(rend_service_descriptor_t));
-  desc->timestamp = time(NULL);
+  desc->timestamp = now;
   desc->pk = pk_generate(0);
   e->parsed = desc;
   digestmap_set(rend_cache_v2_dir, "abcde", e);
 
   hid_serv_responsible_for_desc_id_response = 1;
-  rend_cache_clean_v2_descs_as_dir(time(NULL), 20000);
+  rend_cache_clean_v2_descs_as_dir(now, 20000);
   tt_int_op(digestmap_size(rend_cache_v2_dir), OP_EQ, 1);
 
 
