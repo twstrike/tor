@@ -128,7 +128,7 @@ test_dir_handle_get_v1_command_returns_disclaimer(void *data)
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
   tt_assert(strstr(header, "Content-Length: 20\r\n"));
 
-  tt_int_op(body_used, OP_EQ, body_len);
+  tt_int_op(body_used, OP_EQ, strlen(body));
   tt_str_op(body, OP_EQ, exp_body);
 
   done:
@@ -189,7 +189,7 @@ test_dir_handle_get_robots_txt(void *data)
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
   tt_assert(strstr(header, "Content-Length: 28\r\n"));
 
-  tt_int_op(body_used, OP_EQ, 28);
+  tt_int_op(body_used, OP_EQ, strlen(body));
   tt_str_op(body, OP_EQ, "User-agent: *\r\nDisallow: /\r\n");
 
   done:
@@ -233,7 +233,7 @@ test_dir_handle_get_bytes_txt(void *data)
   sprintf(buff, "Content-Length: %ld\r\n", body_len);
   tt_assert(strstr(header, buff));
 
-  tt_int_op(body_used, OP_EQ, body_len);
+  tt_int_op(body_used, OP_EQ, strlen(body));
   tt_str_op(body, OP_EQ, exp_body);
 
   done:
@@ -431,6 +431,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_success(void *data)
   sprintf(buff, "Content-Length: %ld\r\n", body_len);
   tt_assert(strstr(header, buff));
 
+  tt_int_op(body_used, OP_EQ, strlen(body));
   tt_str_op(body, OP_EQ, desc_holder->desc_str);
 
   done:
@@ -550,6 +551,7 @@ test_dir_handle_get_micro_d_finds_fingerprints(void *data)
   tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
 
+  tt_int_op(body_used, OP_EQ, strlen(body));
   tt_str_op(body, OP_EQ, microdesc);
 
   done:
@@ -842,17 +844,20 @@ test_dir_handle_get_server_descriptors_all(void* data)
   //TODO: Is this a BUG?
   //It requires strlen(TEST_DESCRIPTOR)+1 as body_len but returns a body which
   //is smaller than that by annotation_len bytes
-  //The same happens with body_used. It is not equal to strlen(body)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       &body, &body_used, strlen(TEST_DESCRIPTOR)+1, 0);
 
   tt_assert(header);
   tt_assert(body);
-  tt_int_op(body_used, OP_EQ, strlen(TEST_DESCRIPTOR));
 
   tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
   tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+
+  //TODO: Is this a BUG?
+  //This is what should be expected:
+  //tt_int_op(body_used, OP_EQ, strlen(body));
+  tt_int_op(body_used, OP_EQ, strlen(TEST_DESCRIPTOR));
 
   tt_str_op(body, OP_EQ, TEST_DESCRIPTOR + annotation_len);
   tt_int_op(conn->dir_spool_src, OP_EQ, DIR_SPOOL_NONE);
