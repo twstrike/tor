@@ -479,21 +479,18 @@ test_relay_connection_edge_process_relay_cell__data(void *ignored)
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(tdata->circ->deliver_window, OP_EQ, 101);
   tt_int_op(ret, OP_EQ, 0);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Relay data cell with zero stream_id. Dropping.\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "Relay data cell with zero stream_id. Dropping.\n");
 
   tdata->rh->stream_id = 3;
   relay_header_pack(tdata->cell->payload, tdata->rh);
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "data cell dropped, unknown stream (streamid 3).\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "data cell dropped, unknown stream (streamid 3).\n");
 
   tdata->layer_hint->deliver_window = 2;
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
   tt_int_op(ret, OP_EQ, 0);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "data cell dropped, unknown stream (streamid 3).\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "data cell dropped, unknown stream (streamid 3).\n");
 
   tdata->layer_hint->deliver_window = 2;
   tdata->edgeconn->base_.marked_for_close = 0;
@@ -504,8 +501,7 @@ test_relay_connection_edge_process_relay_cell__data(void *ignored)
   tdata->edgeconn->deliver_window = 0;
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, tdata->layer_hint);
   tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "(relay data) conn deliver_window below 0. Killing.\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "(relay data) conn deliver_window below 0. Killing.\n");
 
   tdata->layer_hint->deliver_window = 2;
   tdata->edgeconn->deliver_window = 2;
@@ -764,8 +760,7 @@ test_relay_connection_edge_process_relay_cell__extended2(void *ignored)
   relay_header_pack(tdata->cell->payload, tdata->rh);
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "'extended' unsupported at non-origin. Dropping.\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "'extended' unsupported at non-origin. Dropping.\n");
 
  done:
   teardown_capture_of_logs(previous_log);
@@ -885,31 +880,30 @@ test_relay_connection_edge_process_relay_cell__sendme(void *ignored)
   relay_header_pack(tdata->cell->payload, tdata->rh);
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "sendme cell dropped, unknown stream (streamid 2).\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "sendme cell dropped, unknown stream (streamid 2).\n");
 
   tdata->rh->stream_id = 0;
   relay_header_pack(tdata->cell->payload, tdata->rh);
   tdata->layer_hint->package_window = 901;
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
   tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Unexpected sendme cell from exit relay. Closing circ.\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "Unexpected sendme cell from exit relay. Closing circ.\n");
 
   tdata->layer_hint->package_window = 1;
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
   tt_int_op(ret, OP_EQ, 0);
-  tt_str_op(mock_saved_logs()->next->generated_msg, OP_EQ, "circ-level sendme at origin, packagewindow 101.\n");
+  tt_str_op(mock_saved_log_at(-2), OP_EQ, "circ-level sendme at origin, packagewindow 101.\n");
   tt_int_op(tdata->layer_hint->package_window, OP_EQ, 101);
 
   tdata->circ->package_window = 901;
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Unexpected sendme cell from client. Closing circ (window 901).\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "Unexpected sendme cell from client. Closing circ (window 901).\n");
 
   tdata->circ->package_window = 2;
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
-  tt_str_op(mock_saved_logs()->next->generated_msg, OP_EQ, "circ-level sendme at non-origin, packagewindow 102.\n");
+  tt_str_op(mock_saved_log_at(-2), OP_EQ, "circ-level sendme at non-origin, packagewindow 102.\n");
   tt_int_op(tdata->circ->package_window, OP_EQ, 102);
 
   tdata->rh->stream_id = 2;
@@ -967,35 +961,30 @@ test_relay_connection_edge_process_relay_cell__truncate(void *ignored)
   relay_header_pack(tdata->cell->payload, tdata->rh);
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
   tt_int_op(ret, OP_EQ, 0);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "'truncate' unsupported at origin. Dropping.\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "'truncate' unsupported at origin. Dropping.\n");
 
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Processed 'truncate', replying.\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "Processed 'truncate', replying.\n");
 
   nchan = new_fake_channel();
 
   tdata->circ->n_chan = nchan;
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Processed 'truncate', replying.\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "Processed 'truncate', replying.\n");
 
   tdata->circ->n_chan = NULL;
   tdata->circ->n_hop = tor_malloc_zero(sizeof(extend_info_t));
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Processed 'truncate', replying.\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "Processed 'truncate', replying.\n");
 
   tdata->circ->n_chan = nchan;
   tdata->circ->n_hop = tor_malloc_zero(sizeof(extend_info_t));
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
-  tt_assert(mock_saved_logs());
-  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Processed 'truncate', replying.\n");
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "Processed 'truncate', replying.\n");
 
  done:
   tor_free(nchan);

@@ -2537,8 +2537,7 @@ static int uname_result_is_set = 0;
 
 /** Return a pointer to a description of our platform.
  */
-const char *
-get_uname(void)
+MOCK_IMPL(const char *, get_uname, (void))
 {
 #ifdef HAVE_UNAME
   struct utsname u;
@@ -3424,4 +3423,3 @@ tor_get_avail_disk_space(const char *path)
   return -1;
 #endif
 }
-

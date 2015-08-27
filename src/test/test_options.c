@@ -9,6 +9,8 @@
 #include "config.h"
 #include "test.h"
 
+#include "log_test_helpers.h"
+
 typedef struct {
   int severity;
   uint32_t domain;
@@ -163,8 +165,69 @@ test_options_validate(void *arg)
   return;
 }
 
+static char *fixed_get_uname_result = NULL;
+
+static const char *
+fixed_get_uname(void)
+{
+  return fixed_get_uname_result;
+}
+
+typedef struct {
+  or_options_t *old_opt;
+  or_options_t *opt;
+  or_options_t *def_opt;
+} options_test_data_t;
+
+static options_test_data_t *
+get_options_test_data(char *conf)
+{
+  config_line_t *cl=NULL;
+  options_test_data_t *result = tor_malloc(sizeof(options_test_data_t));
+  result->opt = options_new();
+  result->old_opt = options_new();
+  result->def_opt = options_new();
+  config_get_lines(conf, &cl, 1);
+  config_assign(&options_format, result->opt, cl, 0, 0, NULL);
+
+  return result;
+}
+
+
+static void
+test_options_validate__uname_for_server(void *ignored)
+{
+  (void)ignored;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("ORListenAddress 127.0.0.1:5555");
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  MOCK(get_uname, fixed_get_uname);
+  fixed_get_uname_result = "Windows 95";
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Tor is running as a server, but you are running Windows 95; this probably won't work. See https://www.torproject.org/docs/faq.html#BestOSForRelay for details.\n");
+
+  fixed_get_uname_result = "Windows 98";
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Tor is running as a server, but you are running Windows 98; this probably won't work. See https://www.torproject.org/docs/faq.html#BestOSForRelay for details.\n");
+
+  fixed_get_uname_result = "Windows Me";
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Tor is running as a server, but you are running Windows Me; this probably won't work. See https://www.torproject.org/docs/faq.html#BestOSForRelay for details.\n");
+
+  fixed_get_uname_result = "Windows 2000";
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+
+ done:
+  UNMOCK(get_uname);
+  teardown_capture_of_logs(previous_log);
+}
 struct testcase_t options_tests[] = {
   { "validate", test_options_validate, TT_FORK, NULL, NULL },
+  { "validate__uname_for_server", test_options_validate__uname_for_server, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
-
