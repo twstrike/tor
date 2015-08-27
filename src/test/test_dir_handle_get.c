@@ -40,6 +40,10 @@ static void connection_write_to_buf_mock(const char *string, size_t len,
   write_to_buf(string, len, conn->outbuf);
 }
 
+#define GET(path) "GET " path " HTTP/1.0\r\n\r\n"
+#define NOT_FOUND "HTTP/1.0 404 Not found\r\n\r\n"
+#define BAD_REQUEST "HTTP/1.0 400 Bad request\r\n\r\n"
+
 static tor_addr_t MOCK_TOR_ADDR;
 
 static void
@@ -57,7 +61,7 @@ test_dir_handle_get_bad_request(void *data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(sent, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
+  tt_str_op(sent, OP_EQ, BAD_REQUEST);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -80,12 +84,12 @@ test_dir_handle_get_v1_command_without_disclaimer(void *data)
   tt_ptr_op(get_dirportfrontpage(), OP_EQ, NULL);
 
   /* V1 path */
-  tt_int_op(directory_handle_command_get(conn, "GET /tor/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, GET("/tor/"), NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+  tt_str_op(header, OP_EQ, NOT_FOUND);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -115,7 +119,7 @@ test_dir_handle_get_v1_command_returns_disclaimer(void *data)
   body_len = strlen(exp_body);
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
-  tt_int_op(directory_handle_command_get(conn, "GET /tor/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, GET("/tor/"), NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       &body, &body_used, body_len+1, 0);
@@ -151,11 +155,11 @@ test_dir_handle_get_unknown_path(void *data)
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
   /* Unrecognized path */
-  tt_int_op(directory_handle_command_get(conn, "GET /anything HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, GET("/anything"), NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(sent, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+  tt_str_op(sent, OP_EQ, NOT_FOUND);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -176,8 +180,7 @@ test_dir_handle_get_robots_txt(void *data)
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  #define ROBOTS_TXT_PATH "/tor/robots.txt"
-  tt_int_op(directory_handle_command_get(conn, "GET " ROBOTS_TXT_PATH " HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, GET("/tor/robots.txt"), NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       &body, &body_used, 29, 0);
 
@@ -217,8 +220,7 @@ test_dir_handle_get_bytes_txt(void *data)
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  #define BYTES_TXT_PATH "/tor/bytes.txt"
-  tt_int_op(directory_handle_command_get(conn, "GET " BYTES_TXT_PATH " HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, GET("/tor/bytes.txt"), NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       &body, &body_used, body_len+1, 0);
 
@@ -243,7 +245,7 @@ test_dir_handle_get_bytes_txt(void *data)
     tor_free(body);
 }
 
-#define RENDEZVOUS2_PATH "/tor/rendezvous2"
+#define RENDEZVOUS2_GET(descid) GET("/tor/rendezvous2/" descid)
 static void
 test_dir_handle_get_rendezvous2_on_not_encrypted_conn(void *data)
 {
@@ -258,11 +260,11 @@ test_dir_handle_get_rendezvous2_on_not_encrypted_conn(void *data)
   // connection is not encrypted
   tt_assert(!connection_dir_is_encrypted(conn))
 
-  tt_int_op(directory_handle_command_get(conn, "GET " RENDEZVOUS2_PATH "/ HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, RENDEZVOUS2_GET(), NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+  tt_str_op(header, OP_EQ, NOT_FOUND);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -284,11 +286,11 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id(void *dat
   TO_CONN(conn)->linked = 1;
   tt_assert(connection_dir_is_encrypted(conn));
 
-  tt_int_op(directory_handle_command_get(conn, "GET " RENDEZVOUS2_PATH "/invalid-desc-id HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, RENDEZVOUS2_GET("invalid-desc-id"), NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
+  tt_str_op(header, OP_EQ, BAD_REQUEST);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -315,11 +317,11 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_well_formed(void *data)
   //test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id
   //We should refactor to remove the case from the switch.
 
-  tt_int_op(directory_handle_command_get(conn, "GET " RENDEZVOUS2_PATH "/1bababababababababababababababab HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, RENDEZVOUS2_GET("1bababababababababababababababab"), NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, "HTTP/1.0 400 Bad request\r\n\r\n");
+  tt_str_op(header, OP_EQ, BAD_REQUEST);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -343,11 +345,11 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_present(void *data)
   TO_CONN(conn)->linked = 1;
   tt_assert(connection_dir_is_encrypted(conn));
 
-  tt_int_op(directory_handle_command_get(conn, "GET " RENDEZVOUS2_PATH "/3xqunszqnaolrrfmtzgaki7mxelgvkje HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, RENDEZVOUS2_GET("3xqunszqnaolrrfmtzgaki7mxelgvkje"), NULL, 0), OP_EQ, 0);
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+  tt_str_op(header, OP_EQ, NOT_FOUND);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -413,7 +415,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_success(void *data)
   TO_CONN(conn)->linked = 1;
   tt_assert(connection_dir_is_encrypted(conn));
 
-  sprintf(req, "GET " RENDEZVOUS2_PATH "/%s HTTP/1.0\r\n\r\n", desc_id_base32);
+  sprintf(req, RENDEZVOUS2_GET("%s"), desc_id_base32);
 
   tt_int_op(directory_handle_command_get(conn, req, NULL, 0), OP_EQ, 0);
 
@@ -445,7 +447,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_success(void *data)
     rend_cache_free_all();
 }
 
-#define MICRODESC_PATH "/tor/micro/d/"
+#define MICRODESC_GET(digest) GET("/tor/micro/d/" digest)
 static void
 test_dir_handle_get_micro_d_missing_fingerprints(void *data)
 {
@@ -458,12 +460,12 @@ test_dir_handle_get_micro_d_missing_fingerprints(void *data)
   #define B64_256_1 "8/Pz8/u7vz8/Pz+7vz8/Pz+7u/Pz8/P7u/Pz8/P7u78"
   #define B64_256_2 "zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMw"
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
-  tt_int_op(directory_handle_command_get(conn, "GET " MICRODESC_PATH B64_256_1 "-" B64_256_2 " HTTP/1.0\r\n\r\n", NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, MICRODESC_GET(B64_256_1 "-" B64_256_2), NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+  tt_str_op(header, OP_EQ, NOT_FOUND);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -538,7 +540,7 @@ test_dir_handle_get_micro_d_finds_fingerprints(void *data)
   /* Make the request */
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  sprintf(path, "GET " MICRODESC_PATH "%s HTTP/1.0\r\n\r\n", digest_base64);
+  sprintf(path, MICRODESC_GET("%s"), digest_base64);
   tt_int_op(directory_handle_command_get(conn, path, NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
@@ -610,7 +612,7 @@ test_dir_handle_get_micro_d_server_busy(void *data)
   /* Make the request */
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  sprintf(path, "GET " MICRODESC_PATH "%s HTTP/1.0\r\n\r\n", digest_base64);
+  sprintf(path, MICRODESC_GET("%s"), digest_base64);
   tt_int_op(directory_handle_command_get(conn, path, NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
@@ -649,13 +651,12 @@ test_dir_handle_get_networkstatus_bridges_bad_header(void *data)
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   TO_CONN(conn)->linked = 1;
 
-  const char *path = "GET " BRIDGES_PATH  " HTTP/1.0\r\n\r\n";
-  tt_int_op(directory_handle_command_get(conn, path, NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, GET(BRIDGES_PATH), NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+  tt_str_op(header, OP_EQ, NOT_FOUND);
 
   done:
     UNMOCK(get_options);
@@ -729,7 +730,8 @@ test_dir_handle_get_networkstatus_bridges_different_digest(void *data)
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
-  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+
+  tt_str_op(header, OP_EQ, NOT_FOUND);
 
   done:
     UNMOCK(get_options);
@@ -739,7 +741,7 @@ test_dir_handle_get_networkstatus_bridges_different_digest(void *data)
     tor_free(header);
 }
 
-#define SERVER_DESC_PATH "/tor/server"
+#define SERVER_DESC_GET(id) GET("/tor/server/" id)
 static void
 test_dir_handle_get_server_descriptors_invalid_req(void* data)
 {
@@ -751,13 +753,12 @@ test_dir_handle_get_server_descriptors_invalid_req(void* data)
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  const char *req_header = "GET " SERVER_DESC_PATH "/invalid HTTP/1.0\r\n\r\n";
-  tt_int_op(directory_handle_command_get(conn, req_header, NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, SERVER_DESC_GET("invalid"), NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, "HTTP/1.0 404 Not found\r\n\r\n");
+  tt_str_op(header, OP_EQ, NOT_FOUND);
   tt_int_op(conn->dir_spool_src, OP_EQ, DIR_SPOOL_SERVER_BY_FP);
 
   done:
@@ -838,8 +839,7 @@ test_dir_handle_get_server_descriptors_all(void* data)
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  const char *req_header = "GET " SERVER_DESC_PATH "/all HTTP/1.0\r\n\r\n";
-  tt_int_op(directory_handle_command_get(conn, req_header, NULL, 0), OP_EQ, 0);
+  tt_int_op(directory_handle_command_get(conn, SERVER_DESC_GET("all"), NULL, 0), OP_EQ, 0);
 
   //TODO: Is this a BUG?
   //It requires strlen(TEST_DESCRIPTOR)+1 as body_len but returns a body which
