@@ -831,6 +831,24 @@ test_relay_connection_edge_process_relay_cell__end(void *ignored)
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
+  smartlist_clear(closeable_connection_lst);
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_AP;
+  tdata->edgeconn->base_.magic = ENTRY_CONNECTION_MAGIC;
+  tdata->edgeconn->base_.state = AP_CONN_STATE_OPEN;
+  tdata->entryconn->socks_request->has_finished = 0;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  smartlist_clear(closeable_connection_lst);
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_AP;
+  tdata->edgeconn->base_.magic = ENTRY_CONNECTION_MAGIC;
+  tdata->edgeconn->base_.state = AP_CONN_STATE_OPEN;
+  tdata->entryconn->socks_request = NULL;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
   // TODO: we can't reach the case when !conn->base_.marked_for_close  is false, since the prefix takes care of that. Maybe this part should go.
 
  done:
