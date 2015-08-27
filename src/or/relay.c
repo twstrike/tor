@@ -1457,7 +1457,6 @@ connection_edge_process_relay_cell(cell_t *cell, circuit_t *circ,
 
   /* either conn is NULL, in which case we've got a control cell, or else
    * conn points to the recognized stream. */
-
   if (conn && !connection_state_is_open(TO_CONN(conn))) {
     if (conn->base_.type == CONN_TYPE_EXIT &&
         (conn->base_.state == EXIT_CONN_STATE_CONNECTING ||

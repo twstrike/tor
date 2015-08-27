@@ -700,6 +700,15 @@ test_relay_connection_edge_process_relay_cell__extended2(void *ignored)
 extern smartlist_t *closeable_connection_lst;
 
 static void
+ignoring_connection_mark_for_close_internal_(connection_t *conn,
+                                             int line, const char *file)
+{
+  (void)conn;
+  (void)line;
+  (void)file;
+}
+
+static void
 test_relay_connection_edge_process_relay_cell__end(void *ignored)
 {
   (void)ignored;
@@ -708,6 +717,11 @@ test_relay_connection_edge_process_relay_cell__end(void *ignored)
   relay_connection_test_data_t *tdata = init_relay_connection_test_data();
 
   tdata->rh->command = RELAY_COMMAND_END;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->rh->length = 0;
   relay_header_pack(tdata->cell->payload, tdata->rh);
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
   tt_int_op(ret, OP_EQ, 0);
@@ -733,7 +747,19 @@ test_relay_connection_edge_process_relay_cell__end(void *ignored)
   ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
   tt_int_op(ret, OP_EQ, 0);
 
+  MOCK(connection_mark_for_close_internal_, ignoring_connection_mark_for_close_internal_);
+  smartlist_clear(closeable_connection_lst);
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_AP;
+  tdata->edgeconn->base_.magic = ENTRY_CONNECTION_MAGIC;
+  tdata->edgeconn->base_.state = AP_CONN_STATE_OPEN;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  // TODO: we can't reach the case when !conn->base_.marked_for_close  is false, since the prefix takes care of that. Maybe this part should go.
+
  done:
+  UNMOCK(connection_mark_for_close_internal_);
   clean_relay_connection_test_data(tdata);
 }
 
