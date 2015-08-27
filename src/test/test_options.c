@@ -336,6 +336,7 @@ test_options_validate__logs(void *ignored)
 {
   (void)ignored;
   int ret;
+  (void)ret;
   char *msg;
   int orig_quiet_level = quiet_level;
   options_test_data_t *tdata = get_options_test_data("");
@@ -378,6 +379,37 @@ test_options_validate__logs(void *ignored)
   tor_free(msg);
 }
 
+static void
+test_options_validate__authdir(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int previous_log = setup_capture_of_logs(LOG_DEBUG);
+  options_test_data_t *tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                                     "Address this.should.not_exist.example.org");
+  tdata->opt->LogTimeGranularity = 1;
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Failed to resolve/guess local address. See logs for details.");
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Could not resolve local Address 'this.should.not_exist.example.org'. Failing.\n");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1");
+  tdata->opt->LogTimeGranularity = 1;
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_NE, "Failed to resolve/guess local address. See logs for details.");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
 
 
 struct testcase_t options_tests[] = {
@@ -388,5 +420,6 @@ struct testcase_t options_tests[] = {
   { "validate__nickname", test_options_validate__nickname, TT_FORK, NULL, NULL },
   { "validate__contactinfo", test_options_validate__contactinfo, TT_FORK, NULL, NULL },
   { "validate__logs", test_options_validate__logs, TT_FORK, NULL, NULL },
+  { "validate__authdir", test_options_validate__authdir, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
