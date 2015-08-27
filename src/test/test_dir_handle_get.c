@@ -814,6 +814,7 @@ test_dir_handle_get_server_descriptors_all(void* data)
   size_t body_used = 0;
   (void) data;
 
+  //TODO: change to router_get_my_extrainfo when testing "extra" path
   NS_MOCK(router_get_my_routerinfo);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
@@ -825,10 +826,8 @@ test_dir_handle_get_server_descriptors_all(void* data)
   routerinfo_t *router = smartlist_get(our_routerlist->routers, 0);
   set_server_identity_key(router->identity_pkey);
 
-  // TODO: change to router_get_my_extrainfo()->cache_info->send_unencrypted if
-  // "extra" is enabled
-  mock_routerinfo = tor_malloc(sizeof(routerinfo_t));
   /* Treat "all" requests as if they were unencrypted */
+  router_get_my_routerinfo(); //init the mock
   mock_routerinfo->cache_info.send_unencrypted = 1;
 
   /* Setup descriptor */
@@ -881,14 +880,13 @@ test_dir_handle_get_server_descriptors_authority(void* data)
   char *header = NULL;
   char *body = NULL;
   size_t body_used = 0;
+  crypto_pk_t *identity_pkey = pk_generate(0);
   (void) data;
 
   NS_MOCK(router_get_my_routerinfo);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
-  // Initializes the mock
-  router_get_my_routerinfo();
-  crypto_pk_t *identity_pkey = pk_generate(0);
+  router_get_my_routerinfo(); //init mock
   crypto_pk_get_digest(identity_pkey, mock_routerinfo->cache_info.identity_digest);
 
   // the digest is mine (the channel is unnecrypted, so we must allow sending)
@@ -932,6 +930,7 @@ test_dir_handle_get_server_descriptors_authority(void* data)
     tor_free(mock_routerinfo);
     tor_free(conn);
     tor_free(header);
+    crypto_pk_free(identity_pkey);
 }
 
 #define DIR_HANDLE_CMD(name,flags)                              \
