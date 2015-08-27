@@ -1416,12 +1416,14 @@ options_act(const or_options_t *old_options)
 #endif
 
 #ifdef ENABLE_TOR2WEB_MODE
+/* LCOV_EXCL_START */
   if (!options->Tor2webMode) {
     log_err(LD_CONFIG, "This copy of Tor was compiled to run in "
             "'tor2web mode'. It can only be run with the Tor2webMode torrc "
             "option enabled.");
     return -1;
   }
+/* LCOV_EXCL_STOP */
 #else
   if (options->Tor2webMode) {
     log_err(LD_CONFIG, "This copy of Tor was not compiled to run in "
