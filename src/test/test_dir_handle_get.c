@@ -1051,6 +1051,31 @@ test_dir_handle_get_server_descriptors_d(void* data)
     crypto_pk_free(identity_pkey);
 }
 
+static void
+test_dir_handle_get_server_keys_bad_req(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(directory_handle_command_get(conn, GET("/tor/keys/"), NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+
+  tt_assert(header);
+  tt_str_op(BAD_REQUEST, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(mock_routerinfo);
+    tor_free(conn);
+    tor_free(header);
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -1077,5 +1102,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_descriptors_authority, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_fp, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_d, TT_FORK),
+  DIR_HANDLE_CMD(server_keys_bad_req, 0),
   END_OF_TESTCASES
 };
