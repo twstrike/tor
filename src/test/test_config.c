@@ -4242,8 +4242,7 @@ int mock_dns_reset(void){
     return 0;
 }
 
-static void
-test_config_options_act_Statistics_public_server_mode(void *arg)
+static void test_config_options_act_enable_Statistics_public_server_mode(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
@@ -4252,6 +4251,48 @@ test_config_options_act_Statistics_public_server_mode(void *arg)
 
     options->CellStatistics = 1;
     old_options->CellStatistics = 0;
+    options->EntryStatistics = 1;
+    old_options->EntryStatistics = 0;
+    options->ExitPortStatistics = 1;
+    old_options->ExitPortStatistics = 0;
+    options->ConnDirectionStatistics = 1;
+    old_options->ConnDirectionStatistics = 0;
+    options->HiddenServiceStatistics = 1;
+    old_options->HiddenServiceStatistics = 0;
+    options->BridgeAuthoritativeDir = 1;
+    old_options->BridgeAuthoritativeDir = 0;
+
+    MOCK(dns_reset,mock_dns_reset);
+    NS_MOCK(server_mode);
+    NS_MOCK(public_server_mode);
+    tt_int_op(options_act(old_options),OP_EQ,0);
+  done:
+    options->CellStatistics = 0;
+    UNMOCK(get_options_mutable);
+    UNMOCK(dns_reset);
+    NS_UNMOCK(server_mode);
+    NS_UNMOCK(public_server_mode);
+    (void)arg;
+}
+
+static void test_config_options_act_disable_Statistics_public_server_mode(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = test_setup_option_CMD_TOR();
+
+    old_options->CellStatistics = 1;
+    options->CellStatistics = 0;
+    old_options->EntryStatistics = 1;
+    options->EntryStatistics = 0;
+    old_options->ExitPortStatistics = 1;
+    options->ExitPortStatistics = 0;
+    old_options->ConnDirectionStatistics = 1;
+    options->ConnDirectionStatistics = 0;
+    old_options->HiddenServiceStatistics = 1;
+    options->HiddenServiceStatistics = 0;
+    old_options->BridgeAuthoritativeDir = 1;
+    options->BridgeAuthoritativeDir = 0;
 
     MOCK(dns_reset,mock_dns_reset);
     NS_MOCK(server_mode);
@@ -4297,6 +4338,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_BridgePassword, 0),
   CONFIG_TEST(options_act_BridgeRelay, 0),
   CONFIG_TEST(options_act_Statistics_private_server_mode, 0),
-  CONFIG_TEST(options_act_Statistics_public_server_mode, TT_FORK),
+  CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
+  CONFIG_TEST(options_act_disable_Statistics_public_server_mode, TT_FORK),
   END_OF_TESTCASES
 };
