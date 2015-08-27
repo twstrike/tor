@@ -302,6 +302,83 @@ test_options_validate__nickname(void *ignored)
 }
 
 
+static void
+test_options_validate__contactinfo(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("ORListenAddress 127.0.0.1:5555\nORPort 955");
+  int previous_log = setup_capture_of_logs(LOG_DEBUG);
+  tdata->opt->ContactInfo = NULL;
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Your ContactInfo config option is not set. Please consider setting it, so we can contact you if your server is misconfigured or something else goes wrong.\n");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("ORListenAddress 127.0.0.1:5555\nORPort 955\nContactInfo hella@example.org");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(0), OP_NE, "Your ContactInfo config option is not set. Please consider setting it, so we can contact you if your server is misconfigured or something else goes wrong.\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+extern int quiet_level;
+
+static void
+test_options_validate__logs(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int orig_quiet_level = quiet_level;
+  options_test_data_t *tdata = get_options_test_data("");
+  tdata->opt->Logs = NULL;
+  tdata->opt->RunAsDaemon = 0;
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(tdata->opt->Logs->key, OP_EQ, "Log");
+  tt_str_op(tdata->opt->Logs->value, OP_EQ, "notice stdout");
+
+  tdata->opt->Logs = NULL;
+  quiet_level = 1;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(tdata->opt->Logs->key, OP_EQ, "Log");
+  tt_str_op(tdata->opt->Logs->value, OP_EQ, "warn stdout");
+
+  tdata->opt->Logs = NULL;
+  quiet_level = 2;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_assert(!tdata->opt->Logs);
+
+  tdata->opt->Logs = NULL;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 1, &msg);
+  tt_assert(!tdata->opt->Logs);
+
+  tdata->opt->RunAsDaemon = 1;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_assert(!tdata->opt->Logs);
+
+  config_line_t *cl=NULL;
+  config_get_lines("Log foo", &cl, 1);
+  tdata->opt->Logs = cl;
+  tdata->opt->RunAsDaemon = 0;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op((intptr_t)tdata->opt->Logs, OP_EQ, (intptr_t)cl);
+
+ done:
+  quiet_level = orig_quiet_level;
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
 
 struct testcase_t options_tests[] = {
   { "validate", test_options_validate, TT_FORK, NULL, NULL },
@@ -309,5 +386,7 @@ struct testcase_t options_tests[] = {
   { "validate__outbound_addresses", test_options_validate__outbound_addresses, TT_FORK, NULL, NULL },
   { "validate__data_directory", test_options_validate__data_directory, TT_FORK, NULL, NULL },
   { "validate__nickname", test_options_validate__nickname, TT_FORK, NULL, NULL },
+  { "validate__contactinfo", test_options_validate__contactinfo, TT_FORK, NULL, NULL },
+  { "validate__logs", test_options_validate__logs, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
