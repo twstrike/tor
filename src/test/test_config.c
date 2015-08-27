@@ -4334,6 +4334,27 @@ test_config_options_act_EntryNodes(void *arg)
 }
 
 static void
+test_config_options_act_ExcludeNodes(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = test_setup_option_CMD_TOR();
+
+    options->EntryNodes = routerset_new();
+    options->ExcludeNodes = routerset_new();
+    smartlist_add(options->ExcludeNodes->list, tor_strndup("foo", 3));
+    old_options->ExcludeNodes = NULL;
+
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  done:
+    options->EntryNodes = NULL;
+    options->ExcludeNodes->list = NULL;
+    options->ExcludeNodes = NULL;
+    (void)arg;
+}
+
+static void
 test_config_options_act_DirPortFrontPage(void *arg)
 {
     or_options_t *options, *old_options;
@@ -4380,6 +4401,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
   CONFIG_TEST(options_act_disable_Statistics_public_server_mode, TT_FORK),
   CONFIG_TEST(options_act_EntryNodes, 0),
+  CONFIG_TEST(options_act_ExcludeNodes, 0),
   CONFIG_TEST(options_act_DirPortFrontPage, 0),
   END_OF_TESTCASES
 };
