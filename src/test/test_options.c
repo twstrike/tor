@@ -9,6 +9,9 @@
 #include "config.h"
 #include "test.h"
 
+#define ROUTERSET_PRIVATE
+#include "routerset.h"
+
 #include "log_test_helpers.h"
 
 typedef struct {
@@ -415,7 +418,6 @@ static void
 test_options_validate__relay_with_hidden_services(void *ignored)
 {
   (void)ignored;
-  int ret;
   char *msg;
   int previous_log = setup_capture_of_logs(LOG_DEBUG);
   options_test_data_t *tdata = get_options_test_data("ORListenAddress 127.0.0.1:5555\n"
@@ -423,7 +425,7 @@ test_options_validate__relay_with_hidden_services(void *ignored)
                                                      "HiddenServiceDir /Library/Tor/var/lib/tor/hidden_service/\n"
                                                      "HiddenServicePort 80 127.0.0.1:8080\n");
 
-  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
   tt_str_op(mock_saved_log_at(1), OP_EQ, "Tor is currently configured as a relay and a hidden service. "
             "That's not very secure: you should probably run your hidden service "
             "in a separate Tor process, at least -- see "
@@ -556,6 +558,189 @@ test_options_validate__transproxy(void *ignored)
   tor_free(msg);
 }
 
+
+
+static void
+test_options_validate__exclude_nodes(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("ExcludeExitNodes {us}\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(smartlist_len(tdata->opt->ExcludeExitNodesUnion_->list), OP_EQ, 1);
+  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{us}");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("ExcludeNodes {se}\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(smartlist_len(tdata->opt->ExcludeExitNodesUnion_->list), OP_EQ, 1);
+  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{se}");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("ExcludeNodes {se}\n"
+                                "ExcludeExitNodes {us} {se}\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(smartlist_len(tdata->opt->ExcludeExitNodesUnion_->list), OP_EQ, 2);
+  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{us} {se}");
+  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 1)), OP_EQ, "{se}");
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__scheduler(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int previous_log = setup_capture_of_logs(LOG_DEBUG);
+  options_test_data_t *tdata = get_options_test_data("SchedulerLowWaterMark__ 0\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Bad SchedulerLowWaterMark__ option\n");
+
+  // TODO: this test cannot run on platforms where UINT32_MAX is == to UINT64_MAX.
+  // I suspect it's unlikely this branch can actually happen
+  /* free_options_test_data(tdata); */
+  /* tdata = get_options_test_data("SchedulerLowWaterMark 10000000000000000000\n"); */
+  /* tdata->opt->SchedulerLowWaterMark__ = (uint64_t)UINT32_MAX; */
+  /* tdata->opt->SchedulerLowWaterMark__++; */
+  /* mock_clean_saved_logs(); */
+  /* ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg); */
+  /* tt_int_op(ret, OP_EQ, -1); */
+  /* tt_str_op(mock_saved_log_at(1), OP_EQ, "Bad SchedulerLowWaterMark__ option\n"); */
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("SchedulerLowWaterMark__ 42\n"
+                                "SchedulerHighWaterMark__ 42\n");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Bad SchedulerHighWaterMark option\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__node_families(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("NodeFamily flux, flax\n"
+                                                     "NodeFamily somewhere\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_assert(tdata->opt->NodeFamilySets);
+  tt_int_op(smartlist_len(tdata->opt->NodeFamilySets), OP_EQ, 2);
+  tt_str_op((char *)(smartlist_get(((routerset_t *)smartlist_get(tdata->opt->NodeFamilySets, 0))->list, 0)), OP_EQ, "flux");
+  tt_str_op((char *)(smartlist_get(((routerset_t *)smartlist_get(tdata->opt->NodeFamilySets, 0))->list, 1)), OP_EQ, "flax");
+  tt_str_op((char *)(smartlist_get(((routerset_t *)smartlist_get(tdata->opt->NodeFamilySets, 1))->list, 0)), OP_EQ, "somewhere");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_assert(!tdata->opt->NodeFamilySets);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("NodeFamily !flux\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_assert(tdata->opt->NodeFamilySets);
+  tt_int_op(smartlist_len(tdata->opt->NodeFamilySets), OP_EQ, 0);
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__tlsec(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int previous_log = setup_capture_of_logs(LOG_DEBUG);
+  options_test_data_t *tdata = get_options_test_data("TLSECGroup ed25519\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Unrecognized TLSECGroup: Falling back to the default.\n");
+  tt_assert(!tdata->opt->TLSECGroup);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("TLSECGroup P224\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(0), OP_NE, "Unrecognized TLSECGroup: Falling back to the default.\n");
+  tt_assert(tdata->opt->TLSECGroup);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("TLSECGroup P256\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(0), OP_NE, "Unrecognized TLSECGroup: Falling back to the default.\n");
+  tt_assert(tdata->opt->TLSECGroup);
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__token_bucket(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("");
+
+  tdata->opt->TokenBucketRefillInterval = 0;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "TokenBucketRefillInterval must be between 1 and 1000 inclusive.");
+
+  tdata->opt->TokenBucketRefillInterval = 1001;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "TokenBucketRefillInterval must be between 1 and 1000 inclusive.");
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
 struct testcase_t options_tests[] = {
   { "validate", test_options_validate, TT_FORK, NULL, NULL },
   { "validate__uname_for_server", test_options_validate__uname_for_server, TT_FORK, NULL, NULL },
@@ -567,5 +752,10 @@ struct testcase_t options_tests[] = {
   { "validate__authdir", test_options_validate__authdir, TT_FORK, NULL, NULL },
   { "validate__relay_with_hidden_services", test_options_validate__relay_with_hidden_services, TT_FORK, NULL, NULL },
   { "validate__transproxy", test_options_validate__transproxy, TT_FORK, NULL, NULL },
+  { "validate__exclude_nodes", test_options_validate__exclude_nodes, TT_FORK, NULL, NULL },
+  { "validate__scheduler", test_options_validate__scheduler, TT_FORK, NULL, NULL },
+  { "validate__node_families", test_options_validate__node_families, TT_FORK, NULL, NULL },
+  { "validate__tlsec", test_options_validate__tlsec, TT_FORK, NULL, NULL },
+  { "validate__token_bucket", test_options_validate__token_bucket, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
