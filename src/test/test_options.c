@@ -193,6 +193,15 @@ get_options_test_data(char *conf)
   return result;
 }
 
+static void
+free_options_test_data(options_test_data_t *td)
+{
+  or_options_free(td->old_opt);
+  or_options_free(td->opt);
+  or_options_free(td->def_opt);
+  tor_free(td);
+}
+
 
 static void
 test_options_validate__uname_for_server(void *ignored)
@@ -224,10 +233,81 @@ test_options_validate__uname_for_server(void *ignored)
 
  done:
   UNMOCK(get_uname);
+  free_options_test_data(tdata);
+  tor_free(msg);
   teardown_capture_of_logs(previous_log);
 }
+
+static void
+test_options_validate__outbound_addresses(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("OutboundBindAddress xxyy!!!sdfaf");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__data_directory(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("DataDirectory longreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONGlongreallylongLONGLONG"); // 440 characters long
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Invalid DataDirectory");
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__nickname(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("Nickname ThisNickNameIsABitTooLong");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Nickname 'ThisNickNameIsABitTooLong' is wrong length or contains illegal characters.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("Nickname AMoreValidNick");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Failed to validate Log options. See logs for details.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("DataDirectory /tmp/somewhere");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Failed to validate Log options. See logs for details.");
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+
 struct testcase_t options_tests[] = {
   { "validate", test_options_validate, TT_FORK, NULL, NULL },
   { "validate__uname_for_server", test_options_validate__uname_for_server, TT_FORK, NULL, NULL },
+  { "validate__outbound_addresses", test_options_validate__outbound_addresses, TT_FORK, NULL, NULL },
+  { "validate__data_directory", test_options_validate__data_directory, TT_FORK, NULL, NULL },
+  { "validate__nickname", test_options_validate__nickname, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
