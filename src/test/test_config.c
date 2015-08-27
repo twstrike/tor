@@ -4242,7 +4242,8 @@ int mock_dns_reset(void){
     return 0;
 }
 
-static void test_config_options_act_enable_Statistics_public_server_mode(void *arg)
+static void
+test_config_options_act_enable_Statistics_public_server_mode(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
@@ -4275,7 +4276,8 @@ static void test_config_options_act_enable_Statistics_public_server_mode(void *a
     (void)arg;
 }
 
-static void test_config_options_act_disable_Statistics_public_server_mode(void *arg)
+static void
+test_config_options_act_disable_Statistics_public_server_mode(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
@@ -4310,6 +4312,22 @@ static void test_config_options_act_disable_Statistics_public_server_mode(void *
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+static void
+test_config_options_act_DirPortFrontPage(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = test_setup_option_CMD_TOR();
+
+    options->DirPortFrontPage = "";
+
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  done:
+    options->DirPortFrontPage = NULL;
+    (void)arg;
+}
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4340,5 +4358,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_Statistics_private_server_mode, 0),
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
   CONFIG_TEST(options_act_disable_Statistics_public_server_mode, TT_FORK),
+  CONFIG_TEST(options_act_DirPortFrontPage, 0),
   END_OF_TESTCASES
 };
