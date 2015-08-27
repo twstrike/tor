@@ -3884,48 +3884,64 @@ init_mock_global_options(void){
     MOCK(get_options_mutable,mock_get_options_mutable);
 }
 
-static void test_config_options_act(void *arg)
+static or_options_t *
+test_setup_option_CMD_TOR()
 {
-    or_options_t *options, *old_options;
-    old_options = options_new();
+    or_options_t *options;
+
     init_mock_global_options();
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
+
+    return options;
+}
+
+static void
+test_config_options_act(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = test_setup_option_CMD_TOR();
+
     options->DisableDebuggerAttachment = 0;
     options_act(old_options);
 
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
   done:
     UNMOCK(get_options_mutable);
     (void)arg;
 }
 
-static void test_config_options_act_Tor2webMode_err(void *arg)
+static void
+test_config_options_act_Tor2webMode_err(void *arg)
 {
     mark_logs_temp();
     close_temp_logs();
 
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+
+    options = test_setup_option_CMD_TOR();
+
     //Options should not have Tor2webMode without compiled as ENABLE_TOR2WEB_MODE
     options->Tor2webMode = 1;
-    tt_int_op(options_act(old_options),OP_EQ,-1);
+
+    tt_int_op(options_act(old_options), OP_EQ, -1);
+
   done:
     UNMOCK(get_options_mutable);
     options->Tor2webMode = 0;
     (void)arg;
 }
 
-static void test_config_options_act_DirAuthority_line_err(void *arg)
+static void
+test_config_options_act_DirAuthority_line_err(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     config_line_t *test_dir_authority = tor_malloc(sizeof(config_line_t));
     memset(test_dir_authority, 0, sizeof(config_line_t));
     test_dir_authority->key = tor_strdup("DirAuthority");
@@ -3933,7 +3949,8 @@ static void test_config_options_act_DirAuthority_line_err(void *arg)
     options->DirAuthorities = test_dir_authority;
     options->DisableDebuggerAttachment = 0;
 
-    tt_int_op(options_act(old_options),OP_EQ,-1);
+    tt_int_op(options_act(old_options), OP_EQ, -1);
+
   done:
     UNMOCK(get_options_mutable);
     tor_free(test_dir_authority->key);
@@ -3944,13 +3961,13 @@ static void test_config_options_act_DirAuthority_line_err(void *arg)
     (void)arg;
 }
 
-static void test_config_options_act_Bridge(void *arg)
+static void
+test_config_options_act_Bridge(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     config_line_t *test_bridges = tor_malloc(sizeof(config_line_t));
     memset(test_bridges, 0, sizeof(config_line_t));
     test_bridges->key = tor_strdup("Bridges");
@@ -3958,7 +3975,8 @@ static void test_config_options_act_Bridge(void *arg)
     test_bridges->next = NULL;
     options->Bridges = test_bridges;
 
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
   done:
     UNMOCK(get_options_mutable);
     tor_free(test_bridges->key);
@@ -3968,13 +3986,13 @@ static void test_config_options_act_Bridge(void *arg)
     (void)arg;
 }
 
-static void test_config_options_act_Bridge_err(void *arg)
+static void
+test_config_options_act_Bridge_err(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     config_line_t *test_bridges = tor_malloc(sizeof(config_line_t));
     memset(test_bridges, 0, sizeof(config_line_t));
     test_bridges->key = tor_strdup("NotBridges");
@@ -3982,7 +4000,8 @@ static void test_config_options_act_Bridge_err(void *arg)
     test_bridges->next = NULL;
     options->Bridges = test_bridges;
 
-    tt_int_op(options_act(old_options),OP_EQ,-1);
+    tt_int_op(options_act(old_options), OP_EQ, -1);
+
   done:
     UNMOCK(get_options_mutable);
     tor_free(test_bridges->key);
@@ -3992,20 +4011,21 @@ static void test_config_options_act_Bridge_err(void *arg)
     (void)arg;
 }
 
-static void test_config_options_act_ClientTransportPlugin_err(void *arg)
+static void
+test_config_options_act_ClientTransportPlugin_err(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     config_line_t *test_clientTransportPlugin = tor_malloc(sizeof(config_line_t));
     memset(test_clientTransportPlugin, 0, sizeof(config_line_t));
     test_clientTransportPlugin->key = tor_strdup("ClientTransportPlugin");
     test_clientTransportPlugin->value = tor_strdup("some not correct format of ClientTransportPlugin");
     options->ClientTransportPlugin = test_clientTransportPlugin;
 
-    tt_int_op(options_act(old_options),OP_EQ,-1);
+    tt_int_op(options_act(old_options), OP_EQ, -1);
+
   done:
     UNMOCK(get_options_mutable);
     tor_free(test_clientTransportPlugin->key);
@@ -4027,13 +4047,13 @@ NS(server_mode)(const or_options_t *options)
   return 1;
 }
 
-static void test_config_options_act_ServerTransportPlugin_err(void *arg)
+static void
+test_config_options_act_ServerTransportPlugin_err(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     config_line_t *test_serverTransportPlugin = tor_malloc(sizeof(config_line_t));
     memset(test_serverTransportPlugin, 0, sizeof(config_line_t));
     test_serverTransportPlugin->key = tor_strdup("ServerTransportPlugin");
@@ -4041,7 +4061,8 @@ static void test_config_options_act_ServerTransportPlugin_err(void *arg)
     options->ServerTransportPlugin = test_serverTransportPlugin;
     NS_MOCK(server_mode);
 
-    tt_int_op(options_act(old_options),OP_EQ,-1);
+    tt_int_op(options_act(old_options), OP_EQ, -1);
+
   done:
     UNMOCK(get_options_mutable);
     tor_free(test_serverTransportPlugin->key);
@@ -4060,16 +4081,17 @@ mocked_finish_daemon(const char *desired_cwd)
   (void) desired_cwd;
 }
 
-static void test_config_options_act_RunAsDaemon(void *arg)
+static void
+test_config_options_act_RunAsDaemon(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     MOCK(finish_daemon,mocked_finish_daemon);
     options->RunAsDaemon = 1;
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
   done:
     UNMOCK(get_options_mutable);
     UNMOCK(finish_daemon);
@@ -4077,13 +4099,13 @@ static void test_config_options_act_RunAsDaemon(void *arg)
     (void)arg;
 }
 
-static void test_config_options_act_options_transition_requires_fresh_tls_context(void *arg)
+static void
+test_config_options_act_options_transition_requires_fresh_tls_context(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     options->V3AuthoritativeDir = 0;
     old_options->V3AuthoritativeDir = 1;
     old_options->DataDirectory = options->DataDirectory;
@@ -4097,7 +4119,8 @@ static void test_config_options_act_options_transition_requires_fresh_tls_contex
     old_options->LogMessageDomains = options->LogMessageDomains;
     options->TLSECGroup = "P256";
     old_options->TLSECGroup = "P224";
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
   done:
     UNMOCK(get_options_mutable);
     options->V3AuthoritativeDir = 0;
@@ -4107,52 +4130,56 @@ static void test_config_options_act_options_transition_requires_fresh_tls_contex
     (void)arg;
 }
 
-static void test_config_options_act_write_pidfile(void *arg)
+static void
+test_config_options_act_write_pidfile(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     options->PidFile = "tmp/tor_test_PidFile";
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
   done:
     UNMOCK(get_options_mutable);
     options->PidFile = NULL;
     (void)arg;
 }
 
-static void test_config_options_act_BridgePassword(void *arg)
+static void
+test_config_options_act_BridgePassword(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     options->BridgePassword = "some password";
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
   done:
     UNMOCK(get_options_mutable);
     options->BridgePassword = NULL;
     (void)arg;
 }
 
-static void test_config_options_act_BridgeRelay(void *arg)
+static void
+test_config_options_act_BridgeRelay(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     int tempIsBridgeRelay = options->BridgeRelay;
     //New option is BridgeRelay
     options->BridgeRelay = 1;
     old_options->BridgeRelay = !options->BridgeRelay;
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
     //New option is BridgeRelay
     options->BridgeRelay = 0;
     old_options->BridgeRelay = !options->BridgeRelay;
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
   done:
     UNMOCK(get_options_mutable);
     options->BridgeRelay = tempIsBridgeRelay;
@@ -4166,21 +4193,22 @@ NS_DECL(int, public_server_mode, (const or_options_t *options));
 static int
 NS(public_server_mode)(const or_options_t *options)
 {
-  (void)options;
+  (void) options;
 
   return 0;
 }
 
-static void test_config_options_act_Statistics_private_server_mode(void *arg)
+static void
+test_config_options_act_Statistics_private_server_mode(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
+    options = test_setup_option_CMD_TOR();
+
     options->CellStatistics = 1;
     NS_MOCK(public_server_mode);
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
   done:
     UNMOCK(get_options_mutable);
     options->CellStatistics = 0;
@@ -4214,21 +4242,22 @@ int mock_dns_reset(void){
     return 0;
 }
 
-static void test_config_options_act_Statistics_public_server_mode(void *arg)
+static void
+test_config_options_act_Statistics_public_server_mode(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
-    init_mock_global_options();
-    options = get_options_mutable();
-    options->command = CMD_RUN_TOR;
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    options = test_setup_option_CMD_TOR();
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
     options->CellStatistics = 1;
     old_options->CellStatistics = 0;
 
     MOCK(dns_reset,mock_dns_reset);
     NS_MOCK(server_mode);
     NS_MOCK(public_server_mode);
-    tt_int_op(options_act(old_options),OP_EQ,0);
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
   done:
     options->CellStatistics = 0;
     UNMOCK(get_options_mutable);
