@@ -933,6 +933,71 @@ test_dir_handle_get_server_descriptors_authority(void* data)
     crypto_pk_free(identity_pkey);
 }
 
+static void
+test_dir_handle_get_server_descriptors_fp(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  char *body = NULL;
+  size_t body_used = 0;
+  crypto_pk_t *identity_pkey = pk_generate(0);
+  (void) data;
+
+  NS_MOCK(router_get_my_routerinfo);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  router_get_my_routerinfo(); //init mock
+  crypto_pk_get_digest(identity_pkey, mock_routerinfo->cache_info.identity_digest);
+
+  // the digest is mine (the channel is unnecrypted, so we must allow sending)
+  set_server_identity_key(identity_pkey);
+  mock_routerinfo->cache_info.send_unencrypted = 1;
+
+  /* Setup descriptor */
+  int annotation_len = strstr(TEST_DESCRIPTOR, "router ") - TEST_DESCRIPTOR;
+  mock_routerinfo->cache_info.signed_descriptor_body = TEST_DESCRIPTOR;
+  mock_routerinfo->cache_info.signed_descriptor_len = strlen(TEST_DESCRIPTOR);
+  mock_routerinfo->cache_info.annotations_len = annotation_len;
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  #define HEX1 "Fe0daff89127389bc67558691231234551193EEE"
+  #define HEX2 "Deadbeef99999991111119999911111111f00ba4"
+  const char *hex_digest = hex_str(mock_routerinfo->cache_info.identity_digest, DIGEST_LEN);
+  char req_header[155];
+  sprintf(req_header, SERVER_DESC_GET("fp/%s+" HEX1 "+" HEX2), hex_digest);
+  tt_int_op(directory_handle_command_get(conn, req_header, NULL, 0), OP_EQ, 0);
+
+  //TODO: Is this a BUG?
+  //It requires strlen(TEST_DESCRIPTOR)+1 as body_len but returns a body which
+  //is smaller than that by annotation_len bytes
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, strlen(TEST_DESCRIPTOR)+1, 0);
+
+  tt_assert(header);
+  tt_assert(body);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+
+  //TODO: Is this a BUG?
+  //This is what should be expected:
+  //tt_int_op(body_used, OP_EQ, strlen(body));
+  tt_int_op(body_used, OP_EQ, strlen(TEST_DESCRIPTOR));
+
+  tt_str_op(body, OP_EQ, TEST_DESCRIPTOR + annotation_len);
+  tt_int_op(conn->dir_spool_src, OP_EQ, DIR_SPOOL_NONE);
+
+  done:
+    NS_UNMOCK(router_get_my_routerinfo);
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(mock_routerinfo);
+    tor_free(conn);
+    tor_free(header);
+    crypto_pk_free(identity_pkey);
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -957,5 +1022,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_descriptors_invalid_req, 0),
   DIR_HANDLE_CMD(server_descriptors_all, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_authority, 0),
+  DIR_HANDLE_CMD(server_descriptors_fp, 0),
   END_OF_TESTCASES
 };
