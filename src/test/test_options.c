@@ -411,6 +411,161 @@ test_options_validate__authdir(void *ignored)
 }
 
 
+static void
+test_options_validate__relay_with_hidden_services(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int previous_log = setup_capture_of_logs(LOG_DEBUG);
+  options_test_data_t *tdata = get_options_test_data("ORListenAddress 127.0.0.1:5555\n"
+                                                     "ORPort 955\n"
+                                                     "HiddenServiceDir /Library/Tor/var/lib/tor/hidden_service/\n"
+                                                     "HiddenServicePort 80 127.0.0.1:8080\n");
+  tdata->opt->LogTimeGranularity = 1;
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "Tor is currently configured as a relay and a hidden service. "
+            "That's not very secure: you should probably run your hidden service "
+            "in a separate Tor process, at least -- see "
+            "https://trac.torproject.org/8742\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+// TODO: it doesn't seem possible to hit the case of having no port lines at all, since there will be a default created for SocksPort
+/* static void */
+/* test_options_validate__ports(void *ignored) */
+/* { */
+/*   (void)ignored; */
+/*   int ret; */
+/*   char *msg; */
+/*   int previous_log = setup_capture_of_logs(LOG_WARN); */
+/*   options_test_data_t *tdata = get_options_test_data(""); */
+/*   tdata->opt->LogTimeGranularity = 1; */
+
+/*   ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg); */
+/*   tt_str_op(mock_saved_log_at(0), OP_EQ, "SocksPort, TransPort, NATDPort, DNSPort, and ORPort are all " */
+/*         "undefined, and there aren't any hidden services configured.  " */
+/*         "Tor will still run, but probably won't do anything.\n"); */
+
+/*  done: */
+/*   teardown_capture_of_logs(previous_log); */
+/*   free_options_test_data(tdata); */
+/*   tor_free(msg); */
+/* } */
+
+static void
+test_options_validate__transproxy(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata;
+
+#ifdef USE_TRANSPARENT
+  // Test default trans proxy
+  tdata = get_options_test_data("TransProxyType default\n");
+  tdata->opt->LogTimeGranularity = 1;
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(tdata->opt->TransProxyType_parsed, OP_EQ, TPT_DEFAULT);
+
+  // Test pf-divert trans proxy
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("TransProxyType pf-divert\n");
+  tdata->opt->LogTimeGranularity = 1;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+
+#if !defined(__OpenBSD__) && !defined( DARWIN )
+  tt_str_op(msg, OP_EQ, "pf-divert is a OpenBSD-specific and OS X/Darwin-specific feature.");
+#else
+  tt_int_op(tdata->opt->TransProxyType_parsed, OP_EQ, TPT_PF_DIVERT);
+  tt_str_op(msg, OP_EQ, "Cannot use TransProxyType without any valid TransPort or TransListenAddress.");
+#endif
+
+  // Test tproxy trans proxy
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("TransProxyType tproxy\n");
+  tdata->opt->LogTimeGranularity = 1;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+
+#if !defined(__linux__)
+  tt_str_op(msg, OP_EQ, "TPROXY is a Linux-specific feature.");
+#else
+  tt_int_op(tdata->opt->TransProxyType_parsed, OP_EQ, TPT_TPROXY);
+  tt_str_op(msg, OP_EQ, "Cannot use TransProxyType without any valid TransPort or TransListenAddress.");
+#endif
+
+  // Test ipfw trans proxy
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("TransProxyType ipfw\n");
+  tdata->opt->LogTimeGranularity = 1;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+
+#if !defined(__FreeBSD__) && !defined( DARWIN )
+  tt_str_op(msg, OP_EQ, "ipfw is a FreeBSD-specificand OS X/Darwin-specific feature.");
+#else
+  tt_int_op(tdata->opt->TransProxyType_parsed, OP_EQ, TPT_IPFW);
+  tt_str_op(msg, OP_EQ, "Cannot use TransProxyType without any valid TransPort or TransListenAddress.");
+#endif
+
+  // Test unknown trans proxy
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("TransProxyType non-existant\n");
+  tdata->opt->LogTimeGranularity = 1;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Unrecognized value for TransProxyType");
+
+  // Test trans proxy success
+  free_options_test_data(tdata);
+
+#if defined(linux)
+  tdata = get_options_test_data("TransProxyType tproxy\n"
+                                "TransPort 127.0.0.1:123\n");
+  tdata->opt->LogTimeGranularity = 1;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_NE, "Cannot use TransProxyType without any valid TransPort or TransListenAddress.");
+#endif
+#if defined(__FreeBSD__) || defined( DARWIN )
+  tdata = get_options_test_data("TransProxyType ipfw\n"
+                                "TransPort 127.0.0.1:123\n");
+  tdata->opt->LogTimeGranularity = 1;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_NE, "Cannot use TransProxyType without any valid TransPort or TransListenAddress.");
+#endif
+#if defined(__OpenBSD__)
+  tdata = get_options_test_data("TransProxyType pf-divert\n"
+                                "TransPort 127.0.0.1:123\n");
+  tdata->opt->LogTimeGranularity = 1;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_NE, "Cannot use TransProxyType without any valid TransPort or TransListenAddress.");
+#endif
+
+#else
+  tdata = get_options_test_data("TransPort 127.0.0.1:555\n");
+  tdata->opt->LogTimeGranularity = 1;
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "TransPort and TransListenAddress are disabled in this build.");
+#endif
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
 
 struct testcase_t options_tests[] = {
   { "validate", test_options_validate, TT_FORK, NULL, NULL },
@@ -421,5 +576,7 @@ struct testcase_t options_tests[] = {
   { "validate__contactinfo", test_options_validate__contactinfo, TT_FORK, NULL, NULL },
   { "validate__logs", test_options_validate__logs, TT_FORK, NULL, NULL },
   { "validate__authdir", test_options_validate__authdir, TT_FORK, NULL, NULL },
+  { "validate__relay_with_hidden_services", test_options_validate__relay_with_hidden_services, TT_FORK, NULL, NULL },
+  { "validate__transproxy", test_options_validate__transproxy, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
