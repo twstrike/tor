@@ -16,7 +16,7 @@ int dns_init(void);
 int has_dns_init_failed(void);
 void dns_free_all(void);
 uint32_t dns_clip_ttl(uint32_t ttl);
-int dns_reset(void);
+MOCK_DECL(int, dns_reset, (void));
 void connection_dns_remove(edge_connection_t *conn);
 void assert_connection_edge_not_dns_pending(edge_connection_t *conn);
 void assert_all_pending_dns_resolves_ok(void);

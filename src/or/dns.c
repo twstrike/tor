@@ -318,8 +318,8 @@ dns_init(void)
 
 /** Called when DNS-related options change (or may have changed).  Returns -1
  * on failure, 0 on success. */
-int
-dns_reset(void)
+MOCK_IMPL(int,
+dns_reset,(void))
 {
   const or_options_t *options = get_options();
   if (! server_mode(options)) {

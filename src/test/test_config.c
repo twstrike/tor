@@ -21,6 +21,7 @@
 #include "routerlist.h"
 #include "router.h"
 #include "util.h"
+#include "dns.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -4158,8 +4159,8 @@ static void test_config_options_act_BridgeRelay(void *arg)
     (void)arg;
 }
 
-#define NS_MODULE public_server_mode
-#define NS_SUBMODULE Statistics
+#define NS_MODULE server_mode
+#define NS_SUBMODULE Statistics_private_server_mode
 NS_DECL(int, public_server_mode, (const or_options_t *options));
 
 static int
@@ -4170,12 +4171,11 @@ NS(public_server_mode)(const or_options_t *options)
   return 0;
 }
 
-static void test_config_options_act_Statistics(void *arg)
+static void test_config_options_act_Statistics_private_server_mode(void *arg)
 {
     or_options_t *options, *old_options;
     old_options = options_new();
     init_mock_global_options();
-    MOCK(get_options_mutable,mock_get_options_mutable);
     options = get_options_mutable();
     options->command = CMD_RUN_TOR;
     options->CellStatistics = 1;
@@ -4183,6 +4183,57 @@ static void test_config_options_act_Statistics(void *arg)
     tt_int_op(options_act(old_options),OP_EQ,0);
   done:
     UNMOCK(get_options_mutable);
+    options->CellStatistics = 0;
+    NS_UNMOCK(public_server_mode);
+    (void)arg;
+}
+#undef NS_SUBMODULE
+
+#define NS_SUBMODULE Statistics_public_server_mode
+NS_DECL(int, public_server_mode, (const or_options_t *options));
+
+static int
+NS(public_server_mode)(const or_options_t *options)
+{
+  (void)options;
+
+  return 1;
+}
+
+NS_DECL(int, server_mode, (const or_options_t *options));
+
+static int
+NS(server_mode)(const or_options_t *options)
+{
+  (void)options;
+
+  return 1;
+}
+
+int mock_dns_reset(void){
+    return 0;
+}
+
+static void test_config_options_act_Statistics_public_server_mode(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    init_mock_global_options();
+    options = get_options_mutable();
+    options->command = CMD_RUN_TOR;
+    tt_int_op(options_act(old_options),OP_EQ,0);
+    options->CellStatistics = 1;
+    old_options->CellStatistics = 0;
+
+    MOCK(dns_reset,mock_dns_reset);
+    NS_MOCK(server_mode);
+    NS_MOCK(public_server_mode);
+    tt_int_op(options_act(old_options),OP_EQ,0);
+  done:
+    options->CellStatistics = 0;
+    UNMOCK(get_options_mutable);
+    UNMOCK(dns_reset);
+    NS_UNMOCK(server_mode);
     NS_UNMOCK(public_server_mode);
     (void)arg;
 }
@@ -4216,6 +4267,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_write_pidfile, 0),
   CONFIG_TEST(options_act_BridgePassword, 0),
   CONFIG_TEST(options_act_BridgeRelay, 0),
-  CONFIG_TEST(options_act_Statistics, 0),
+  CONFIG_TEST(options_act_Statistics_private_server_mode, 0),
+  CONFIG_TEST(options_act_Statistics_public_server_mode, TT_FORK),
   END_OF_TESTCASES
 };
