@@ -1021,7 +1021,7 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(networkstatus_bridges_different_digest, 0),
   DIR_HANDLE_CMD(server_descriptors_invalid_req, 0),
   DIR_HANDLE_CMD(server_descriptors_all, TT_FORK),
-  DIR_HANDLE_CMD(server_descriptors_authority, 0),
-  DIR_HANDLE_CMD(server_descriptors_fp, 0),
+  DIR_HANDLE_CMD(server_descriptors_authority, TT_FORK),
+  DIR_HANDLE_CMD(server_descriptors_fp, TT_FORK),
   END_OF_TESTCASES
 };
