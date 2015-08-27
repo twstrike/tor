@@ -449,6 +449,81 @@ test_relay_connection_edge_process_relay_cell__begin(void *ignored)
   clean_relay_connection_test_data(tdata);
 }
 
+
+static void
+test_relay_connection_edge_process_relay_cell__data(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  int previous_log = setup_capture_of_logs(LOG_INFO);
+  init_connection_lists();
+  relay_connection_test_data_t *tdata = init_relay_connection_test_data();
+
+  tdata->rh->command = RELAY_COMMAND_DATA;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
+
+  tdata->layer_hint->deliver_window = 0;
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_EXIT;
+  tdata->edgeconn->base_.magic = EDGE_CONNECTION_MAGIC;
+  tdata->edgeconn->base_.state = EXIT_CONN_STATE_OPEN;
+  tdata->edgeconn->base_.purpose = EXIT_PURPOSE_CONNECT;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
+
+  tdata->rh->stream_id = 0;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  tdata->circ->deliver_window = 2;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(tdata->circ->deliver_window, OP_EQ, 101);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "Relay data cell with zero stream_id. Dropping.\n");
+
+  tdata->rh->stream_id = 3;
+  relay_header_pack(tdata->cell->payload, tdata->rh);
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "data cell dropped, unknown stream (streamid 3).\n");
+
+  tdata->layer_hint->deliver_window = 2;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, NULL, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "data cell dropped, unknown stream (streamid 3).\n");
+
+  tdata->layer_hint->deliver_window = 2;
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.type = CONN_TYPE_EXIT;
+  tdata->edgeconn->base_.magic = EDGE_CONNECTION_MAGIC;
+  tdata->edgeconn->base_.state = EXIT_CONN_STATE_OPEN;
+  tdata->edgeconn->base_.purpose = EXIT_PURPOSE_CONNECT;
+  tdata->edgeconn->deliver_window = 0;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, -END_CIRC_REASON_TORPROTOCOL);
+  tt_assert(mock_saved_logs());
+  tt_str_op(mock_saved_logs()->generated_msg, OP_EQ, "(relay data) conn deliver_window below 0. Killing.\n");
+
+  tdata->layer_hint->deliver_window = 2;
+  tdata->edgeconn->deliver_window = 2;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tdata->layer_hint->deliver_window = 2;
+  tdata->edgeconn->base_.marked_for_close = 0;
+  tdata->edgeconn->base_.state = EXIT_CONN_STATE_CONNECTING;
+  tdata->edgeconn->deliver_window = 2;
+  ret = connection_edge_process_relay_cell(tdata->cell, tdata->circ, tdata->edgeconn, tdata->layer_hint);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  clean_relay_connection_test_data(tdata);
+}
+
 static void
 test_relay_connection_edge_process_relay_cell__begin_dir(void *ignored)
 {
@@ -1043,6 +1118,7 @@ struct testcase_t relay_tests[] = {
   RELAY_TEST(connection_edge_process_relay_cell__command_group, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__begin, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__begin_dir, TT_FORK),
+  RELAY_TEST(connection_edge_process_relay_cell__data, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__resolved, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__resolve, TT_FORK),
   RELAY_TEST(connection_edge_process_relay_cell__connected, TT_FORK),
