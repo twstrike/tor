@@ -8,6 +8,7 @@
 #define CONFIG_PRIVATE
 #define PT_PRIVATE
 #define ROUTER_PRIVATE
+#define ROUTERSET_PRIVATE
 #include "or.h"
 #include "addressmap.h"
 #include "config.h"
@@ -22,6 +23,7 @@
 #include "router.h"
 #include "util.h"
 #include "dns.h"
+#include "routerset.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -4313,6 +4315,25 @@ test_config_options_act_disable_Statistics_public_server_mode(void *arg)
 #undef NS_MODULE
 
 static void
+test_config_options_act_EntryNodes(void *arg)
+{
+    or_options_t *options, *old_options;
+    old_options = options_new();
+    options = test_setup_option_CMD_TOR();
+
+    options->EntryNodes = routerset_new();
+    smartlist_add(options->EntryNodes->list, tor_strndup("foo", 3));
+    old_options->EntryNodes = NULL;
+
+    tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  done:
+    options->EntryNodes->list = NULL;
+    options->EntryNodes = NULL;
+    (void)arg;
+}
+
+static void
 test_config_options_act_DirPortFrontPage(void *arg)
 {
     or_options_t *options, *old_options;
@@ -4358,6 +4379,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_Statistics_private_server_mode, 0),
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
   CONFIG_TEST(options_act_disable_Statistics_public_server_mode, TT_FORK),
+  CONFIG_TEST(options_act_EntryNodes, 0),
   CONFIG_TEST(options_act_DirPortFrontPage, 0),
   END_OF_TESTCASES
 };
