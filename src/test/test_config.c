@@ -4048,6 +4048,7 @@ static int
 NS(server_mode)(const or_options_t *options)
 {
   (void)options;
+  CALLED(server_mode)++;
 
   return 1;
 }
@@ -4067,6 +4068,7 @@ test_config_options_act_ServerTransportPlugin_err(void *arg)
   NS_MOCK(server_mode);
 
   tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
 
  done:
   UNMOCK(get_options_mutable);
@@ -4080,10 +4082,14 @@ test_config_options_act_ServerTransportPlugin_err(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE util
+#define NS_SUBMODULE finish_daemon
+NS_DECL(void, finish_daemon, (const char *desired_cwd));
 void
-mocked_finish_daemon(const char *desired_cwd)
+NS(finish_daemon)(const char *desired_cwd)
 {
   (void) desired_cwd;
+  CALLED(finish_daemon)++;
 }
 
 static void
@@ -4093,16 +4099,19 @@ test_config_options_act_RunAsDaemon(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  MOCK(finish_daemon,mocked_finish_daemon);
+  NS_MOCK(finish_daemon);
   options->RunAsDaemon = 1;
   tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(finish_daemon), OP_GT, 1);
 
  done:
   UNMOCK(get_options_mutable);
-  UNMOCK(finish_daemon);
+  NS_UNMOCK(finish_daemon);
   options->RunAsDaemon = 0;
   (void)arg;
 }
+#undef NS_SUBMODULE
+#undef NS_MODULE
 
 static void
 test_config_options_act_options_transition_requires_fresh_tls_context(void *arg)
