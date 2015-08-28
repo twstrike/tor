@@ -774,12 +774,12 @@ test_dir_handle_get_server_descriptors_all(void* data)
   size_t body_used = 0;
   (void) data;
 
+  /* Setup fake routerlist. */
+  helper_setup_fake_routerlist();
+
   //TODO: change to router_get_my_extrainfo when testing "extra" path
   NS_MOCK(router_get_my_routerinfo);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
-
-  /* Setup fake routerlist. */
-  helper_setup_fake_routerlist();
 
   // We are one of the routers
   routerlist_t *our_routerlist = router_get_routerlist();
@@ -1001,11 +1001,11 @@ test_dir_handle_get_server_descriptors_d(void* data)
   crypto_pk_t *identity_pkey = pk_generate(0);
   (void) data;
 
-  NS_MOCK(router_get_my_routerinfo);
-  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
-
   /* Setup fake routerlist. */
   helper_setup_fake_routerlist();
+
+  NS_MOCK(router_get_my_routerinfo);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   /* Get one router's signed_descriptor_digest */
   routerlist_t *our_routerlist = router_get_routerlist();
@@ -1050,6 +1050,10 @@ test_dir_handle_get_server_descriptors_d(void* data)
     tor_free(header);
     tor_free(body);
     crypto_pk_free(identity_pkey);
+
+    routerlist_free_all();
+    nodelist_free_all();
+    entry_guards_free_all();
 }
 
 static void
@@ -1060,11 +1064,11 @@ test_dir_handle_get_server_descriptors_busy(void* data)
   crypto_pk_t *identity_pkey = pk_generate(0);
   (void) data;
 
-  NS_MOCK(router_get_my_routerinfo);
-  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
-
   /* Setup fake routerlist. */
   helper_setup_fake_routerlist();
+
+  NS_MOCK(router_get_my_routerinfo);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   //Make it busy
   MOCK(get_options, mock_get_options);
@@ -1101,6 +1105,10 @@ test_dir_handle_get_server_descriptors_busy(void* data)
     tor_free(conn);
     tor_free(header);
     crypto_pk_free(identity_pkey);
+
+    routerlist_free_all();
+    nodelist_free_all();
+    entry_guards_free_all();
 }
 
 
