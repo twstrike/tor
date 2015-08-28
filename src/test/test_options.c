@@ -390,7 +390,7 @@ test_options_validate__authdir(void *ignored)
   (void)ignored;
   int ret;
   char *msg;
-  int previous_log = setup_capture_of_logs(LOG_DEBUG);
+  int previous_log = setup_capture_of_logs(LOG_INFO);
   options_test_data_t *tdata = get_options_test_data("AuthoritativeDirectory 1\n"
                                                      "Address this.should.not_exist.example.org");
 
@@ -406,6 +406,201 @@ test_options_validate__authdir(void *ignored)
   ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
   tt_int_op(ret, OP_EQ, -1);
   tt_assert(!msg);
+
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Authoritative directory servers must set ContactInfo");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "TestingTorNetwork 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "AuthoritativeDir is set, but none of (Bridge/V3)AuthoritativeDir is set.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "AuthoritativeDir is set, but none of (Bridge/V3)AuthoritativeDir is set.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "RecommendedVersions 1.2, 3.14\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(tdata->opt->RecommendedClientVersions->value, OP_EQ, "1.2, 3.14");
+  tt_str_op(tdata->opt->RecommendedServerVersions->value, OP_EQ, "1.2, 3.14");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "RecommendedVersions 1.2, 3.14\n"
+                                "RecommendedClientVersions 25\n"
+                                "RecommendedServerVersions 4.18\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(tdata->opt->RecommendedClientVersions->value, OP_EQ, "25");
+  tt_str_op(tdata->opt->RecommendedServerVersions->value, OP_EQ, "4.18");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "VersioningAuthoritativeDirectory 1\n"
+                                "RecommendedVersions 1.2, 3.14\n"
+                                "RecommendedClientVersions 25\n"
+                                "RecommendedServerVersions 4.18\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(msg, OP_EQ, "AuthoritativeDir is set, but none of (Bridge/V3)AuthoritativeDir is set.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "VersioningAuthoritativeDirectory 1\n"
+                                "RecommendedServerVersions 4.18\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(msg, OP_EQ, "Versioning authoritative dir servers must set Recommended*Versions.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "VersioningAuthoritativeDirectory 1\n"
+                                "RecommendedClientVersions 4.18\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(msg, OP_EQ, "Versioning authoritative dir servers must set Recommended*Versions.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "UseEntryGuards 1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Authoritative directory servers can't set UseEntryGuards. Disabling.\n");
+  tt_int_op(tdata->opt->UseEntryGuards, OP_EQ, 0);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "V3AuthoritativeDir 1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Authoritative directories always try to download extra-info documents. Setting DownloadExtraInfo.\n");
+  tt_int_op(tdata->opt->DownloadExtraInfo, OP_EQ, 1);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "DownloadExtraInfo 1\n"
+                                "V3AuthoritativeDir 1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(0), OP_NE, "Authoritative directories always try to download extra-info documents. Setting DownloadExtraInfo.\n");
+  tt_int_op(tdata->opt->DownloadExtraInfo, OP_EQ, 1);
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(msg, OP_EQ, "AuthoritativeDir is set, but none of (Bridge/V3)AuthoritativeDir is set.");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "BridgeAuthoritativeDir 1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "V3BandwidthsFile non-existant-file\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(msg, OP_EQ, "Running as authoritative directory, but no DirPort set.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "BridgeAuthoritativeDir 1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "V3BandwidthsFile non-existant-file\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(NULL, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(msg, OP_EQ, "Running as authoritative directory, but no DirPort set.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "BridgeAuthoritativeDir 1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "GuardfractionFile non-existant-file\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(msg, OP_EQ, "Running as authoritative directory, but no DirPort set.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "BridgeAuthoritativeDir 1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "GuardfractionFile non-existant-file\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  options_validate(NULL, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(msg, OP_EQ, "Running as authoritative directory, but no DirPort set.");
 
  done:
   teardown_capture_of_logs(previous_log);
@@ -566,6 +761,7 @@ test_options_validate__exclude_nodes(void *ignored)
   (void)ignored;
   int ret;
   char *msg;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
   options_test_data_t *tdata = get_options_test_data("ExcludeExitNodes {us}\n");
 
   ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
@@ -574,22 +770,46 @@ test_options_validate__exclude_nodes(void *ignored)
   tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{us}");
 
   free_options_test_data(tdata);
-  tdata = get_options_test_data("ExcludeNodes {se}\n");
+  tdata = get_options_test_data("ExcludeNodes {uk}\n");
   ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
   tt_int_op(ret, OP_EQ, -1);
   tt_int_op(smartlist_len(tdata->opt->ExcludeExitNodesUnion_->list), OP_EQ, 1);
-  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{se}");
+  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{uk}");
 
   free_options_test_data(tdata);
-  tdata = get_options_test_data("ExcludeNodes {se}\n"
-                                "ExcludeExitNodes {us} {se}\n");
+  tdata = get_options_test_data("ExcludeNodes {uk}\n"
+                                "ExcludeExitNodes {us} {uk}\n");
   ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
   tt_int_op(ret, OP_EQ, -1);
   tt_int_op(smartlist_len(tdata->opt->ExcludeExitNodesUnion_->list), OP_EQ, 2);
-  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{us} {se}");
-  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 1)), OP_EQ, "{se}");
+  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{us} {uk}");
+  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 1)), OP_EQ, "{uk}");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("ExcludeNodes {uk}\n"
+                                "StrictNodes 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "You have asked to exclude certain relays from all positions "
+            "in your circuits. Expect hidden services and other Tor "
+            "features to be broken in unpredictable ways.\n");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("ExcludeNodes {uk}\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(0), OP_NE, "You have asked to exclude certain relays from all positions "
+            "in your circuits. Expect hidden services and other Tor "
+            "features to be broken in unpredictable ways.\n");
 
  done:
+  teardown_capture_of_logs(previous_log);
   free_options_test_data(tdata);
   tor_free(msg);
 }
@@ -741,6 +961,29 @@ test_options_validate__token_bucket(void *ignored)
   tor_free(msg);
 }
 
+static void
+test_options_validate__recommended_packages(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+  options_test_data_t *tdata = get_options_test_data("RecommendedPackages foo 1.2 http://foo.com sha1=123123123123\n"
+                                                     "RecommendedPackages invalid-package-line\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_NE, "Invalid RecommendedPackage line invalid-package-line will be ignored\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
 struct testcase_t options_tests[] = {
   { "validate", test_options_validate, TT_FORK, NULL, NULL },
   { "validate__uname_for_server", test_options_validate__uname_for_server, TT_FORK, NULL, NULL },
@@ -757,5 +1000,6 @@ struct testcase_t options_tests[] = {
   { "validate__node_families", test_options_validate__node_families, TT_FORK, NULL, NULL },
   { "validate__tlsec", test_options_validate__tlsec, TT_FORK, NULL, NULL },
   { "validate__token_bucket", test_options_validate__token_bucket, TT_FORK, NULL, NULL },
+  { "validate__recommended_packages", test_options_validate__recommended_packages, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
