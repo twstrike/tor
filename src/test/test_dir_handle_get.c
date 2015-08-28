@@ -105,7 +105,7 @@ mock_get_dirportfrontpage(void){
 }
 
 static void
-test_dir_handle_get_v1_command_returns_disclaimer(void *data)
+test_dir_handle_get_v1_command(void *data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -500,7 +500,7 @@ static const char microdesc[] =
   "-----END RSA PUBLIC KEY-----\n";
 
 static void
-test_dir_handle_get_micro_d_finds_fingerprints(void *data)
+test_dir_handle_get_micro_d(void *data)
 {
   dir_connection_t *conn = NULL;
   microdesc_cache_t *mc = NULL ;
@@ -664,7 +664,7 @@ test_dir_handle_get_networkstatus_bridges_not_found_without_auth(void *data)
 }
 
 static void
-test_dir_handle_get_networkstatus_bridges_basic_auth(void *data)
+test_dir_handle_get_networkstatus_bridges(void *data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -1175,6 +1175,7 @@ test_dir_handle_get_server_keys_all(void* data)
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   clear_dir_servers();
+  routerlist_free_all();
 
   /* create a trusted ds */
   ds = trusted_dir_server_new("ds", "127.0.0.1", 9059, 9060, "", NULL, V3_DIRINFO, 1.0);
@@ -1209,6 +1210,7 @@ test_dir_handle_get_server_keys_all(void* data)
     tor_free(body);
 
     clear_dir_servers();
+    routerlist_free_all();
 }
 
 static void
@@ -1314,9 +1316,21 @@ test_dir_handle_get_server_keys_fp(void* data)
   char *header = NULL;
   char *body = NULL;
   size_t body_used = 0;
+  dir_server_t *ds = NULL;
   (void) data;
 
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  clear_dir_servers();
+  routerlist_free_all();
+
+  /* create a trusted ds */
+  ds = trusted_dir_server_new("ds", "127.0.0.1", 9059, 9060, "", NULL, V3_DIRINFO, 1.0);
+  tt_assert(ds);
+  dir_server_add(ds);
+
+  /* ds v3_identity_digest is the certificate's identity_key */
+  base16_decode(ds->v3_identity_digest, DIGEST_LEN, TEST_CERT_IDENT_KEY, HEX_DIGEST_LEN);
 
   tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(TEST_CERTIFICATE,
     TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
@@ -1344,6 +1358,8 @@ test_dir_handle_get_server_keys_fp(void* data)
     tor_free(conn);
     tor_free(header);
     tor_free(body);
+    clear_dir_servers();
+    routerlist_free_all();
 }
 
 static void
@@ -1382,6 +1398,9 @@ test_dir_handle_get_server_keys_sk(void* data)
   mock_cert = authority_cert_parse_from_string(TEST_CERTIFICATE, NULL);
   MOCK(get_my_v3_authority_cert, get_my_v3_authority_cert_m);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  clear_dir_servers();
+  routerlist_free_all();
 
   tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(TEST_CERTIFICATE,
     TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
@@ -1449,6 +1468,7 @@ test_dir_handle_get_server_keys_fpsk(void* data)
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   clear_dir_servers();
+  routerlist_free_all();
 
   /* create a trusted ds */
   ds = trusted_dir_server_new("ds", "127.0.0.1", 9059, 9060, "", NULL, V3_DIRINFO, 1.0);
@@ -1484,7 +1504,9 @@ test_dir_handle_get_server_keys_fpsk(void* data)
     tor_free(conn);
     tor_free(header);
     tor_free(body);
+
     clear_dir_servers();
+    routerlist_free_all();
 }
 
 static void
@@ -1492,7 +1514,19 @@ test_dir_handle_get_server_keys_busy(void* data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
+  dir_server_t *ds = NULL;
   (void) data;
+
+  clear_dir_servers();
+  routerlist_free_all();
+
+  /* create a trusted ds */
+  ds = trusted_dir_server_new("ds", "127.0.0.1", 9059, 9060, "", NULL, V3_DIRINFO, 1.0);
+  tt_assert(ds);
+
+  /* ds v3_identity_digest is the certificate's identity_key */
+  base16_decode(ds->v3_identity_digest, DIGEST_LEN, TEST_CERT_IDENT_KEY, HEX_DIGEST_LEN);
+  dir_server_add(ds);
 
   tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(TEST_CERTIFICATE,
     TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
@@ -1521,6 +1555,9 @@ test_dir_handle_get_server_keys_busy(void* data)
     tor_free(conn);
     tor_free(header);
     tor_free(mock_options);
+
+    clear_dir_servers();
+    routerlist_free_all();
 }
 
 #define DIR_HANDLE_CMD(name,flags)                              \
@@ -1530,27 +1567,28 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(not_found, 0),
   DIR_HANDLE_CMD(bad_request, 0),
   DIR_HANDLE_CMD(v1_command_not_found, 0),
-  DIR_HANDLE_CMD(v1_command_returns_disclaimer, 0),
+  DIR_HANDLE_CMD(v1_command, 0),
   DIR_HANDLE_CMD(robots_txt, 0),
   DIR_HANDLE_CMD(bytes_txt, 0),
   DIR_HANDLE_CMD(rendezvous2_not_found_if_not_encrypted, 0),
+  DIR_HANDLE_CMD(rendezvous2_not_found, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_with_invalid_desc_id, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_well_formed, 0),
-  DIR_HANDLE_CMD(rendezvous2_not_found, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_success, 0),
   DIR_HANDLE_CMD(micro_d_not_found, 0),
-  DIR_HANDLE_CMD(micro_d_finds_fingerprints, 0),
   DIR_HANDLE_CMD(micro_d_server_busy, 0),
+  DIR_HANDLE_CMD(micro_d, 0),
   DIR_HANDLE_CMD(networkstatus_bridges_not_found_without_auth, 0),
-  DIR_HANDLE_CMD(networkstatus_bridges_basic_auth, 0),
   DIR_HANDLE_CMD(networkstatus_bridges_not_found_wrong_auth, 0),
+  DIR_HANDLE_CMD(networkstatus_bridges, 0),
   DIR_HANDLE_CMD(server_descriptors_not_found, 0),
+  DIR_HANDLE_CMD(server_descriptors_busy, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_all, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_authority, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_fp, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_d, TT_FORK),
-  DIR_HANDLE_CMD(server_descriptors_busy, TT_FORK),
   DIR_HANDLE_CMD(server_keys_bad_req, 0),
+  DIR_HANDLE_CMD(server_keys_busy, 0),
   DIR_HANDLE_CMD(server_keys_all_not_found, 0),
   DIR_HANDLE_CMD(server_keys_all, 0),
   DIR_HANDLE_CMD(server_keys_authority_not_found, 0),
@@ -1561,6 +1599,5 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_keys_sk, 0),
   DIR_HANDLE_CMD(server_keys_fpsk_not_found, 0),
   DIR_HANDLE_CMD(server_keys_fpsk, 0),
-  DIR_HANDLE_CMD(server_keys_busy, 0),
   END_OF_TESTCASES
 };
