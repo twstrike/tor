@@ -337,6 +337,7 @@ test_options_validate__contactinfo(void *ignored)
   tor_free(msg);
 }
 
+
 extern int quiet_level;
 
 static void
@@ -386,6 +387,16 @@ test_options_validate__logs(void *ignored)
   free_options_test_data(tdata);
   tor_free(msg);
 }
+
+/* static config_line_t * */
+/* mock_config_line(const char *key, const char *val) */
+/* { */
+/*   config_line_t *config_line = tor_malloc(sizeof(config_line_t)); */
+/*   memset(config_line, 0, sizeof(config_line_t)); */
+/*   config_line->key = tor_strdup(key); */
+/*   config_line->value = tor_strdup(val); */
+/*   return config_line; */
+/* } */
 
 static void
 test_options_validate__authdir(void *ignored)
@@ -604,6 +615,49 @@ test_options_validate__authdir(void *ignored)
   mock_clean_saved_logs();
   options_validate(NULL, tdata->opt, tdata->def_opt, 0, &msg);
   tt_str_op(msg, OP_EQ, "Running as authoritative directory, but no DirPort set.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "BridgeAuthoritativeDir 1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Running as authoritative directory, but no DirPort set.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AuthoritativeDirectory 1\n"
+                                "Address 100.200.10.1\n"
+                                "DirPort 999\n"
+                                "BridgeAuthoritativeDir 1\n"
+                                "ContactInfo hello@hello.com\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Running as authoritative directory, but no ORPort set.");
+
+
+  // TODO: This case can't be reached, since clientonly is used to check when parsing port lines as well.
+  /* free_options_test_data(tdata); */
+  /* tdata = get_options_test_data("AuthoritativeDirectory 1\n" */
+  /*                               "Address 100.200.10.1\n" */
+  /*                               "DirPort 999\n" */
+  /*                               "ORPort 888\n" */
+  /*                               "ClientOnly 1\n" */
+  /*                               "BridgeAuthoritativeDir 1\n" */
+  /*                               "ContactInfo hello@hello.com\n" */
+  /*                               "SchedulerHighWaterMark__ 42\n" */
+  /*                               "SchedulerLowWaterMark__ 10\n"); */
+  /* mock_clean_saved_logs(); */
+  /* ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg); */
+  /* tt_int_op(ret, OP_EQ, -1); */
+  /* tt_str_op(msg, OP_EQ, "Running as authoritative directory, but ClientOnly also set."); */
+
 
  done:
   teardown_capture_of_logs(previous_log);
