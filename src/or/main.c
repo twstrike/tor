@@ -2769,8 +2769,8 @@ try_locking,(const or_options_t *options, int err_if_locked))
 }
 
 /** Return true iff we've successfully acquired the lock file. */
-int
-have_lockfile(void)
+MOCK_IMPL(int,
+have_lockfile,(void))
 {
   return lockfile != NULL;
 }

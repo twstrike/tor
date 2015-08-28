@@ -64,7 +64,7 @@ void handle_signals(int is_parent);
 void activate_signal(int signal_num);
 
 MOCK_DECL(int, try_locking, (const or_options_t *options, int err_if_locked));
-int have_lockfile(void);
+MOCK_DECL(int, have_lockfile, (void));
 void release_lockfile(void);
 
 void tor_cleanup(void);
