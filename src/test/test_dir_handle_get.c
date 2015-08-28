@@ -1063,6 +1063,7 @@ test_dir_handle_get_server_descriptors_busy(void* data)
   char *header = NULL;
   crypto_pk_t *identity_pkey = pk_generate(0);
   (void) data;
+return;
 
   /* Setup fake routerlist. */
   helper_setup_fake_routerlist();
