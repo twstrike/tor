@@ -19,6 +19,7 @@
 #include "test_helpers.h"
 #include "nodelist.h"
 #include "entrynodes.h"
+#include "routerparse.h"
 
 #ifdef _WIN32
 /* For mkdir() */
@@ -1174,6 +1175,54 @@ test_dir_handle_get_server_keys_authority_not_found(void* data)
     tor_free(header);
 }
 
+static authority_cert_t * mock_cert = NULL;
+
+static authority_cert_t *
+get_my_v3_authority_cert_m(void)
+{
+  tor_assert(mock_cert);
+  return mock_cert;
+}
+
+static void
+test_dir_handle_get_server_keys_authority(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  char *body = NULL;
+  size_t body_used = 0;
+  (void) data;
+
+  mock_cert = authority_cert_parse_from_string(AUTHORITY_CERT_3, NULL);
+
+  MOCK(get_my_v3_authority_cert, get_my_v3_authority_cert_m);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(directory_handle_command_get(conn, GET("/tor/keys/authority"), NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, strlen(AUTHORITY_CERT_3)+1, 0);
+
+  tt_assert(header);
+  tt_assert(body);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Content-Length: 1883\r\n"));
+
+  tt_str_op(AUTHORITY_CERT_3, OP_EQ, body);
+
+  done:
+    UNMOCK(get_my_v3_authority_cert);
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+    tor_free(body);
+    tor_free(mock_cert);
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -1204,5 +1253,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_keys_all_not_found, 0),
   DIR_HANDLE_CMD(server_keys_all, 0),
   DIR_HANDLE_CMD(server_keys_authority_not_found, 0),
+  DIR_HANDLE_CMD(server_keys_authority, 0),
   END_OF_TESTCASES
 };
