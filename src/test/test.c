@@ -857,6 +857,7 @@ test_geoip(void *arg)
  done:
   tor_free(s);
   tor_free(v);
+  geoip_free_all();
 }
 
 static void
