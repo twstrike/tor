@@ -11,23 +11,22 @@
 #define ROUTERSET_PRIVATE
 #define RENDSERVICE_PRIVATE
 #include "or.h"
+#include "address.h"
 #include "addressmap.h"
 #include "config.h"
 #include "confparse.h"
 #include "connection_edge.h"
-#include "test.h"
-#include "util.h"
-#include "address.h"
-#include "entrynodes.h"
-#include "transports.h"
-#include "routerlist.h"
-#include "router.h"
-#include "util.h"
 #include "dns.h"
-#include "routerset.h"
-#include "rendservice.h"
-#include "rendclient.h"
+#include "entrynodes.h"
 #include "main.h"
+#include "rendclient.h"
+#include "rendservice.h"
+#include "router.h"
+#include "routerlist.h"
+#include "routerset.h"
+#include "test.h"
+#include "transports.h"
+#include "util.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -4408,9 +4407,8 @@ NS(rend_config_services)(const or_options_t *options, int validate_only)
 static void
 test_config_options_act_rend_config_services_err(void *arg)
 {
-  or_options_t *options, *old_options;
+  or_options_t *old_options;
   old_options = options_new();
-  options = test_setup_option_CMD_TOR();
 
   NS_MOCK(rend_config_services);
 
@@ -4440,9 +4438,8 @@ NS(rend_parse_service_authorization)(const or_options_t *options, int validate_o
 static void
 test_config_options_act_rend_parse_service_authorization_err(void *arg)
 {
-  or_options_t *options, *old_options;
+  or_options_t *old_options;
   old_options = options_new();
-  options = test_setup_option_CMD_TOR();
 
   NS_MOCK(rend_parse_service_authorization);
 
