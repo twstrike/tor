@@ -4197,25 +4197,27 @@ NS(public_server_mode)(const or_options_t *options)
 {
   (void) options;
 
+  CALLED(public_server_mode)++;
   return 0;
 }
 
 static void
 test_config_options_act_Statistics_private_server_mode(void *arg)
 {
-    or_options_t *options, *old_options;
-    old_options = options_new();
-    options = test_setup_option_CMD_TOR();
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
 
-    options->CellStatistics = 1;
-    NS_MOCK(public_server_mode);
-    tt_int_op(options_act(old_options), OP_EQ, 0);
+  options->CellStatistics = 1;
+  NS_MOCK(public_server_mode);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
 
-  done:
-    UNMOCK(get_options_mutable);
-    options->CellStatistics = 0;
-    NS_UNMOCK(public_server_mode);
-    (void)arg;
+done:
+  UNMOCK(get_options_mutable);
+  options->CellStatistics = 0;
+  NS_UNMOCK(public_server_mode);
+  (void)arg;
 }
 #undef NS_SUBMODULE
 
@@ -4227,6 +4229,7 @@ NS(public_server_mode)(const or_options_t *options)
 {
   (void)options;
 
+  CALLED(public_server_mode)++;
   return 1;
 }
 
@@ -4237,79 +4240,83 @@ NS(server_mode)(const or_options_t *options)
 {
   (void)options;
 
+  CALLED(server_mode)++;
   return 1;
 }
 
 int mock_dns_reset(void){
-    return 0;
+  return 0;
 }
 
 static void
 test_config_options_act_enable_Statistics_public_server_mode(void *arg)
 {
-    or_options_t *options, *old_options;
-    old_options = options_new();
-    options = test_setup_option_CMD_TOR();
-    tt_int_op(options_act(old_options), OP_EQ, 0);
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+  tt_int_op(options_act(old_options), OP_EQ, 0);
 
-    options->CellStatistics = 1;
-    old_options->CellStatistics = 0;
-    options->EntryStatistics = 1;
-    old_options->EntryStatistics = 0;
-    options->ExitPortStatistics = 1;
-    old_options->ExitPortStatistics = 0;
-    options->ConnDirectionStatistics = 1;
-    old_options->ConnDirectionStatistics = 0;
-    options->HiddenServiceStatistics = 1;
-    old_options->HiddenServiceStatistics = 0;
-    options->BridgeAuthoritativeDir = 1;
-    old_options->BridgeAuthoritativeDir = 0;
+  options->CellStatistics = 1;
+  old_options->CellStatistics = 0;
+  options->EntryStatistics = 1;
+  old_options->EntryStatistics = 0;
+  options->ExitPortStatistics = 1;
+  old_options->ExitPortStatistics = 0;
+  options->ConnDirectionStatistics = 1;
+  old_options->ConnDirectionStatistics = 0;
+  options->HiddenServiceStatistics = 1;
+  old_options->HiddenServiceStatistics = 0;
+  options->BridgeAuthoritativeDir = 1;
+  old_options->BridgeAuthoritativeDir = 0;
 
-    MOCK(dns_reset,mock_dns_reset);
-    NS_MOCK(server_mode);
-    NS_MOCK(public_server_mode);
-    tt_int_op(options_act(old_options),OP_EQ,0);
-  done:
-    options->CellStatistics = 0;
-    UNMOCK(get_options_mutable);
-    UNMOCK(dns_reset);
-    NS_UNMOCK(server_mode);
-    NS_UNMOCK(public_server_mode);
-    (void)arg;
+  MOCK(dns_reset,mock_dns_reset);
+  NS_MOCK(server_mode);
+  NS_MOCK(public_server_mode);
+  tt_int_op(options_act(old_options),OP_EQ,0);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
+
+ done:
+  options->CellStatistics = 0;
+  UNMOCK(get_options_mutable);
+  UNMOCK(dns_reset);
+  NS_UNMOCK(server_mode);
+  NS_UNMOCK(public_server_mode);
+  (void)arg;
 }
 
 static void
 test_config_options_act_disable_Statistics_public_server_mode(void *arg)
 {
-    or_options_t *options, *old_options;
-    old_options = options_new();
-    options = test_setup_option_CMD_TOR();
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
 
-    old_options->CellStatistics = 1;
-    options->CellStatistics = 0;
-    old_options->EntryStatistics = 1;
-    options->EntryStatistics = 0;
-    old_options->ExitPortStatistics = 1;
-    options->ExitPortStatistics = 0;
-    old_options->ConnDirectionStatistics = 1;
-    options->ConnDirectionStatistics = 0;
-    old_options->HiddenServiceStatistics = 1;
-    options->HiddenServiceStatistics = 0;
-    old_options->BridgeAuthoritativeDir = 1;
-    options->BridgeAuthoritativeDir = 0;
+  old_options->CellStatistics = 1;
+  options->CellStatistics = 0;
+  old_options->EntryStatistics = 1;
+  options->EntryStatistics = 0;
+  old_options->ExitPortStatistics = 1;
+  options->ExitPortStatistics = 0;
+  old_options->ConnDirectionStatistics = 1;
+  options->ConnDirectionStatistics = 0;
+  old_options->HiddenServiceStatistics = 1;
+  options->HiddenServiceStatistics = 0;
+  old_options->BridgeAuthoritativeDir = 1;
+  options->BridgeAuthoritativeDir = 0;
 
-    MOCK(dns_reset,mock_dns_reset);
-    NS_MOCK(server_mode);
-    NS_MOCK(public_server_mode);
-    tt_int_op(options_act(old_options), OP_EQ, 0);
+  MOCK(dns_reset,mock_dns_reset);
+  NS_MOCK(server_mode);
+  NS_MOCK(public_server_mode);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
 
-  done:
-    options->CellStatistics = 0;
-    UNMOCK(get_options_mutable);
-    UNMOCK(dns_reset);
-    NS_UNMOCK(server_mode);
-    NS_UNMOCK(public_server_mode);
-    (void)arg;
+ done:
+  options->CellStatistics = 0;
+  UNMOCK(get_options_mutable);
+  UNMOCK(dns_reset);
+  NS_UNMOCK(server_mode);
+  NS_UNMOCK(public_server_mode);
+  (void)arg;
 }
 #undef NS_SUBMODULE
 #undef NS_MODULE
@@ -4317,57 +4324,57 @@ test_config_options_act_disable_Statistics_public_server_mode(void *arg)
 static void
 test_config_options_act_EntryNodes(void *arg)
 {
-    or_options_t *options, *old_options;
-    old_options = options_new();
-    options = test_setup_option_CMD_TOR();
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
 
-    options->EntryNodes = routerset_new();
-    smartlist_add(options->EntryNodes->list, tor_strndup("foo", 3));
-    old_options->EntryNodes = NULL;
+  options->EntryNodes = routerset_new();
+  smartlist_add(options->EntryNodes->list, tor_strndup("foo", 3));
+  old_options->EntryNodes = NULL;
 
-    tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
 
-  done:
-    options->EntryNodes->list = NULL;
-    options->EntryNodes = NULL;
-    (void)arg;
+ done:
+  options->EntryNodes->list = NULL;
+  options->EntryNodes = NULL;
+  (void)arg;
 }
 
 static void
 test_config_options_act_ExcludeNodes(void *arg)
 {
-    or_options_t *options, *old_options;
-    old_options = options_new();
-    options = test_setup_option_CMD_TOR();
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
 
-    options->EntryNodes = routerset_new();
-    options->ExcludeNodes = routerset_new();
-    smartlist_add(options->ExcludeNodes->list, tor_strndup("foo", 3));
-    old_options->ExcludeNodes = NULL;
+  options->EntryNodes = routerset_new();
+  options->ExcludeNodes = routerset_new();
+  smartlist_add(options->ExcludeNodes->list, tor_strndup("foo", 3));
+  old_options->ExcludeNodes = NULL;
 
-    tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
 
-  done:
-    options->EntryNodes = NULL;
-    options->ExcludeNodes->list = NULL;
-    options->ExcludeNodes = NULL;
-    (void)arg;
+ done:
+  options->EntryNodes = NULL;
+  options->ExcludeNodes->list = NULL;
+  options->ExcludeNodes = NULL;
+  (void)arg;
 }
 
 static void
 test_config_options_act_DirPortFrontPage(void *arg)
 {
-    or_options_t *options, *old_options;
-    old_options = options_new();
-    options = test_setup_option_CMD_TOR();
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
 
-    options->DirPortFrontPage = "";
+  options->DirPortFrontPage = "";
 
-    tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
 
-  done:
-    options->DirPortFrontPage = NULL;
-    (void)arg;
+ done:
+  options->DirPortFrontPage = NULL;
+  (void)arg;
 }
 
 #define CONFIG_TEST(name, flags)                          \
