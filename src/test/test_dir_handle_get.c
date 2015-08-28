@@ -1312,6 +1312,48 @@ test_dir_handle_get_server_keys_sk_not_found(void* data)
 }
 
 static void
+test_dir_handle_get_server_keys_sk(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  char *body = NULL;
+  size_t body_used = 0;
+  (void) data;
+
+  mock_cert = authority_cert_parse_from_string(TEST_CERTIFICATE, NULL);
+  MOCK(get_my_v3_authority_cert, get_my_v3_authority_cert_m);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(TEST_CERTIFICATE,
+    TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  char req[71];
+  sprintf(req, GET("/tor/keys/sk/%s"), TEST_SIGNING_KEY);
+  tt_int_op(directory_handle_command_get(conn, req, NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, strlen(TEST_CERTIFICATE)+1, 0);
+
+  tt_assert(header);
+  tt_assert(body);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Content-Length: 1883\r\n"));
+
+  tt_str_op(TEST_CERTIFICATE, OP_EQ, body);
+
+  done:
+    UNMOCK(get_my_v3_authority_cert);
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+    tor_free(body);
+}
+
+static void
 test_dir_handle_get_server_keys_fpsk_not_found(void* data)
 {
   dir_connection_t *conn = NULL;
@@ -1369,6 +1411,7 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_keys_fp_not_found, 0),
   DIR_HANDLE_CMD(server_keys_fp, 0),
   DIR_HANDLE_CMD(server_keys_sk_not_found, 0),
+  DIR_HANDLE_CMD(server_keys_sk, 0),
   DIR_HANDLE_CMD(server_keys_fpsk_not_found, 0),
   END_OF_TESTCASES
 };
