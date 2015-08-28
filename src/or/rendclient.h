@@ -45,8 +45,8 @@ int rend_client_any_intro_points_usable(const rend_cache_entry_t *entry);
 
 int rend_client_send_introduction(origin_circuit_t *introcirc,
                                   origin_circuit_t *rendcirc);
-int rend_parse_service_authorization(const or_options_t *options,
-                                     int validate_only);
+MOCK_DECL(int, rend_parse_service_authorization, (const or_options_t *options,
+                                     int validate_only));
 rend_service_authorization_t *rend_client_lookup_service_authorization(
                                                 const char *onion_address);
 void rend_service_authorization_free_all(void);

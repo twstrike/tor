@@ -1456,9 +1456,9 @@ rend_service_authorization_free_all(void)
 /** Parse <b>config_line</b> as a client-side authorization for a hidden
  * service and add it to the local map of hidden service authorizations.
  * Return 0 for success and -1 for failure. */
-int
-rend_parse_service_authorization(const or_options_t *options,
-                                 int validate_only)
+MOCK_IMPL(int,
+rend_parse_service_authorization,(const or_options_t *options,
+                                 int validate_only))
 {
   config_line_t *line;
   int res = -1;

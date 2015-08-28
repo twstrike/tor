@@ -9,6 +9,7 @@
 #define PT_PRIVATE
 #define ROUTER_PRIVATE
 #define ROUTERSET_PRIVATE
+#define RENDSERVICE_PRIVATE
 #include "or.h"
 #include "addressmap.h"
 #include "config.h"
@@ -24,6 +25,8 @@
 #include "util.h"
 #include "dns.h"
 #include "routerset.h"
+#include "rendservice.h"
+#include "rendclient.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -4377,6 +4380,70 @@ test_config_options_act_DirPortFrontPage(void *arg)
   (void)arg;
 }
 
+#define NS_MODULE rend_config_services
+#define NS_SUBMODULE error
+NS_DECL(int,rend_config_services,(const or_options_t *options, int validate_only));
+
+static int
+NS(rend_config_services)(const or_options_t *options, int validate_only)
+{
+  (void)options;
+  (void)validate_only;
+  CALLED(rend_config_services)++;
+  return -1;
+};
+
+static void
+test_config_options_act_rend_config_services_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(rend_config_services);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(rend_config_services), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(rend_config_services);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE rend_parse_service_authorization
+#define NS_SUBMODULE error
+NS_DECL(int,rend_parse_service_authorization,(const or_options_t *options, int validate_only));
+
+static int
+NS(rend_parse_service_authorization)(const or_options_t *options, int validate_only)
+{
+  (void)options;
+  (void)validate_only;
+  CALLED(rend_parse_service_authorization)++;
+  return -1;
+};
+
+static void
+test_config_options_act_rend_parse_service_authorization_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(rend_parse_service_authorization);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(rend_parse_service_authorization), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(rend_parse_service_authorization);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4410,5 +4477,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_EntryNodes, 0),
   CONFIG_TEST(options_act_ExcludeNodes, 0),
   CONFIG_TEST(options_act_DirPortFrontPage, 0),
+  CONFIG_TEST(options_act_rend_config_services_err, 0),
+  CONFIG_TEST(options_act_rend_parse_service_authorization_err, 0),
   END_OF_TESTCASES
 };
