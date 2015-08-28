@@ -1437,16 +1437,15 @@ test_dir_handle_get_server_keys_busy(void* data)
   char *header = NULL;
   (void) data;
 
+  tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(TEST_CERTIFICATE,
+    TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
+
   MOCK(get_options, mock_get_options);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   /* setup busy server */
   init_mock_options();
-  options_init(mock_options);
   mock_options->CountPrivateBandwidth = 1;
-
-  tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(TEST_CERTIFICATE,
-    TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   char req[71];
