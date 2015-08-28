@@ -4102,7 +4102,7 @@ test_config_options_act_RunAsDaemon(void *arg)
   NS_MOCK(finish_daemon);
   options->RunAsDaemon = 1;
   tt_int_op(options_act(old_options), OP_EQ, 0);
-  tt_int_op(CALLED(finish_daemon), OP_GT, 1);
+  tt_int_op(CALLED(finish_daemon), OP_GT, 0);
 
  done:
   UNMOCK(get_options_mutable);
