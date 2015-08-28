@@ -44,6 +44,7 @@ static void connection_write_to_buf_mock(const char *string, size_t len,
 #define GET(path) "GET " path " HTTP/1.0\r\n\r\n"
 #define NOT_FOUND "HTTP/1.0 404 Not found\r\n\r\n"
 #define BAD_REQUEST "HTTP/1.0 400 Bad request\r\n\r\n"
+#define SERVER_BUSY "HTTP/1.0 503 Directory busy, try again later\r\n\r\n"
 
 static tor_addr_t MOCK_TOR_ADDR;
 
@@ -613,7 +614,7 @@ test_dir_handle_get_micro_d_server_busy(void *data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, "HTTP/1.0 503 Directory busy, try again later\r\n\r\n");
+  tt_str_op(SERVER_BUSY, OP_EQ, header);
 
   done:
     UNMOCK(get_options);
@@ -621,6 +622,7 @@ test_dir_handle_get_micro_d_server_busy(void *data)
 
     if (mock_options)
       tor_free(mock_options->DataDirectory);
+
     tor_free(conn);
     tor_free(header);
     smartlist_free(list);
@@ -1428,6 +1430,43 @@ test_dir_handle_get_server_keys_fpsk(void* data)
     clear_dir_servers();
 }
 
+static void
+test_dir_handle_get_server_keys_busy(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(get_options, mock_get_options);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  /* setup busy server */
+  init_mock_options();
+  options_init(mock_options);
+  mock_options->CountPrivateBandwidth = 1;
+
+  tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(TEST_CERTIFICATE,
+    TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  char req[71];
+  sprintf(req, GET("/tor/keys/fp/%s"), TEST_CERT_IDENT_KEY);
+  tt_int_op(directory_handle_command_get(conn, req, NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+
+  tt_assert(header);
+  tt_str_op(SERVER_BUSY, OP_EQ, header);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+    tor_free(mock_options);
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -1465,5 +1504,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_keys_sk, 0),
   DIR_HANDLE_CMD(server_keys_fpsk_not_found, 0),
   DIR_HANDLE_CMD(server_keys_fpsk, 0),
+  DIR_HANDLE_CMD(server_keys_busy, 0),
   END_OF_TESTCASES
 };
