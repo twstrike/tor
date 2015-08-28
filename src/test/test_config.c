@@ -27,6 +27,7 @@
 #include "routerset.h"
 #include "rendservice.h"
 #include "rendclient.h"
+#include "main.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -4453,6 +4454,38 @@ test_config_options_act_rend_parse_service_authorization_err(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE try_locking
+#define NS_SUBMODULE error
+NS_DECL(int,try_locking,(const or_options_t *options, int err_if_locked));
+
+static int
+NS(try_locking)(const or_options_t *options, int err_if_locked)
+{
+  (void)options;
+  (void)err_if_locked;
+  CALLED(try_locking)++;
+  return -1;
+};
+
+static void
+test_config_options_act_try_locking_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(try_locking);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(try_locking), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(try_locking);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4468,6 +4501,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(fix_my_family, 0),
   CONFIG_TEST(parse_port_config__listenaddress, 0),
   CONFIG_TEST(parse_port_config__ports, 0),
+  CONFIG_TEST(options_act_try_locking_err, 0),
   CONFIG_TEST(options_act, 0),
   CONFIG_TEST(options_act_Tor2webMode_err, 0),
   CONFIG_TEST(options_act_DirAuthority_line_err, 0),

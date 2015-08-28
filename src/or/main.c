@@ -2733,8 +2733,8 @@ static tor_lockfile_t *lockfile = NULL;
  * holding the lock, and exit if we can't get it after waiting.  Otherwise,
  * return -1 if we can't get the lockfile.  Return 0 on success.
  */
-int
-try_locking(const or_options_t *options, int err_if_locked)
+MOCK_IMPL(int,
+try_locking,(const or_options_t *options, int err_if_locked))
 {
   if (lockfile)
     return 0;
