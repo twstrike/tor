@@ -1563,7 +1563,7 @@ test_dir_handle_get_server_keys_busy(void* data)
 }
 
 #define DIR_HANDLE_CMD(name,flags)                              \
-  { #name, test_dir_handle_get_##name, TT_FORK, NULL, NULL }
+  { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
 struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(not_found, 0),
