@@ -1004,7 +1004,6 @@ test_dir_handle_get_server_descriptors_d(void* data)
   /* Setup fake routerlist. */
   helper_setup_fake_routerlist();
 
-  NS_MOCK(router_get_my_routerinfo);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   /* Get one router's signed_descriptor_digest */
@@ -1043,7 +1042,6 @@ test_dir_handle_get_server_descriptors_d(void* data)
   tt_int_op(conn->dir_spool_src, OP_EQ, DIR_SPOOL_NONE);
 
   done:
-    NS_UNMOCK(router_get_my_routerinfo);
     UNMOCK(connection_write_to_buf_impl_);
     tor_free(mock_routerinfo);
     tor_free(conn);
@@ -1063,12 +1061,10 @@ test_dir_handle_get_server_descriptors_busy(void* data)
   char *header = NULL;
   crypto_pk_t *identity_pkey = pk_generate(0);
   (void) data;
-return;
 
   /* Setup fake routerlist. */
   helper_setup_fake_routerlist();
 
-  NS_MOCK(router_get_my_routerinfo);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   //Make it busy
@@ -1100,7 +1096,6 @@ return;
 
   done:
     UNMOCK(get_options);
-    NS_UNMOCK(router_get_my_routerinfo);
     UNMOCK(connection_write_to_buf_impl_);
     tor_free(mock_routerinfo);
     tor_free(conn);
@@ -1111,8 +1106,6 @@ return;
     nodelist_free_all();
     entry_guards_free_all();
 }
-
-
 
 static void
 test_dir_handle_get_server_keys_bad_req(void* data)
