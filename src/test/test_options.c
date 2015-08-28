@@ -785,23 +785,23 @@ test_options_validate__exclude_nodes(void *ignored)
   tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{us}");
 
   free_options_test_data(tdata);
-  tdata = get_options_test_data("ExcludeNodes {uk}\n");
+  tdata = get_options_test_data("ExcludeNodes {cn}\n");
   ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
   tt_int_op(ret, OP_EQ, -1);
   tt_int_op(smartlist_len(tdata->opt->ExcludeExitNodesUnion_->list), OP_EQ, 1);
-  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{uk}");
+  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{cn}");
 
   free_options_test_data(tdata);
-  tdata = get_options_test_data("ExcludeNodes {uk}\n"
-                                "ExcludeExitNodes {us} {uk}\n");
+  tdata = get_options_test_data("ExcludeNodes {cn}\n"
+                                "ExcludeExitNodes {us} {cn}\n");
   ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
   tt_int_op(ret, OP_EQ, -1);
   tt_int_op(smartlist_len(tdata->opt->ExcludeExitNodesUnion_->list), OP_EQ, 2);
-  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{us} {uk}");
-  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 1)), OP_EQ, "{uk}");
+  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 0)), OP_EQ, "{us} {cn}");
+  tt_str_op((char *)(smartlist_get(tdata->opt->ExcludeExitNodesUnion_->list, 1)), OP_EQ, "{cn}");
 
   free_options_test_data(tdata);
-  tdata = get_options_test_data("ExcludeNodes {uk}\n"
+  tdata = get_options_test_data("ExcludeNodes {cn}\n"
                                 "StrictNodes 1\n"
                                 "SchedulerHighWaterMark__ 42\n"
                                 "SchedulerLowWaterMark__ 10\n");
@@ -813,7 +813,7 @@ test_options_validate__exclude_nodes(void *ignored)
             "features to be broken in unpredictable ways.\n");
 
   free_options_test_data(tdata);
-  tdata = get_options_test_data("ExcludeNodes {uk}\n"
+  tdata = get_options_test_data("ExcludeNodes {cn}\n"
                                 "SchedulerHighWaterMark__ 42\n"
                                 "SchedulerLowWaterMark__ 10\n");
   mock_clean_saved_logs();
