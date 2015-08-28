@@ -526,10 +526,7 @@ test_dir_handle_get_micro_d_finds_fingerprints(void *data)
 
   /* Add microdesc to cache */
   crypto_digest256(digest, microdesc, strlen(microdesc), DIGEST_SHA256);
-  base64_encode(digest_base64, sizeof(digest_base64), digest, DIGEST256_LEN, 0);
-
-  //replace the padding = by 0
-  digest_base64[43] = 0;
+  base64_encode_nopad(digest_base64, sizeof(digest_base64), (uint8_t *) digest, DIGEST256_LEN);
 
   mc = get_microdesc_cache();
   list = microdescs_add_to_cache(mc, microdesc, NULL, SAVED_NOWHERE, 0,
@@ -596,10 +593,7 @@ test_dir_handle_get_micro_d_server_busy(void *data)
 
   /* Add microdesc to cache */
   crypto_digest256(digest, microdesc, strlen(microdesc), DIGEST_SHA256);
-  base64_encode(digest_base64, sizeof(digest_base64), digest, DIGEST256_LEN, 0);
-
-  //replace the padding = by 0
-  digest_base64[43] = 0;
+  base64_encode_nopad(digest_base64, sizeof(digest_base64), (uint8_t *) digest, DIGEST256_LEN);
 
   mc = get_microdesc_cache();
   list = microdescs_add_to_cache(mc, microdesc, NULL, SAVED_NOWHERE, 0,
