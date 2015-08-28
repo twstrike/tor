@@ -3903,7 +3903,7 @@ test_setup_option_CMD_TOR()
 }
 
 static void
-test_config_options_act(void *arg)
+test_config_options_act_not_DisableDebuggerAttachment(void *arg)
 {
   or_options_t *options, *old_options;
   old_options = options_new();
@@ -4513,7 +4513,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(fix_my_family, 0),
   CONFIG_TEST(parse_port_config__listenaddress, 0),
   CONFIG_TEST(parse_port_config__ports, 0),
-  CONFIG_TEST(options_act, 0),
+  CONFIG_TEST(options_act_not_DisableDebuggerAttachment, 0),
   CONFIG_TEST(options_act_Tor2webMode_err, 0),
   CONFIG_TEST(options_act_DirAuthority_line_err, 0),
   CONFIG_TEST(options_act_Bridge, 0),
