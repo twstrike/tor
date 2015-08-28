@@ -1099,6 +1099,63 @@ test_dir_handle_get_server_keys_not_found(void* data)
     tor_free(header);
 }
 
+extern const char AUTHORITY_CERT_3[];
+extern const char AUTHORITY_SIGNKEY_A_DIGEST[];
+extern const char AUTHORITY_SIGNKEY_A_DIGEST256[];
+static const char AUTHORITY_CERT_3_IDENTITY_KEY[] =
+  "D867ACF56A9D229B35C25F0090BC9867E906BE69"; 
+
+static void
+test_dir_handle_get_server_keys_all(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  char *body = NULL;
+  size_t body_used = 0;
+
+  dir_server_t *ds = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  clear_dir_servers();
+  //routerlist_free_all();
+
+  /* create a trusted ds */
+  ds = trusted_dir_server_new("ds", "127.0.0.1", 9059, 9060, "", NULL, V3_DIRINFO, 1.0);
+  tt_assert(ds);
+  dir_server_add(ds);
+
+  /* ds v3_identity_digest is the certificate's identity_key */
+  base16_decode(ds->v3_identity_digest, DIGEST_LEN, AUTHORITY_CERT_3_IDENTITY_KEY, HEX_DIGEST_LEN);
+  tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(AUTHORITY_CERT_3,
+    TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(directory_handle_command_get(conn, GET("/tor/keys/all"), NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, strlen(AUTHORITY_CERT_3)+1, 0);
+
+  tt_assert(header);
+  tt_assert(body);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Content-Length: 1883\r\n"));
+
+  tt_str_op(AUTHORITY_CERT_3, OP_EQ, body);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+    tor_free(body);
+
+    clear_dir_servers();
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -1127,5 +1184,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_descriptors_d, TT_FORK),
   DIR_HANDLE_CMD(server_keys_bad_req, 0),
   DIR_HANDLE_CMD(server_keys_not_found, 0),
+  DIR_HANDLE_CMD(server_keys_all, 0),
   END_OF_TESTCASES
 };
