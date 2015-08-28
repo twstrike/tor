@@ -1094,10 +1094,12 @@ test_dir_handle_get_server_keys_all_not_found(void* data)
     tor_free(header);
 }
 
+#define TEST_CERTIFICATE AUTHORITY_CERT_3
+#define TEST_SIGNING_KEY AUTHORITY_SIGNKEY_A_DIGEST
 extern const char AUTHORITY_CERT_3[];
 extern const char AUTHORITY_SIGNKEY_A_DIGEST[];
-extern const char AUTHORITY_SIGNKEY_A_DIGEST256[];
-static const char AUTHORITY_CERT_3_IDENTITY_KEY[] =
+
+static const char TEST_CERT_IDENT_KEY[] =
   "D867ACF56A9D229B35C25F0090BC9867E906BE69"; 
 
 static void
@@ -1121,15 +1123,15 @@ test_dir_handle_get_server_keys_all(void* data)
   dir_server_add(ds);
 
   /* ds v3_identity_digest is the certificate's identity_key */
-  base16_decode(ds->v3_identity_digest, DIGEST_LEN, AUTHORITY_CERT_3_IDENTITY_KEY, HEX_DIGEST_LEN);
-  tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(AUTHORITY_CERT_3,
+  base16_decode(ds->v3_identity_digest, DIGEST_LEN, TEST_CERT_IDENT_KEY, HEX_DIGEST_LEN);
+  tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(TEST_CERTIFICATE,
     TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   tt_int_op(directory_handle_command_get(conn, GET("/tor/keys/all"), NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      &body, &body_used, strlen(AUTHORITY_CERT_3)+1, 0);
+                      &body, &body_used, strlen(TEST_CERTIFICATE)+1, 0);
 
   tt_assert(header);
   tt_assert(body);
@@ -1139,7 +1141,7 @@ test_dir_handle_get_server_keys_all(void* data)
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
   tt_assert(strstr(header, "Content-Length: 1883\r\n"));
 
-  tt_str_op(AUTHORITY_CERT_3, OP_EQ, body);
+  tt_str_op(TEST_CERTIFICATE, OP_EQ, body);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -1192,7 +1194,7 @@ test_dir_handle_get_server_keys_authority(void* data)
   size_t body_used = 0;
   (void) data;
 
-  mock_cert = authority_cert_parse_from_string(AUTHORITY_CERT_3, NULL);
+  mock_cert = authority_cert_parse_from_string(TEST_CERTIFICATE, NULL);
 
   MOCK(get_my_v3_authority_cert, get_my_v3_authority_cert_m);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
@@ -1201,7 +1203,7 @@ test_dir_handle_get_server_keys_authority(void* data)
   tt_int_op(directory_handle_command_get(conn, GET("/tor/keys/authority"), NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      &body, &body_used, strlen(AUTHORITY_CERT_3)+1, 0);
+                      &body, &body_used, strlen(TEST_CERTIFICATE)+1, 0);
 
   tt_assert(header);
   tt_assert(body);
@@ -1211,7 +1213,7 @@ test_dir_handle_get_server_keys_authority(void* data)
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
   tt_assert(strstr(header, "Content-Length: 1883\r\n"));
 
-  tt_str_op(AUTHORITY_CERT_3, OP_EQ, body);
+  tt_str_op(TEST_CERTIFICATE, OP_EQ, body);
 
   done:
     UNMOCK(get_my_v3_authority_cert);
@@ -1257,18 +1259,16 @@ test_dir_handle_get_server_keys_fp(void* data)
 
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
-  clear_dir_servers();
-
-  tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(AUTHORITY_CERT_3,
+  tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(TEST_CERTIFICATE,
     TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   char req[71];
-  sprintf(req, GET("/tor/keys/fp/%s"), AUTHORITY_CERT_3_IDENTITY_KEY);
+  sprintf(req, GET("/tor/keys/fp/%s"), TEST_CERT_IDENT_KEY);
   tt_int_op(directory_handle_command_get(conn, req, NULL, 0), OP_EQ, 0);
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      &body, &body_used, strlen(AUTHORITY_CERT_3)+1, 0);
+                      &body, &body_used, strlen(TEST_CERTIFICATE)+1, 0);
 
   tt_assert(header);
   tt_assert(body);
@@ -1278,15 +1278,13 @@ test_dir_handle_get_server_keys_fp(void* data)
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
   tt_assert(strstr(header, "Content-Length: 1883\r\n"));
 
-  tt_str_op(AUTHORITY_CERT_3, OP_EQ, body);
+  tt_str_op(TEST_CERTIFICATE, OP_EQ, body);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
     tor_free(conn);
     tor_free(header);
     tor_free(body);
-
-    clear_dir_servers();
 }
 
 static void
