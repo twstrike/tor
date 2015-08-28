@@ -1053,6 +1053,59 @@ test_dir_handle_get_server_descriptors_d(void* data)
 }
 
 static void
+test_dir_handle_get_server_descriptors_busy(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  crypto_pk_t *identity_pkey = pk_generate(0);
+  (void) data;
+
+  NS_MOCK(router_get_my_routerinfo);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  /* Setup fake routerlist. */
+  helper_setup_fake_routerlist();
+
+  //Make it busy
+  MOCK(get_options, mock_get_options);
+  init_mock_options();
+  mock_options->CountPrivateBandwidth = 1;
+
+  /* Get one router's signed_descriptor_digest */
+  routerlist_t *our_routerlist = router_get_routerlist();
+  tt_int_op(smartlist_len(our_routerlist->routers), OP_GE, 1);
+  routerinfo_t *router = smartlist_get(our_routerlist->routers, 0);
+  const char *hex_digest = hex_str(router->cache_info.signed_descriptor_digest, DIGEST_LEN);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+
+  #define HEX1 "Fe0daff89127389bc67558691231234551193EEE"
+  #define HEX2 "Deadbeef99999991111119999911111111f00ba4"
+  char req_header[155];
+  sprintf(req_header, SERVER_DESC_GET("d/%s+" HEX1 "+" HEX2), hex_digest);
+  tt_int_op(directory_handle_command_get(conn, req_header, NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+
+  tt_assert(header);
+  tt_str_op(SERVER_BUSY, OP_EQ, header);
+
+  tt_int_op(conn->dir_spool_src, OP_EQ, DIR_SPOOL_NONE);
+
+  done:
+    UNMOCK(get_options);
+    NS_UNMOCK(router_get_my_routerinfo);
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(mock_routerinfo);
+    tor_free(conn);
+    tor_free(header);
+    crypto_pk_free(identity_pkey);
+}
+
+
+
+static void
 test_dir_handle_get_server_keys_bad_req(void* data)
 {
   dir_connection_t *conn = NULL;
@@ -1496,6 +1549,7 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_descriptors_authority, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_fp, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_d, TT_FORK),
+  DIR_HANDLE_CMD(server_descriptors_busy, TT_FORK),
   DIR_HANDLE_CMD(server_keys_bad_req, 0),
   DIR_HANDLE_CMD(server_keys_all_not_found, 0),
   DIR_HANDLE_CMD(server_keys_all, 0),
