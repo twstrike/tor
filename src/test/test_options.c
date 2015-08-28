@@ -8,11 +8,14 @@
 #include "confparse.h"
 #include "config.h"
 #include "test.h"
+#include "geoip.h"
 
 #define ROUTERSET_PRIVATE
 #include "routerset.h"
 
 #include "log_test_helpers.h"
+
+#define NS_MODULE test_options
 
 typedef struct {
   int severity;
@@ -753,12 +756,24 @@ test_options_validate__transproxy(void *ignored)
   tor_free(msg);
 }
 
+NS_DECL(country_t, geoip_get_country, (const char *country));
 
+static country_t
+NS(geoip_get_country)(const char *countrycode)
+{
+  (void)countrycode;
+  CALLED(geoip_get_country)++;
+
+  return 1;
+}
 
 static void
 test_options_validate__exclude_nodes(void *ignored)
 {
   (void)ignored;
+
+  NS_MOCK(geoip_get_country);
+
   int ret;
   char *msg;
   int previous_log = setup_capture_of_logs(LOG_WARN);
@@ -809,6 +824,7 @@ test_options_validate__exclude_nodes(void *ignored)
             "features to be broken in unpredictable ways.\n");
 
  done:
+  NS_UNMOCK(geoip_get_country);
   teardown_capture_of_logs(previous_log);
   free_options_test_data(tdata);
   tor_free(msg);
