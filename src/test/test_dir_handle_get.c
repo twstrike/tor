@@ -52,7 +52,7 @@ static void
 test_dir_handle_get_bad_request(void *data)
 {
   dir_connection_t *conn = NULL;
-  char *sent = NULL;
+  char *header = NULL;
   (void) data;
 
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
@@ -60,19 +60,19 @@ test_dir_handle_get_bad_request(void *data)
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   tt_int_op(directory_handle_command_get(conn, "", NULL, 0), OP_EQ, 0);
 
-  fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(sent, OP_EQ, BAD_REQUEST);
+  tt_str_op(header, OP_EQ, BAD_REQUEST);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
     tor_free(conn);
-    tor_free(sent);
+    tor_free(header);
 }
 
 static void
-test_dir_handle_get_v1_command_without_disclaimer(void *data)
+test_dir_handle_get_v1_command_not_found(void *data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -91,7 +91,7 @@ test_dir_handle_get_v1_command_without_disclaimer(void *data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, NOT_FOUND);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -146,10 +146,10 @@ test_dir_handle_get_v1_command_returns_disclaimer(void *data)
 }
 
 static void
-test_dir_handle_get_unknown_path(void *data)
+test_dir_handle_get_not_found(void *data)
 {
   dir_connection_t *conn = NULL;
-  char *sent = NULL;
+  char *header = NULL;
   (void) data;
 
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
@@ -158,15 +158,15 @@ test_dir_handle_get_unknown_path(void *data)
 
   /* Unrecognized path */
   tt_int_op(directory_handle_command_get(conn, GET("/anything"), NULL, 0), OP_EQ, 0);
-  fetch_from_buf_http(TO_CONN(conn)->outbuf, &sent, MAX_HEADERS_SIZE,
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(sent, OP_EQ, NOT_FOUND);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
     tor_free(conn);
-    tor_free(sent);
+    tor_free(header);
 }
 
 static void
@@ -249,7 +249,7 @@ test_dir_handle_get_bytes_txt(void *data)
 
 #define RENDEZVOUS2_GET(descid) GET("/tor/rendezvous2/" descid)
 static void
-test_dir_handle_get_rendezvous2_on_not_encrypted_conn(void *data)
+test_dir_handle_get_rendezvous2_not_found_if_not_encrypted(void *data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -266,7 +266,7 @@ test_dir_handle_get_rendezvous2_on_not_encrypted_conn(void *data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, NOT_FOUND);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -332,7 +332,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_well_formed(void *data)
 }
 
 static void
-test_dir_handle_get_rendezvous2_on_encrypted_conn_not_present(void *data)
+test_dir_handle_get_rendezvous2_not_found(void *data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -351,7 +351,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_present(void *data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, NOT_FOUND);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -451,7 +451,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_success(void *data)
 
 #define MICRODESC_GET(digest) GET("/tor/micro/d/" digest)
 static void
-test_dir_handle_get_micro_d_missing_fingerprints(void *data)
+test_dir_handle_get_micro_d_not_found(void *data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -467,7 +467,7 @@ test_dir_handle_get_micro_d_missing_fingerprints(void *data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, NOT_FOUND);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -631,7 +631,7 @@ test_dir_handle_get_micro_d_server_busy(void *data)
 
 #define BRIDGES_PATH "/tor/networkstatus-bridges"
 static void
-test_dir_handle_get_networkstatus_bridges_bad_header(void *data)
+test_dir_handle_get_networkstatus_bridges_not_found_without_auth(void *data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -653,7 +653,7 @@ test_dir_handle_get_networkstatus_bridges_bad_header(void *data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, NOT_FOUND);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(get_options);
@@ -703,7 +703,7 @@ test_dir_handle_get_networkstatus_bridges_basic_auth(void *data)
 }
 
 static void
-test_dir_handle_get_networkstatus_bridges_different_digest(void *data)
+test_dir_handle_get_networkstatus_bridges_not_found_wrong_auth(void *data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -728,7 +728,7 @@ test_dir_handle_get_networkstatus_bridges_different_digest(void *data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, NOT_FOUND);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(get_options);
@@ -740,7 +740,7 @@ test_dir_handle_get_networkstatus_bridges_different_digest(void *data)
 
 #define SERVER_DESC_GET(id) GET("/tor/server/" id)
 static void
-test_dir_handle_get_server_descriptors_invalid_req(void* data)
+test_dir_handle_get_server_descriptors_not_found(void* data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -755,7 +755,7 @@ test_dir_handle_get_server_descriptors_invalid_req(void* data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
 
-  tt_str_op(header, OP_EQ, NOT_FOUND);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
   tt_int_op(conn->dir_spool_src, OP_EQ, DIR_SPOOL_SERVER_BY_FP);
 
   done:
@@ -820,6 +820,7 @@ test_dir_handle_get_server_descriptors_all(void* data)
     UNMOCK(connection_write_to_buf_impl_);
     tor_free(conn);
     tor_free(header);
+    tor_free(body);
 
     routerlist_free_all();
     nodelist_free_all();
@@ -920,6 +921,7 @@ test_dir_handle_get_server_descriptors_authority(void* data)
     tor_free(mock_routerinfo);
     tor_free(conn);
     tor_free(header);
+    tor_free(body);
     crypto_pk_free(identity_pkey);
 }
 
@@ -985,6 +987,7 @@ test_dir_handle_get_server_descriptors_fp(void* data)
     tor_free(mock_routerinfo);
     tor_free(conn);
     tor_free(header);
+    tor_free(body);
     crypto_pk_free(identity_pkey);
 }
 
@@ -1045,6 +1048,7 @@ test_dir_handle_get_server_descriptors_d(void* data)
     tor_free(mock_routerinfo);
     tor_free(conn);
     tor_free(header);
+    tor_free(body);
     crypto_pk_free(identity_pkey);
 }
 
@@ -1470,24 +1474,24 @@ test_dir_handle_get_server_keys_busy(void* data)
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
 struct testcase_t dir_handle_get_tests[] = {
+  DIR_HANDLE_CMD(not_found, 0),
   DIR_HANDLE_CMD(bad_request, 0),
-  DIR_HANDLE_CMD(v1_command_without_disclaimer, 0),
+  DIR_HANDLE_CMD(v1_command_not_found, 0),
   DIR_HANDLE_CMD(v1_command_returns_disclaimer, 0),
-  DIR_HANDLE_CMD(unknown_path, 0),
   DIR_HANDLE_CMD(robots_txt, 0),
   DIR_HANDLE_CMD(bytes_txt, 0),
-  DIR_HANDLE_CMD(rendezvous2_on_not_encrypted_conn, 0),
+  DIR_HANDLE_CMD(rendezvous2_not_found_if_not_encrypted, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_with_invalid_desc_id, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_well_formed, 0),
-  DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_present, 0),
+  DIR_HANDLE_CMD(rendezvous2_not_found, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_success, 0),
-  DIR_HANDLE_CMD(micro_d_missing_fingerprints, 0),
+  DIR_HANDLE_CMD(micro_d_not_found, 0),
   DIR_HANDLE_CMD(micro_d_finds_fingerprints, 0),
   DIR_HANDLE_CMD(micro_d_server_busy, 0),
-  DIR_HANDLE_CMD(networkstatus_bridges_bad_header, 0),
+  DIR_HANDLE_CMD(networkstatus_bridges_not_found_without_auth, 0),
   DIR_HANDLE_CMD(networkstatus_bridges_basic_auth, 0),
-  DIR_HANDLE_CMD(networkstatus_bridges_different_digest, 0),
-  DIR_HANDLE_CMD(server_descriptors_invalid_req, 0),
+  DIR_HANDLE_CMD(networkstatus_bridges_not_found_wrong_auth, 0),
+  DIR_HANDLE_CMD(server_descriptors_not_found, 0),
   DIR_HANDLE_CMD(server_descriptors_all, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_authority, TT_FORK),
   DIR_HANDLE_CMD(server_descriptors_fp, TT_FORK),
