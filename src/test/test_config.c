@@ -18,6 +18,7 @@
 #include "connection_edge.h"
 #include "dns.h"
 #include "entrynodes.h"
+#include "geoip.h"
 #include "main.h"
 #include "rendclient.h"
 #include "rendservice.h"
@@ -4333,6 +4334,60 @@ test_config_options_act_disable_Statistics_public_server_mode(void *arg)
   (void)arg;
 }
 #undef NS_SUBMODULE
+
+#define NS_SUBMODULE EntryStatistics_public_server_mode
+NS_DECL(int, public_server_mode, (const or_options_t *options));
+
+static int
+NS(public_server_mode)(const or_options_t *options)
+{
+  (void)options;
+  return 1;
+}
+
+NS_DECL(int, server_mode, (const or_options_t *options));
+
+static int
+NS(server_mode)(const or_options_t *options)
+{
+  (void)options;
+  return 1;
+}
+
+NS_DECL(int, geoip_is_loaded, (sa_family_t family));
+
+static int
+NS(geoip_is_loaded)(sa_family_t family)
+{
+  (void)family;
+  return 0;
+}
+
+static void
+test_config_options_act_no_geoIP_database_found_to_mesure_entry_node(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+  options->EntryStatistics = 1;
+  old_options->EntryStatistics = 0;
+  NS_MOCK(public_server_mode);
+  NS_MOCK(server_mode);
+  NS_MOCK(geoip_is_loaded);
+  MOCK(dns_reset, mock_dns_reset);
+
+  options_act(old_options);
+
+  tt_int_op(options->EntryStatistics, OP_EQ, 0);
+
+ done:
+  NS_UNMOCK(public_server_mode);
+  NS_UNMOCK(server_mode);
+  NS_UNMOCK(geoip_is_loaded);
+  UNMOCK(dns_reset);
+  (void)arg;
+}
+#undef NS_SUBMODULE
 #undef NS_MODULE
 
 static void
@@ -4525,6 +4580,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_Statistics_private_server_mode, 0),
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
   CONFIG_TEST(options_act_disable_Statistics_public_server_mode, TT_FORK),
+  CONFIG_TEST(options_act_no_geoIP_database_found_to_mesure_entry_node, TT_FORK),
   CONFIG_TEST(options_act_EntryNodes, 0),
   CONFIG_TEST(options_act_ExcludeNodes, 0),
   CONFIG_TEST(options_act_DirPortFrontPage, 0),
