@@ -19,6 +19,7 @@
 #include "entrynodes.h"
 #include "geoip.h"
 #include "main.h"
+#include "nodelist.h"
 #include "rendclient.h"
 #include "rendservice.h"
 #include "router.h"
@@ -4697,6 +4698,37 @@ test_config_options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes(void
 }
 #undef NS_MODULE
 
+#define NS_MODULE
+NS_DECL(void, router_dir_info_changed, (void));
+
+static void
+NS(router_dir_info_changed)(void)
+{
+  CALLED(router_dir_info_changed)++;
+}
+
+static void
+test_config_options_act_calls_update_router_when_changes_status(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->BridgeRelay = 1;
+
+  options = test_setup_option_CMD_TOR();
+  options->FetchDirInfoEarly = 1;
+
+  NS_MOCK(router_dir_info_changed);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(router_dir_info_changed), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  NS_UNMOCK(router_dir_info_changed);
+  tor_free(options);
+  tor_free(old_options);
+}
+#undef NS_MODULE
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4738,5 +4770,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_try_locking_err, TT_FORK),
   CONFIG_TEST(options_act_init_ext_or_cookie_authentication_err, TT_FORK),
   CONFIG_TEST(options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes, TT_FORK),
+  CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
   END_OF_TESTCASES
 };
