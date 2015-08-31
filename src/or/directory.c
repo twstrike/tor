@@ -2685,6 +2685,9 @@ directory_handle_command_get(dir_connection_t *conn, const char *headers,
     const char *request_type = NULL;
     long lifetime = NETWORKSTATUS_CACHE_LIFETIME;
 
+    //TODO: is there any good reason for this?
+    //It makes all the branches with "if (!smartlist_len(dir_fps))" unreachable
+    //since the only way it could happen is if this 1 becomes 0
     if (1) {
       networkstatus_t *v;
       time_t now = time(NULL);
@@ -2735,12 +2738,15 @@ directory_handle_command_get(dir_connection_t *conn, const char *headers,
       lifetime = (v && v->fresh_until > now) ? v->fresh_until - now : 0;
     }
 
+    //TODO: unreachable
+    /* LCOV_EXCL_START */
     if (!smartlist_len(dir_fps)) { /* we failed to create/cache cp */
       write_http_status_line(conn, 503, "Network status object unavailable");
       smartlist_free(dir_fps);
       geoip_note_ns_response(GEOIP_REJECT_UNAVAILABLE);
       goto done;
     }
+    /* LCOV_EXCL_STOP */
 
     if (!dirserv_remove_old_statuses(dir_fps, if_modified_since)) {
       write_http_status_line(conn, 404, "Not found");
@@ -2748,13 +2754,15 @@ directory_handle_command_get(dir_connection_t *conn, const char *headers,
       smartlist_free(dir_fps);
       geoip_note_ns_response(GEOIP_REJECT_NOT_FOUND);
       goto done;
-    } else if (!smartlist_len(dir_fps)) {
+    } else if (!smartlist_len(dir_fps)) { /* LCOV_EXCL_START */
+      //TODO: unreachable
       write_http_status_line(conn, 304, "Not modified");
       SMARTLIST_FOREACH(dir_fps, char *, cp, tor_free(cp));
       smartlist_free(dir_fps);
       geoip_note_ns_response(GEOIP_REJECT_NOT_MODIFIED);
       goto done;
     }
+    /* LCOV_EXCL_STOP */
 
     dlen = dirserv_estimate_data_size(dir_fps, 0, compressed);
     if (global_write_bucket_low(TO_CONN(conn), dlen, 2)) {
