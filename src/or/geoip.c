@@ -1193,8 +1193,8 @@ geoip_reset_dirreq_stats(time_t now)
 
 /** Stop collecting directory request stats in a way that we can re-start
  * doing so in geoip_dirreq_stats_init(). */
-void
-geoip_dirreq_stats_term(void)
+MOCK_IMPL(void,
+geoip_dirreq_stats_term, (void))
 {
   geoip_reset_dirreq_stats(0);
 }

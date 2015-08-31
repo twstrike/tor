@@ -4296,11 +4296,12 @@ test_config_options_act_enable_Statistics_public_server_mode(void *arg)
   tt_int_op(CALLED(public_server_mode), OP_GT, 0);
 
  done:
-  options->CellStatistics = 0;
   UNMOCK(get_options_mutable);
   UNMOCK(dns_reset);
   NS_UNMOCK(server_mode);
   NS_UNMOCK(public_server_mode);
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4391,6 +4392,35 @@ test_config_options_act_no_geoIP_database_found_to_mesure_entry_node(void *arg)
   UNMOCK(dns_reset);
   (void)arg;
 }
+
+NS_DECL(void, geoip_dirreq_stats_term, (void));
+
+static void
+NS(geoip_dirreq_stats_term)(void)
+{
+  CALLED(geoip_dirreq_stats_term)++;
+}
+
+static void
+test_config_options_act_disables_statistics_calls_geoip_dirreq_stats_term(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  old_options->DirReqStatistics = 1;
+  options->DirReqStatistics = 0;
+  NS_MOCK(geoip_dirreq_stats_term);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(geoip_dirreq_stats_term), OP_EQ, 1);
+
+ done:
+  NS_UNMOCK(geoip_dirreq_stats_term);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
@@ -4478,6 +4508,8 @@ test_config_options_act_rend_config_services_err(void *arg)
 
  done:
   NS_UNMOCK(rend_config_services);
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 #undef NS_SUBMODULE
@@ -4510,6 +4542,8 @@ test_config_options_act_rend_parse_service_authorization_err(void *arg)
   tt_int_op(CALLED(rend_parse_service_authorization), OP_GT, 0);
 
  done:
+  tor_free(options);
+  tor_free(old_options);
   NS_UNMOCK(rend_parse_service_authorization);
   (void)arg;
 }
@@ -4554,6 +4588,8 @@ test_config_options_act_try_locking_err(void *arg)
  done:
   NS_UNMOCK(have_lockfile);
   NS_UNMOCK(try_locking);
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 #undef NS_SUBMODULE
@@ -4590,6 +4626,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
   CONFIG_TEST(options_act_disable_Statistics_public_server_mode, TT_FORK),
   CONFIG_TEST(options_act_no_geoIP_database_found_to_mesure_entry_node, TT_FORK),
+  CONFIG_TEST(options_act_disables_statistics_calls_geoip_dirreq_stats_term, TT_FORK),
   CONFIG_TEST(options_act_EntryNodes, TT_FORK),
   CONFIG_TEST(options_act_ExcludeNodes, TT_FORK),
   CONFIG_TEST(options_act_DirPortFrontPage, TT_FORK),
