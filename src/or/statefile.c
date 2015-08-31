@@ -307,8 +307,8 @@ or_state_new(void)
 /** Reload the persistent state from disk, generating a new state as needed.
  * Return 0 on success, less than 0 on failure.
  */
-int
-or_state_load(void)
+MOCK_IMPL(int,
+or_state_load,(void))
 {
   or_state_t *new_state = NULL;
   char *contents = NULL, *fname;

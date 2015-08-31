@@ -29,6 +29,7 @@
 #include "transports.h"
 #include "util.h"
 #include "ext_orport.h"
+#include "statefile.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -4657,6 +4658,38 @@ test_config_options_act_try_locking_err(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE or_state_load
+#define NS_SUBMODULE error
+NS_DECL(int,or_state_load,(void));
+
+int
+NS(or_state_load)(void)
+{
+  CALLED(or_state_load)++;
+  return -1;
+};
+
+static void
+test_config_options_act_or_state_load_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(or_state_load);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(or_state_load), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(or_state_load);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
 #define NS_MODULE init_ext_or_cookie_authentication
 #define NS_SUBMODULE error
 NS_DECL(int,init_ext_or_cookie_authentication,(int is_enabled));
@@ -4779,7 +4812,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_RunAsDaemon, TT_FORK),
   CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, TT_FORK),
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
-
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
   CONFIG_TEST(options_act_Statistics_private_server_mode, TT_FORK),
@@ -4793,6 +4825,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_rend_config_services_err, TT_FORK),
   CONFIG_TEST(options_act_rend_parse_service_authorization_err, TT_FORK),
   CONFIG_TEST(options_act_try_locking_err, TT_FORK),
+  CONFIG_TEST(options_act_or_state_load_err, TT_FORK),
   CONFIG_TEST(options_act_init_ext_or_cookie_authentication_err, TT_FORK),
   CONFIG_TEST(options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes, TT_FORK),
   CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
