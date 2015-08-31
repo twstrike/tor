@@ -4467,6 +4467,7 @@ static void
 test_config_options_act_rend_config_services_err(void *arg)
 {
   or_options_t *options, *old_options;
+  (void)options; // options will be used as global options in options_act
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
@@ -4499,6 +4500,7 @@ static void
 test_config_options_act_rend_parse_service_authorization_err(void *arg)
 {
   or_options_t *options, *old_options;
+  (void)options; // options will be used as global options in options_act
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
@@ -4539,6 +4541,7 @@ static void
 test_config_options_act_try_locking_err(void *arg)
 {
   or_options_t *options, *old_options;
+  (void)options; // options will be used as global options in options_act
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
