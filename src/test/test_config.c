@@ -14,6 +14,7 @@
 #include "config.h"
 #include "confparse.h"
 #include "connection_edge.h"
+#include "dirvote.h"
 #include "dns.h"
 #include "entrynodes.h"
 #include "geoip.h"
@@ -4518,7 +4519,7 @@ test_config_options_act_DirPortFrontPage(void *arg)
 
 #define NS_MODULE rend_config_services
 #define NS_SUBMODULE error
-NS_DECL(int,rend_config_services,(const or_options_t *options, int validate_only));
+NS_DECL(int, rend_config_services, (const or_options_t *options, int validate_only));
 
 static int
 NS(rend_config_services)(const or_options_t *options, int validate_only)
@@ -4588,8 +4589,8 @@ test_config_options_act_rend_parse_service_authorization_err(void *arg)
 
 #define NS_MODULE try_locking
 #define NS_SUBMODULE error
-NS_DECL(int,have_lockfile,(void));
-NS_DECL(int,try_locking,(const or_options_t *options, int err_if_locked));
+NS_DECL(int, have_lockfile, (void));
+NS_DECL(int, try_locking, (const or_options_t *options, int err_if_locked));
 
 int
 NS(have_lockfile)(void)
@@ -4663,6 +4664,39 @@ test_config_options_act_init_ext_or_cookie_authentication_err(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE
+NS_DECL(void, dirvote_recalculate_timing, (const or_options_t *op, time_t now));
+
+static void
+NS(dirvote_recalculate_timing)(const or_options_t *op, time_t now)
+{
+  CALLED(dirvote_recalculate_timing)++;
+}
+
+static void
+test_config_options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->AuthoritativeDir = 0;
+
+  options = test_setup_option_CMD_TOR();
+  options->AuthoritativeDir = 1;
+  options->V3AuthoritativeDir = 1;
+
+  NS_MOCK(dirvote_recalculate_timing);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(dirvote_recalculate_timing), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  NS_UNMOCK(dirvote_recalculate_timing);
+  tor_free(options);
+  tor_free(old_options);
+}
+#undef NS_MODULE
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4688,6 +4722,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_RunAsDaemon, TT_FORK),
   CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, TT_FORK),
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
+
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
   CONFIG_TEST(options_act_Statistics_private_server_mode, TT_FORK),
@@ -4702,5 +4737,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_rend_parse_service_authorization_err, TT_FORK),
   CONFIG_TEST(options_act_try_locking_err, TT_FORK),
   CONFIG_TEST(options_act_init_ext_or_cookie_authentication_err, TT_FORK),
+  CONFIG_TEST(options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes, TT_FORK),
   END_OF_TESTCASES
 };
