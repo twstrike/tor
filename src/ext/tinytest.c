@@ -30,6 +30,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
+#include <math.h>
 
 #ifndef NO_FORKING
 
@@ -60,6 +62,11 @@
 #include "tinytest_macros.h"
 
 #define LONGEST_TEST_NAME 16384
+
+struct testrun_t {
+  struct testgroup_t* testgroup;
+  struct testcase_t* testcase;
+};
 
 static int in_tinytest_main = 0; /**< true if we're in tinytest_main().*/
 static int n_ok = 0; /**< Number of tests that have passed */
@@ -380,7 +387,7 @@ tinytest_set_aliases(const struct testlist_alias_t *aliases)
 int
 tinytest_main(int c, const char **v, struct testgroup_t *groups)
 {
-	int i, j, n=0;
+	int i, j, n=0, randomize=0;
 
 #ifdef _WIN32
 	const char *sp = strrchr(v[0], '.');
@@ -409,6 +416,16 @@ tinytest_main(int c, const char **v, struct testgroup_t *groups)
 				usage(groups, 0);
 			} else if (!strcmp(v[i], "--list-tests")) {
 				usage(groups, 1);
+      } else if (!strcmp(v[i], "--random")){
+        unsigned int seed = time(NULL);
+        srand(seed);
+        randomize = 1;
+        printf("seed=%d\n", seed);
+      } else if (strstr(v[i], "--random=")){
+        unsigned int seed = atoi(v[i]+9);
+        srand(seed);
+        randomize = 1;
+        printf("seed=%d\n", seed);
 			} else {
 				printf("Unknown option %s.  Try --help\n",v[i]);
 				return -1;
@@ -427,13 +444,39 @@ tinytest_main(int c, const char **v, struct testgroup_t *groups)
 	setvbuf(stdout, NULL, _IONBF, 0);
 #endif
 
-	++in_tinytest_main;
+  int num_test_cases = 0;
 	for (i=0; groups[i].prefix; ++i)
 		for (j=0; groups[i].cases[j].name; ++j)
 			if (groups[i].cases[j].flags & TT_ENABLED_)
-				testcase_run_one(&groups[i],
-						 &groups[i].cases[j]);
+        num_test_cases++;
 
+  struct testrun_t **runs = malloc(sizeof(struct testrun_t*)*num_test_cases);
+
+  int k = 0;
+	for (i=0; groups[i].prefix; ++i){
+		for (j=0; groups[i].cases[j].name; ++j) {
+			if (groups[i].cases[j].flags & TT_ENABLED_) {
+        runs[k] = malloc(sizeof(struct testrun_t));
+        runs[k]->testgroup = &groups[i];
+        runs[k]->testcase = &groups[i].cases[j];
+        k++;
+      }
+    }
+  }
+
+  if(randomize) {
+    for (i=num_test_cases-1; i > 0; --i) {
+      int k = round((double)rand()/RAND_MAX*(num_test_cases-1));
+      struct testrun_t* tmp = runs[i];
+      runs[i] = runs[k];
+      runs[k] = tmp;
+    }
+  }
+
+	++in_tinytest_main;
+  for (i=0; i < num_test_cases; i++) {
+    testcase_run_one(runs[i]->testgroup, runs[i]->testcase);
+  }
 	--in_tinytest_main;
 
 	if (opt_verbosity==0)
