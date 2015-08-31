@@ -1766,6 +1766,14 @@ test_options_validate__hidserv(void *ignored)
   tt_str_op(mock_saved_log_at(1), OP_EQ, "RendPostPeriod option is too short; raising to 600 seconds.\n");
   tt_int_op(tdata->opt->RendPostPeriod, OP_EQ, 600);
 
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "RendPostPeriod 302401\n" );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "RendPostPeriod is too large; clipping to 302400s.\n");
+  tt_int_op(tdata->opt->RendPostPeriod, OP_EQ, 302400);
+
  done:
   teardown_capture_of_logs(previous_log);
   free_options_test_data(tdata);
@@ -1863,7 +1871,211 @@ test_options_validate__bandwidth(void *ignored)
   ENSURE_BANDWIDTH_PARAM(AuthDirFastGuarantee);
   ENSURE_BANDWIDTH_PARAM(AuthDirGuardBWGuarantee);
 
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "RelayBandwidthRate 1000\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->RelayBandwidthBurst, OP_EQ, 1000);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "RelayBandwidthBurst 1001\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->RelayBandwidthRate, OP_EQ, 1001);
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "RelayBandwidthRate 1001\n"
+                                "RelayBandwidthBurst 1000\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "RelayBandwidthBurst must be at least equal to RelayBandwidthRate.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "BandwidthRate 1001\n"
+                                "BandwidthBurst 1000\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "BandwidthBurst must be at least equal to BandwidthRate.");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "RelayBandwidthRate 1001\n"
+                                "BandwidthRate 1000\n"
+                                "BandwidthBurst 1000\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->BandwidthRate, OP_EQ, 1001);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "RelayBandwidthRate 1001\n"
+                                "BandwidthRate 1000\n"
+                                "RelayBandwidthBurst 1001\n"
+                                "BandwidthBurst 1000\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->BandwidthBurst, OP_EQ, 1001);
+
  done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__circuits(void *ignored)
+{
+  (void)ignored;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "MaxCircuitDirtiness 2592001\n");
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "MaxCircuitDirtiness option is too high; setting to 30 days.\n");
+  tt_int_op(tdata->opt->MaxCircuitDirtiness, OP_EQ, 2592000);
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "CircuitStreamTimeout 1\n");
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(2), OP_EQ, "CircuitStreamTimeout option is too short; raising to 10 seconds.\n");
+  tt_int_op(tdata->opt->CircuitStreamTimeout, OP_EQ, 10);
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "CircuitStreamTimeout 111\n");
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "CircuitStreamTimeout option is too short; raising to 10 seconds.\n");
+  tt_int_op(tdata->opt->CircuitStreamTimeout, OP_EQ, 111);
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "HeartbeatPeriod 1\n");
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(2), OP_EQ, "HeartbeatPeriod option is too short; raising to 1800 seconds.\n");
+  tt_int_op(tdata->opt->HeartbeatPeriod, OP_EQ, 1800);
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "HeartbeatPeriod 1982\n");
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "HeartbeatPeriod option is too short; raising to 1800 seconds.\n");
+  tt_int_op(tdata->opt->HeartbeatPeriod, OP_EQ, 1982);
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "CircuitBuildTimeout 1\n"
+                                );
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "CircuitBuildTimeout is shorter (1 seconds) than the recommended minimum (10 seconds), and LearnCircuitBuildTimeout is disabled.  If tor isn't working, raise this value or enable LearnCircuitBuildTimeout.\n");
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "CircuitBuildTimeout 11\n"
+                                );
+  options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_str_op(mock_saved_log_at(1), OP_NE, "CircuitBuildTimeout is shorter (1 seconds) than the recommended minimum (10 seconds), and LearnCircuitBuildTimeout is disabled.  If tor isn't working, raise this value or enable LearnCircuitBuildTimeout.\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__port_forwarding(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "PortForwarding 1\nSandbox 1\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "PortForwarding is not compatible with Sandbox; at most one can be set");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "PortForwarding 1\nSandbox 0\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(!msg);
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__tor2web(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "Tor2webRendezvousPoints 1\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Tor2webRendezvousPoints cannot be set without Tor2webMode.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "Tor2webRendezvousPoints 1\nTor2webMode 1\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__rend(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "UseEntryGuards 0\n"
+                                "HiddenServiceDir /Library/Tor/var/lib/tor/hidden_service/\n"
+                                "HiddenServicePort 80 127.0.0.1:8080\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "UseEntryGuards is disabled, but you have configured one or more hidden services on this Tor instance.  Your hidden services will be very easy to locate using a well-known attack -- see http://freehaven.net/anonbib/#hs-attack06 for details.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "UseEntryGuards 1\n"
+                                "HiddenServiceDir /Library/Tor/var/lib/tor/hidden_service/\n"
+                                "HiddenServicePort 80 127.0.0.1:8080\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(1), OP_NE, "UseEntryGuards is disabled, but you have configured one or more hidden services on this Tor instance.  Your hidden services will be very easy to locate using a well-known attack -- see http://freehaven.net/anonbib/#hs-attack06 for details.\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
   free_options_test_data(tdata);
   tor_free(msg);
 }
@@ -1902,5 +2114,9 @@ struct testcase_t options_tests[] = {
   { "validate__predicted_ports", test_options_validate__predicted_ports, TT_FORK, NULL, NULL },
   { "validate__path_bias", test_options_validate__path_bias, TT_FORK, NULL, NULL },
   { "validate__bandwidth", test_options_validate__bandwidth, TT_FORK, NULL, NULL },
+  { "validate__circuits", test_options_validate__circuits, TT_FORK, NULL, NULL },
+  { "validate__port_forwarding", test_options_validate__port_forwarding, TT_FORK, NULL, NULL },
+  { "validate__tor2web", test_options_validate__tor2web, TT_FORK, NULL, NULL },
+  { "validate__rend", test_options_validate__rend, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
