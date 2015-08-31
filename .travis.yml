@@ -5,5 +5,4 @@ install:
   - ./configure --disable-asciidoc
 
 script:
-  - make
-  - src/test/test --random
+  - make test
