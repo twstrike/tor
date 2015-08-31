@@ -3918,6 +3918,8 @@ test_config_options_act_not_DisableDebuggerAttachment(void *arg)
  done:
   options->DisableDebuggerAttachment = currentDisableDebuggerAttachment;
   UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -3940,6 +3942,8 @@ test_config_options_act_Tor2webMode_err(void *arg)
  done:
   UNMOCK(get_options_mutable);
   options->Tor2webMode = 0;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -3966,6 +3970,8 @@ test_config_options_act_DirAuthority_line_err(void *arg)
   tor_free(test_dir_authority);
 
   options->DirAuthorities = NULL;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -3991,6 +3997,8 @@ test_config_options_act_Bridge(void *arg)
   tor_free(test_bridges->value);
   tor_free(test_bridges);
   options->Bridges = NULL;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4016,6 +4024,8 @@ test_config_options_act_Bridge_err(void *arg)
   tor_free(test_bridges->value);
   tor_free(test_bridges);
   options->Bridges = NULL;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4040,6 +4050,8 @@ test_config_options_act_ClientTransportPlugin_err(void *arg)
   tor_free(test_clientTransportPlugin->value);
   tor_free(test_clientTransportPlugin);
   options->ClientTransportPlugin = NULL;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4080,6 +4092,8 @@ test_config_options_act_ServerTransportPlugin_err(void *arg)
   tor_free(test_serverTransportPlugin);
   options->ServerTransportPlugin = NULL;
   NS_UNMOCK(server_mode);
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 #undef NS_SUBMODULE
@@ -4111,6 +4125,8 @@ test_config_options_act_RunAsDaemon(void *arg)
   UNMOCK(get_options_mutable);
   NS_UNMOCK(finish_daemon);
   options->RunAsDaemon = 0;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 #undef NS_SUBMODULE
@@ -4148,6 +4164,8 @@ test_config_options_act_options_transition_requires_fresh_tls_context(void *arg)
   old_options->V3AuthoritativeDir = 0;
   options->TLSECGroup = NULL;
   old_options->TLSECGroup = NULL;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4164,6 +4182,8 @@ test_config_options_act_write_pidfile(void *arg)
  done:
   UNMOCK(get_options_mutable);
   options->PidFile = NULL;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4180,6 +4200,8 @@ test_config_options_act_BridgePassword(void *arg)
  done:
   UNMOCK(get_options_mutable);
   options->BridgePassword = NULL;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4204,6 +4226,8 @@ test_config_options_act_BridgeRelay(void *arg)
  done:
   UNMOCK(get_options_mutable);
   options->BridgeRelay = tempIsBridgeRelay;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4236,6 +4260,8 @@ test_config_options_act_Statistics_private_server_mode(void *arg)
   UNMOCK(get_options_mutable);
   options->CellStatistics = 0;
   NS_UNMOCK(public_server_mode);
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 #undef NS_SUBMODULE
@@ -4336,6 +4362,8 @@ test_config_options_act_disable_Statistics_public_server_mode(void *arg)
   UNMOCK(dns_reset);
   NS_UNMOCK(server_mode);
   NS_UNMOCK(public_server_mode);
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 #undef NS_SUBMODULE
@@ -4390,6 +4418,8 @@ test_config_options_act_no_geoIP_database_found_to_mesure_entry_node(void *arg)
   NS_UNMOCK(server_mode);
   NS_UNMOCK(geoip_is_loaded);
   UNMOCK(dns_reset);
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4440,6 +4470,8 @@ test_config_options_act_EntryNodes(void *arg)
  done:
   options->EntryNodes->list = NULL;
   options->EntryNodes = NULL;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4461,6 +4493,8 @@ test_config_options_act_ExcludeNodes(void *arg)
   options->EntryNodes = NULL;
   options->ExcludeNodes->list = NULL;
   options->ExcludeNodes = NULL;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4477,6 +4511,8 @@ test_config_options_act_DirPortFrontPage(void *arg)
 
  done:
   options->DirPortFrontPage = NULL;
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 
@@ -4545,6 +4581,8 @@ test_config_options_act_rend_parse_service_authorization_err(void *arg)
   tor_free(options);
   tor_free(old_options);
   NS_UNMOCK(rend_parse_service_authorization);
+  tor_free(options);
+  tor_free(old_options);
   (void)arg;
 }
 #undef NS_SUBMODULE
