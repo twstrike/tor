@@ -4420,7 +4420,10 @@ test_config_options_act_no_geoIP_database_found_to_mesure_entry_node(void *arg)
   tor_free(old_options);
   (void)arg;
 }
+#undef NS_SUBMODULE
+#undef NS_MODULE
 
+#define NS_MODULE geoip_dirreq_stats_term
 NS_DECL(void, geoip_dirreq_stats_term, (void));
 
 static void
@@ -4449,7 +4452,6 @@ test_config_options_act_disables_statistics_calls_geoip_dirreq_stats_term(void *
   tor_free(old_options);
   (void)arg;
 }
-#undef NS_SUBMODULE
 #undef NS_MODULE
 
 static void
