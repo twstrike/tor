@@ -4289,7 +4289,12 @@ NS(server_mode)(const or_options_t *options)
   return 1;
 }
 
-int mock_dns_reset(void) {
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  CALLED(dns_reset)++;
   return 0;
 }
 
@@ -4314,16 +4319,17 @@ test_config_options_act_enable_Statistics_public_server_mode(void *arg)
   options->BridgeAuthoritativeDir = 1;
   old_options->BridgeAuthoritativeDir = 0;
 
-  MOCK(dns_reset,mock_dns_reset);
+  NS_MOCK(dns_reset);
   NS_MOCK(server_mode);
   NS_MOCK(public_server_mode);
   tt_int_op(options_act(old_options),OP_EQ,0);
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
   tt_int_op(CALLED(server_mode), OP_GT, 0);
   tt_int_op(CALLED(public_server_mode), OP_GT, 0);
 
  done:
   UNMOCK(get_options_mutable);
-  UNMOCK(dns_reset);
+  NS_UNMOCK(dns_reset);
   NS_UNMOCK(server_mode);
   NS_UNMOCK(public_server_mode);
   tor_free(options);
@@ -4351,15 +4357,18 @@ test_config_options_act_disable_Statistics_public_server_mode(void *arg)
   old_options->BridgeAuthoritativeDir = 1;
   options->BridgeAuthoritativeDir = 0;
 
-  MOCK(dns_reset,mock_dns_reset);
+  NS_MOCK(dns_reset);
   NS_MOCK(server_mode);
   NS_MOCK(public_server_mode);
   tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
 
  done:
   options->CellStatistics = 0;
   UNMOCK(get_options_mutable);
-  UNMOCK(dns_reset);
+  NS_UNMOCK(dns_reset);
   NS_UNMOCK(server_mode);
   NS_UNMOCK(public_server_mode);
   tor_free(options);
@@ -4375,6 +4384,7 @@ static int
 NS(public_server_mode)(const or_options_t *options)
 {
   (void)options;
+  CALLED(public_server_mode)++;
   return 1;
 }
 
@@ -4384,6 +4394,7 @@ static int
 NS(server_mode)(const or_options_t *options)
 {
   (void)options;
+  CALLED(server_mode)++;
   return 1;
 }
 
@@ -4393,6 +4404,16 @@ static int
 NS(geoip_is_loaded)(sa_family_t family)
 {
   (void)family;
+  CALLED(geoip_is_loaded)++;
+  return 0;
+}
+
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  CALLED(dns_reset)++;
   return 0;
 }
 
@@ -4407,17 +4428,21 @@ test_config_options_act_no_geoIP_database_found_to_mesure_entry_node(void *arg)
   NS_MOCK(public_server_mode);
   NS_MOCK(server_mode);
   NS_MOCK(geoip_is_loaded);
-  MOCK(dns_reset, mock_dns_reset);
+  NS_MOCK(dns_reset);
 
   options_act(old_options);
 
   tt_int_op(options->EntryStatistics, OP_EQ, 0);
+  tt_int_op(CALLED(geoip_is_loaded), OP_GT, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
 
  done:
   NS_UNMOCK(public_server_mode);
   NS_UNMOCK(server_mode);
   NS_UNMOCK(geoip_is_loaded);
-  UNMOCK(dns_reset);
+  NS_UNMOCK(dns_reset);
   tor_free(options);
   tor_free(old_options);
   (void)arg;
