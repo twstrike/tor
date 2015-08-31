@@ -19,7 +19,7 @@ or_connection_t *connection_or_get_by_ext_or_id(const char *id);
 int connection_ext_or_finished_flushing(or_connection_t *conn);
 int connection_ext_or_process_inbuf(or_connection_t *or_conn);
 
-int init_ext_or_cookie_authentication(int is_enabled);
+MOCK_DECL(int,init_ext_or_cookie_authentication,(int is_enabled));
 char *get_ext_or_auth_cookie_file_name(void);
 void ext_orport_free_all(void);
 

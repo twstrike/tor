@@ -28,6 +28,7 @@
 #include "test.h"
 #include "transports.h"
 #include "util.h"
+#include "ext_orport.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -4633,6 +4634,39 @@ test_config_options_act_try_locking_err(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE init_ext_or_cookie_authentication
+#define NS_SUBMODULE error
+NS_DECL(int,init_ext_or_cookie_authentication,(int is_enabled));
+
+int
+NS(init_ext_or_cookie_authentication)(int is_enabled)
+{
+  (void)is_enabled;
+  CALLED(init_ext_or_cookie_authentication)++;
+  return -1;
+};
+
+static void
+test_config_options_act_init_ext_or_cookie_authentication_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(init_ext_or_cookie_authentication);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(init_ext_or_cookie_authentication), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(init_ext_or_cookie_authentication);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4671,5 +4705,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_rend_config_services_err, TT_FORK),
   CONFIG_TEST(options_act_rend_parse_service_authorization_err, TT_FORK),
   CONFIG_TEST(options_act_try_locking_err, TT_FORK),
+  CONFIG_TEST(options_act_init_ext_or_cookie_authentication_err, TT_FORK),
   END_OF_TESTCASES
 };
