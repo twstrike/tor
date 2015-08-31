@@ -20,6 +20,7 @@
 #include "nodelist.h"
 #include "entrynodes.h"
 #include "routerparse.h"
+#include "networkstatus.h"
 
 #ifdef _WIN32
 /* For mkdir() */
@@ -45,6 +46,8 @@ static void connection_write_to_buf_mock(const char *string, size_t len,
 #define NOT_FOUND "HTTP/1.0 404 Not found\r\n\r\n"
 #define BAD_REQUEST "HTTP/1.0 400 Bad request\r\n\r\n"
 #define SERVER_BUSY "HTTP/1.0 503 Directory busy, try again later\r\n\r\n"
+#define NOT_ENOUGH_CONSENSUS_SIGNATURES \
+  "HTTP/1.0 404 Consensus not signed by sufficient number of requested authorities\r\n\r\n"
 
 static tor_addr_t MOCK_TOR_ADDR;
 
@@ -991,6 +994,9 @@ test_dir_handle_get_server_descriptors_fp(void* data)
     crypto_pk_free(identity_pkey);
 }
 
+#define HEX1 "Fe0daff89127389bc67558691231234551193EEE"
+#define HEX2 "Deadbeef99999991111119999911111111f00ba4"
+
 static void
 test_dir_handle_get_server_descriptors_d(void* data)
 {
@@ -1014,8 +1020,6 @@ test_dir_handle_get_server_descriptors_d(void* data)
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
-  #define HEX1 "Fe0daff89127389bc67558691231234551193EEE"
-  #define HEX2 "Deadbeef99999991111119999911111111f00ba4"
   char req_header[155];
   sprintf(req_header, SERVER_DESC_GET("d/%s+" HEX1 "+" HEX2), hex_digest);
   tt_int_op(directory_handle_command_get(conn, req_header, NULL, 0), OP_EQ, 0);
@@ -1562,6 +1566,47 @@ test_dir_handle_get_server_keys_busy(void* data)
     routerlist_free_all();
 }
 
+static networkstatus_t *mock_ns_val = NULL;
+static networkstatus_t *
+mock_ns_get_by_flavor(consensus_flavor_t f)
+{
+  (void)f;
+  return mock_ns_val;
+}
+
+static void
+test_dir_handle_get_status_vote_current_consensus_not_enough_sigs(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  /* init mock */
+  mock_ns_val = tor_malloc_zero(sizeof(networkstatus_t));
+  mock_ns_val->flavor = FLAV_NS;
+  mock_ns_val->voters = smartlist_new();
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+  MOCK(networkstatus_get_latest_consensus_by_flavor, mock_ns_get_by_flavor);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(directory_handle_command_get(conn,
+    GET("/tor/status-vote/current/consensus-flavor/" HEX1 "+" HEX2), NULL, 0), OP_EQ, 0);
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+  tt_assert(header);
+  tt_str_op(NOT_ENOUGH_CONSENSUS_SIGNATURES, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    UNMOCK(networkstatus_get_latest_consensus_by_flavor);
+    tor_free(conn);
+    tor_free(header);
+    smartlist_free(mock_ns_val->voters);
+    tor_free(mock_ns_val);
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -1601,5 +1646,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_keys_sk, 0),
   DIR_HANDLE_CMD(server_keys_fpsk_not_found, 0),
   DIR_HANDLE_CMD(server_keys_fpsk, 0),
+  DIR_HANDLE_CMD(status_vote_current_consensus_not_enough_sigs, 0),
   END_OF_TESTCASES
 };
