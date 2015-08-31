@@ -17,6 +17,7 @@
 #include "dirvote.h"
 #include "dns.h"
 #include "entrynodes.h"
+#include "ext_orport.h"
 #include "geoip.h"
 #include "main.h"
 #include "nodelist.h"
@@ -25,11 +26,10 @@
 #include "router.h"
 #include "routerlist.h"
 #include "routerset.h"
+#include "statefile.h"
 #include "test.h"
 #include "transports.h"
 #include "util.h"
-#include "ext_orport.h"
-#include "statefile.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -4723,6 +4723,60 @@ test_config_options_act_init_ext_or_cookie_authentication_err(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE pt_configure_remaining_proxies
+#define NS_SUBMODULE error
+NS_DECL(int, pt_proxies_configuration_pending, (void));
+
+int
+NS(pt_proxies_configuration_pending)(void)
+{
+  CALLED(pt_proxies_configuration_pending)++;
+  return -1;
+};
+
+NS_DECL(int, net_is_disabled, (void));
+
+int
+NS(net_is_disabled)(void)
+{
+  CALLED(net_is_disabled)++;
+  return 0;
+};
+
+NS_DECL(void, pt_configure_remaining_proxies, (void));
+
+void
+NS(pt_configure_remaining_proxies)(void)
+{
+  CALLED(pt_configure_remaining_proxies)++;
+};
+
+static void
+test_config_options_act_pt_configure_remaining_proxies(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(pt_proxies_configuration_pending);
+  NS_MOCK(net_is_disabled);
+  NS_MOCK(pt_configure_remaining_proxies);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(pt_proxies_configuration_pending), OP_GT, 0);
+  tt_int_op(CALLED(net_is_disabled), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(pt_proxies_configuration_pending);
+  NS_UNMOCK(net_is_disabled);
+  NS_UNMOCK(pt_configure_remaining_proxies);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
 #define NS_MODULE
 NS_DECL(void, dirvote_recalculate_timing, (const or_options_t *op, time_t now));
 
@@ -4827,6 +4881,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_try_locking_err, TT_FORK),
   CONFIG_TEST(options_act_or_state_load_err, TT_FORK),
   CONFIG_TEST(options_act_init_ext_or_cookie_authentication_err, TT_FORK),
+  CONFIG_TEST(options_act_pt_configure_remaining_proxies, TT_FORK),
   CONFIG_TEST(options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes, TT_FORK),
   CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
   END_OF_TESTCASES

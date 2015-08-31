@@ -1341,8 +1341,8 @@ router_perform_bandwidth_test(int num_circs, time_t now)
 /** Return true iff our network is in some sense disabled: either we're
  * hibernating, entering hibernation, or the network is turned off with
  * DisableNetwork. */
-int
-net_is_disabled(void)
+MOCK_IMPL(int,
+net_is_disabled, (void))
 {
   return get_options()->DisableNetwork || we_are_hibernating();
 }

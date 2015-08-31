@@ -48,9 +48,9 @@ MOCK_DECL(void, pt_kickstart_proxy,
 #define pt_kickstart_server_proxy(tl, pa) \
   pt_kickstart_proxy(tl, pa, 1)
 
-void pt_configure_remaining_proxies(void);
+MOCK_DECL(void, pt_configure_remaining_proxies, (void));
 
-int pt_proxies_configuration_pending(void);
+MOCK_DECL(int, pt_proxies_configuration_pending, (void));
 
 char *pt_get_extra_info_descriptor_string(void);
 

@@ -46,7 +46,7 @@ void router_orport_found_reachable(void);
 void router_dirport_found_reachable(void);
 void router_perform_bandwidth_test(int num_circs, time_t now);
 
-int net_is_disabled(void);
+MOCK_DECL(int, net_is_disabled, (void));
 
 int authdir_mode(const or_options_t *options);
 int authdir_mode_v3(const or_options_t *options);
