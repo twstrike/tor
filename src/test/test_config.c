@@ -4136,6 +4136,10 @@ test_config_options_act_options_transition_requires_fresh_tls_context(void *arg)
   old_options->LogMessageDomains = options->LogMessageDomains;
   options->TLSECGroup = "P256";
   old_options->TLSECGroup = "P224";
+  crypto_pk_t *key = NULL;
+  key = pk_generate(2);
+  set_client_identity_key(key);
+
   tt_int_op(options_act(old_options), OP_EQ, 0);
 
  done:
