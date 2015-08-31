@@ -7,9 +7,7 @@
 
 #define CONFIG_PRIVATE
 #define PT_PRIVATE
-#define ROUTER_PRIVATE
 #define ROUTERSET_PRIVATE
-#define RENDSERVICE_PRIVATE
 #include "or.h"
 #include "address.h"
 #include "addressmap.h"
@@ -3912,7 +3910,6 @@ test_config_options_act_not_DisableDebuggerAttachment(void *arg)
 
   int currentDisableDebuggerAttachment = options->DisableDebuggerAttachment;
   options->DisableDebuggerAttachment = 0;
-  options_act(old_options);
 
   tt_int_op(options_act(old_options), OP_EQ, 0);
 
@@ -4534,7 +4531,6 @@ static void
 test_config_options_act_rend_config_services_err(void *arg)
 {
   or_options_t *options, *old_options;
-  (void)options; // options will be used as global options in options_act
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
@@ -4569,7 +4565,6 @@ static void
 test_config_options_act_rend_parse_service_authorization_err(void *arg)
 {
   or_options_t *options, *old_options;
-  (void)options; // options will be used as global options in options_act
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
@@ -4614,7 +4609,6 @@ static void
 test_config_options_act_try_locking_err(void *arg)
 {
   or_options_t *options, *old_options;
-  (void)options; // options will be used as global options in options_act
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
