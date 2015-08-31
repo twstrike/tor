@@ -1609,7 +1609,7 @@ test_dir_handle_get_status_vote_current_consensus_not_enough_sigs(void* data)
   tt_assert(header);
   tt_str_op(NOT_ENOUGH_CONSENSUS_SIGNATURES, OP_EQ, header);
 
-  char *stats = geoip_format_dirreq_stats(0);
+  char *stats = geoip_format_dirreq_stats(time(NULL));
   tt_assert(stats);
   tt_assert(strstr(stats, "not-enough-sigs=8"));
 
