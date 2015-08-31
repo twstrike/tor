@@ -1601,7 +1601,7 @@ test_dir_handle_get_status_vote_current_consensus_not_enough_sigs(void* data)
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
 
   tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
-    GET("/tor/status-vote/current/consensus-flavor/" HEX1 "+" HEX2), NULL, 0));
+    GET("/tor/status-vote/current/consensus-ns/" HEX1 "+" HEX2), NULL, 0));
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
@@ -1614,10 +1614,56 @@ test_dir_handle_get_status_vote_current_consensus_not_enough_sigs(void* data)
   tt_assert(strstr(stats, "not-enough-sigs=8"));
 
   done:
-    UNMOCK(get_options);
-    UNMOCK(connection_write_to_buf_impl_);
     UNMOCK(networkstatus_get_latest_consensus_by_flavor);
+    UNMOCK(connection_write_to_buf_impl_);
+    UNMOCK(get_options);
 
+    tor_free(conn);
+    tor_free(header);
+    smartlist_free(mock_ns_val->voters);
+    tor_free(mock_ns_val);
+    tor_free(mock_options);
+}
+
+static void
+test_dir_handle_get_status_vote_current_consensus_not_found(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  /* init mock */
+  mock_ns_val = tor_malloc_zero(sizeof(networkstatus_t));
+  mock_ns_val->flavor = FLAV_NS;
+  mock_ns_val->voters = smartlist_new();
+
+  init_mock_options();
+
+  MOCK(get_options, mock_get_options);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+  MOCK(networkstatus_get_latest_consensus_by_flavor, mock_ns_get_by_flavor);
+
+  /* start gathering stats */
+  mock_options->DirReqStatistics = 1;
+  geoip_dirreq_stats_init(time(NULL));
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/current/consensus-ns"), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+  tt_assert(header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  char *stats = geoip_format_dirreq_stats(time(NULL));
+  tt_assert(stats);
+  tt_assert(strstr(stats, "not-found=8"));
+
+  done:
+    UNMOCK(networkstatus_get_latest_consensus_by_flavor);
+    UNMOCK(connection_write_to_buf_impl_);
+    UNMOCK(get_options);
     tor_free(conn);
     tor_free(header);
     smartlist_free(mock_ns_val->voters);
@@ -1665,5 +1711,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_keys_fpsk_not_found, 0),
   DIR_HANDLE_CMD(server_keys_fpsk, 0),
   DIR_HANDLE_CMD(status_vote_current_consensus_not_enough_sigs, 0),
+  DIR_HANDLE_CMD(status_vote_current_consensus_not_found, 0),
   END_OF_TESTCASES
 };
