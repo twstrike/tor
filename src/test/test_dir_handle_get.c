@@ -1633,16 +1633,10 @@ test_dir_handle_get_status_vote_current_consensus_not_found(void* data)
   char *header = NULL;
   (void) data;
 
-  /* init mock */
-  mock_ns_val = tor_malloc_zero(sizeof(networkstatus_t));
-  mock_ns_val->flavor = FLAV_NS;
-  mock_ns_val->voters = smartlist_new();
-
   init_mock_options();
 
   MOCK(get_options, mock_get_options);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
-  MOCK(networkstatus_get_latest_consensus_by_flavor, mock_ns_get_by_flavor);
 
   /* start gathering stats */
   mock_options->DirReqStatistics = 1;
@@ -1662,13 +1656,10 @@ test_dir_handle_get_status_vote_current_consensus_not_found(void* data)
   tt_assert(strstr(stats, "not-found=8"));
 
   done:
-    UNMOCK(networkstatus_get_latest_consensus_by_flavor);
     UNMOCK(connection_write_to_buf_impl_);
     UNMOCK(get_options);
     tor_free(conn);
     tor_free(header);
-    smartlist_free(mock_ns_val->voters);
-    tor_free(mock_ns_val);
     tor_free(mock_options);
 }
 
@@ -1685,16 +1676,10 @@ test_dir_handle_get_status_vote_current_consensus_busy(void* data)
   digests_t digests;
   dirserv_set_cached_consensus_networkstatus("network status", "ns", &digests, now-3600);
 
-  /* init mock */
-  mock_ns_val = tor_malloc_zero(sizeof(networkstatus_t));
-  mock_ns_val->flavor = FLAV_NS;
-  mock_ns_val->voters = smartlist_new();
-
   init_mock_options();
 
   MOCK(get_options, mock_get_options);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
-  MOCK(networkstatus_get_latest_consensus_by_flavor, mock_ns_get_by_flavor);
 
   /* start gathering stats */
   mock_options->DirReqStatistics = 1;
@@ -1717,13 +1702,10 @@ test_dir_handle_get_status_vote_current_consensus_busy(void* data)
   tt_assert(strstr(stats, "busy=8"));
 
   done:
-    UNMOCK(networkstatus_get_latest_consensus_by_flavor);
     UNMOCK(connection_write_to_buf_impl_);
     UNMOCK(get_options);
     tor_free(conn);
     tor_free(header);
-    smartlist_free(mock_ns_val->voters);
-    tor_free(mock_ns_val);
     tor_free(mock_options);
     dirserv_free_all();
 }
