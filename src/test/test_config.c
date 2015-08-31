@@ -14,6 +14,7 @@
 #include "config.h"
 #include "confparse.h"
 #include "connection_edge.h"
+#include "connection_or.h"
 #include "dirvote.h"
 #include "dns.h"
 #include "entrynodes.h"
@@ -4927,6 +4928,39 @@ test_config_options_act_calls_update_router_when_changes_status(void *arg)
 }
 #undef NS_MODULE
 
+#define NS_MODULE
+NS_DECL(void, connection_or_update_token_buckets,
+        (smartlist_t *conns, const or_options_t *options));
+
+static void
+NS(connection_or_update_token_buckets)(smartlist_t *conns, const or_options_t *options)
+{
+  CALLED(connection_or_update_token_buckets)++;
+}
+
+static void
+test_config_options_act_updates_token_buckets_if_PerConnBWRate_changes(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->PerConnBWRate = 0;
+
+  options = test_setup_option_CMD_TOR();
+  options->PerConnBWRate = 1;
+
+  NS_MOCK(connection_or_update_token_buckets);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(connection_or_update_token_buckets), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  NS_UNMOCK(connection_or_update_token_buckets);
+  tor_free(options);
+  tor_free(old_options);
+}
+#undef NS_MODULE
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -4972,5 +5006,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_init_key_error, TT_FORK),
   CONFIG_TEST(options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes, TT_FORK),
   CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
+  CONFIG_TEST(options_act_updates_token_buckets_if_PerConnBWRate_changes, TT_FORK),
   END_OF_TESTCASES
 };
