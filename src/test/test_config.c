@@ -4462,8 +4462,9 @@ NS(rend_config_services)(const or_options_t *options, int validate_only)
 static void
 test_config_options_act_rend_config_services_err(void *arg)
 {
-  or_options_t *old_options;
+  or_options_t *options, *old_options;
   old_options = options_new();
+  options = test_setup_option_CMD_TOR();
 
   NS_MOCK(rend_config_services);
 
@@ -4493,8 +4494,9 @@ NS(rend_parse_service_authorization)(const or_options_t *options, int validate_o
 static void
 test_config_options_act_rend_parse_service_authorization_err(void *arg)
 {
-  or_options_t *old_options;
+  or_options_t *options, *old_options;
   old_options = options_new();
+  options = test_setup_option_CMD_TOR();
 
   NS_MOCK(rend_parse_service_authorization);
 
@@ -4565,27 +4567,27 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(fix_my_family, 0),
   CONFIG_TEST(parse_port_config__listenaddress, 0),
   CONFIG_TEST(parse_port_config__ports, 0),
-  CONFIG_TEST(options_act_not_DisableDebuggerAttachment, 0),
-  CONFIG_TEST(options_act_Tor2webMode_err, 0),
-  CONFIG_TEST(options_act_DirAuthority_line_err, 0),
-  CONFIG_TEST(options_act_Bridge, 0),
-  CONFIG_TEST(options_act_Bridge_err, 0),
-  CONFIG_TEST(options_act_ClientTransportPlugin_err, 0),
-  CONFIG_TEST(options_act_ServerTransportPlugin_err, 0),
-  CONFIG_TEST(options_act_RunAsDaemon, 0),
-  CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, 0),
-  CONFIG_TEST(options_act_write_pidfile, 0),
-  CONFIG_TEST(options_act_BridgePassword, 0),
-  CONFIG_TEST(options_act_BridgeRelay, 0),
-  CONFIG_TEST(options_act_Statistics_private_server_mode, 0),
+  CONFIG_TEST(options_act_not_DisableDebuggerAttachment, TT_FORK),
+  CONFIG_TEST(options_act_Tor2webMode_err, TT_FORK),
+  CONFIG_TEST(options_act_DirAuthority_line_err, TT_FORK),
+  CONFIG_TEST(options_act_Bridge, TT_FORK),
+  CONFIG_TEST(options_act_Bridge_err, TT_FORK),
+  CONFIG_TEST(options_act_ClientTransportPlugin_err, TT_FORK),
+  CONFIG_TEST(options_act_ServerTransportPlugin_err, TT_FORK),
+  CONFIG_TEST(options_act_RunAsDaemon, TT_FORK),
+  CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, TT_FORK),
+  CONFIG_TEST(options_act_write_pidfile, TT_FORK),
+  CONFIG_TEST(options_act_BridgePassword, TT_FORK),
+  CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
+  CONFIG_TEST(options_act_Statistics_private_server_mode, TT_FORK),
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
   CONFIG_TEST(options_act_disable_Statistics_public_server_mode, TT_FORK),
   CONFIG_TEST(options_act_no_geoIP_database_found_to_mesure_entry_node, TT_FORK),
-  CONFIG_TEST(options_act_EntryNodes, 0),
-  CONFIG_TEST(options_act_ExcludeNodes, 0),
-  CONFIG_TEST(options_act_DirPortFrontPage, 0),
-  CONFIG_TEST(options_act_rend_config_services_err, 0),
-  CONFIG_TEST(options_act_rend_parse_service_authorization_err, 0),
-  CONFIG_TEST(options_act_try_locking_err, 0),
+  CONFIG_TEST(options_act_EntryNodes, TT_FORK),
+  CONFIG_TEST(options_act_ExcludeNodes, TT_FORK),
+  CONFIG_TEST(options_act_DirPortFrontPage, TT_FORK),
+  CONFIG_TEST(options_act_rend_config_services_err, TT_FORK),
+  CONFIG_TEST(options_act_rend_parse_service_authorization_err, TT_FORK),
+  CONFIG_TEST(options_act_try_locking_err, TT_FORK),
   END_OF_TESTCASES
 };
