@@ -179,6 +179,30 @@ fixed_get_uname(void)
   return fixed_get_uname_result;
 }
 
+#define TEST_OPTIONS_OLD_VALUES   "TestingV3AuthInitialVotingInterval 1800\n" \
+  "TestingV3AuthInitialVoteDelay 300\n" \
+  "TestingV3AuthInitialDistDelay 300\n" \
+  "TestingClientMaxIntervalWithoutRequest 600\n" \
+  "TestingDirConnectionMaxStall 600\n" \
+  "TestingConsensusMaxDownloadTries 8\n" \
+  "TestingDescriptorMaxDownloadTries 8\n" \
+  "TestingMicrodescMaxDownloadTries 8\n" \
+  "TestingCertMaxDownloadTries 8\n"
+
+
+#define TEST_OPTIONS_DEFAULT_VALUES TEST_OPTIONS_OLD_VALUES "MaxClientCircuitsPending 1\n" \
+  "RendPostPeriod 1000\n"                                               \
+  "KeepAlivePeriod 1\n"                                                 \
+  "ConnLimit 1\n"                                                       \
+  "V3AuthVotingInterval 300\n"                                          \
+  "V3AuthVoteDelay 20\n"                                                \
+  "V3AuthDistDelay 20\n"                                                \
+  "V3AuthNIntervalsValid 3\n"                                           \
+  "VirtualAddrNetworkIPv4 127.192.0.0/10\n"                             \
+  "VirtualAddrNetworkIPv6 [FE80::]/10\n"                                \
+  "SchedulerHighWaterMark__ 42\n"                                       \
+  "SchedulerLowWaterMark__ 10\n"
+
 typedef struct {
   or_options_t *old_opt;
   or_options_t *opt;
@@ -197,13 +221,15 @@ get_options_test_data(char *conf)
   config_assign(&options_format, result->opt, cl, 0, 0, NULL);
   result->opt->LogTimeGranularity = 1;
   result->opt->TokenBucketRefillInterval = 1;
-
+  config_get_lines(TEST_OPTIONS_OLD_VALUES, &cl, 1);
+  config_assign(&options_format, result->def_opt, cl, 0, 0, NULL);
   return result;
 }
 
 static void
 free_options_test_data(options_test_data_t *td)
 {
+  if(!td) return;
   or_options_free(td->old_opt);
   or_options_free(td->opt);
   or_options_free(td->def_opt);
@@ -1054,6 +1080,795 @@ test_options_validate__recommended_packages(void *ignored)
   tor_free(msg);
 }
 
+
+static void
+test_options_validate__fetch_dir(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("FetchDirInfoExtraEarly 1\n"
+                                                     "FetchDirInfoEarly 0\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "FetchDirInfoExtraEarly requires that you also set FetchDirInfoEarly");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("FetchDirInfoExtraEarly 1\n"
+                                "FetchDirInfoEarly 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_NE, "FetchDirInfoExtraEarly requires that you also set FetchDirInfoEarly");
+
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__conn_limit(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("ConnLimit 0\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "ConnLimit must be greater than 0, but was set to 0");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "MaxClientCircuitsPending must be between 1 and 1024, but was set to 0");
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__paths_needed(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+  options_test_data_t *tdata = get_options_test_data("PathsNeededToBuildCircuits 0.1\n"
+                                                     "ConnLimit 1\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_assert(tdata->opt->PathsNeededToBuildCircuits > 0.24 && tdata->opt->PathsNeededToBuildCircuits < 0.26);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "PathsNeededToBuildCircuits is too low. Increasing to 0.25\n");
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data("PathsNeededToBuildCircuits 0.99\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_assert(tdata->opt->PathsNeededToBuildCircuits > 0.94 && tdata->opt->PathsNeededToBuildCircuits < 0.96);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "PathsNeededToBuildCircuits is too high. Decreasing to 0.95\n");
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data("PathsNeededToBuildCircuits 0.91\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_assert(tdata->opt->PathsNeededToBuildCircuits > 0.90 && tdata->opt->PathsNeededToBuildCircuits < 0.92);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 0);
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__max_client_circuits(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("MaxClientCircuitsPending 0\n"
+                                                     "ConnLimit 1\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "MaxClientCircuitsPending must be between 1 and 1024, but was set to 0");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("MaxClientCircuitsPending 1025\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "MaxClientCircuitsPending must be between 1 and 1024, but was set to 1025");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "KeepalivePeriod option must be positive.");
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__ports(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("FirewallPorts 65537\n"
+                                                     "MaxClientCircuitsPending 1\n"
+                                                     "ConnLimit 1\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Port '65537' out of range in FirewallPorts");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("FirewallPorts 1\n"
+                                "LongLivedPorts 124444\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Port '124444' out of range in LongLivedPorts");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("FirewallPorts 1\n"
+                                "LongLivedPorts 2\n"
+                                "RejectPlaintextPorts 112233\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Port '112233' out of range in RejectPlaintextPorts");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("FirewallPorts 1\n"
+                                "LongLivedPorts 2\n"
+                                "RejectPlaintextPorts 3\n"
+                                "WarnPlaintextPorts 65536\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Port '65536' out of range in WarnPlaintextPorts");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("FirewallPorts 1\n"
+                                "LongLivedPorts 2\n"
+                                "RejectPlaintextPorts 3\n"
+                                "WarnPlaintextPorts 4\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "KeepalivePeriod option must be positive.");
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__reachable_addresses(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int previous_log = setup_capture_of_logs(LOG_NOTICE);
+  options_test_data_t *tdata = get_options_test_data("FascistFirewall 1\n"
+                                                     "MaxClientCircuitsPending 1\n"
+                                                     "ConnLimit 1\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 6);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "Converting FascistFirewall config option to new format: \"ReachableDirAddresses *:80\"\n");
+  tt_str_op(tdata->opt->ReachableDirAddresses->value, OP_EQ, "*:80");
+  tt_str_op(mock_saved_log_at(2), OP_EQ, "Converting FascistFirewall config option to new format: \"ReachableORAddresses *:443\"\n");
+  tt_str_op(tdata->opt->ReachableORAddresses->value, OP_EQ, "*:443");
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data("FascistFirewall 1\n"
+                                "ReachableDirAddresses *:81\n"
+                                "ReachableORAddresses *:444\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+  tdata->opt->FirewallPorts = smartlist_new();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 4);
+  tt_str_op(tdata->opt->ReachableDirAddresses->value, OP_EQ, "*:81");
+  tt_str_op(tdata->opt->ReachableORAddresses->value, OP_EQ, "*:444");
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data("FascistFirewall 1\n"
+                                "FirewallPort 123\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 5);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "Converting FascistFirewall and FirewallPorts config options to new format: \"ReachableAddresses *:123\"\n");
+  tt_str_op(tdata->opt->ReachableAddresses->value, OP_EQ, "*:123");
+
+  free_options_test_data(tdata);
+  mock_clean_saved_logs();
+  tdata = get_options_test_data("FascistFirewall 1\n"
+                                "ReachableAddresses *:82\n"
+                                "ReachableAddresses *:83\n"
+                                "ReachableAddresses reject *:*\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 4);
+  tt_str_op(tdata->opt->ReachableAddresses->value, OP_EQ, "*:82");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("ReachableAddresses *:82\n"
+                                "ORListenAddress 127.0.0.1:5555\n"
+                                "ORPort 955\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Servers must be able to freely connect to the rest of the Internet, so they must not set Reachable*Addresses or FascistFirewall.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("ReachableORAddresses *:82\n"
+                                "ORListenAddress 127.0.0.1:5555\n"
+                                "ORPort 955\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Servers must be able to freely connect to the rest of the Internet, so they must not set Reachable*Addresses or FascistFirewall.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("ReachableDirAddresses *:82\n"
+                                "ORListenAddress 127.0.0.1:5555\n"
+                                "ORPort 955\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Servers must be able to freely connect to the rest of the Internet, so they must not set Reachable*Addresses or FascistFirewall.");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__use_bridges(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("UseBridges 1\n"
+                                                     "ORListenAddress 127.0.0.1:5555\n"
+                                                     "ORPort 955\n"
+                                                     "MaxClientCircuitsPending 1\n"
+                                                     "ConnLimit 1\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Servers must be able to freely connect to the rest of the Internet, so they must not set UseBridges.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("UseBridges 1\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_NE, "Servers must be able to freely connect to the rest of the Internet, so they must not set UseBridges.");
+
+
+  NS_MOCK(geoip_get_country);
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("UseBridges 1\n"
+                                "EntryNodes {cn}\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "You cannot set both UseBridges and EntryNodes.");
+
+ done:
+  NS_UNMOCK(geoip_get_country);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__entry_nodes(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  NS_MOCK(geoip_get_country);
+  options_test_data_t *tdata = get_options_test_data("EntryNodes {cn}\n"
+                                                     "UseEntryGuards 0\n"
+                                                     "MaxClientCircuitsPending 1\n"
+                                                     "ConnLimit 1\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "If EntryNodes is set, UseEntryGuards must be enabled.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("EntryNodes {cn}\n"
+                                "UseEntryGuards 1\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "KeepalivePeriod option must be positive.");
+
+ done:
+  NS_UNMOCK(geoip_get_country);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__invalid_nodes(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("AllowInvalidNodes something_stupid\n"
+                                                     "MaxClientCircuitsPending 1\n"
+                                                     "ConnLimit 1\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Unrecognized value 'something_stupid' in AllowInvalidNodes");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AllowInvalidNodes entry, middle, exit\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(tdata->opt->AllowInvalid_, OP_EQ, ALLOW_INVALID_ENTRY | ALLOW_INVALID_EXIT | ALLOW_INVALID_MIDDLE);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("AllowInvalidNodes introduction, rendezvous\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(tdata->opt->AllowInvalid_, OP_EQ, ALLOW_INVALID_INTRODUCTION | ALLOW_INVALID_RENDEZVOUS);
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__safe_logging(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = get_options_test_data("MaxClientCircuitsPending 1\n"
+                                                     "ConnLimit 1\n"
+                                                     "SchedulerHighWaterMark__ 42\n"
+                                                     "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(tdata->opt->SafeLogging_, OP_EQ, SAFELOG_SCRUB_NONE);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("SafeLogging 0\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(tdata->opt->SafeLogging_, OP_EQ, SAFELOG_SCRUB_NONE);
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("SafeLogging Relay\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(tdata->opt->SafeLogging_, OP_EQ, SAFELOG_SCRUB_RELAY);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("SafeLogging 1\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_int_op(tdata->opt->SafeLogging_, OP_EQ, SAFELOG_SCRUB_ALL);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("SafeLogging stuffy\n"
+                                "MaxClientCircuitsPending 1\n"
+                                "ConnLimit 1\n"
+                                "SchedulerHighWaterMark__ 42\n"
+                                "SchedulerLowWaterMark__ 10\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Unrecognized value '\"stuffy\"' in SafeLogging");
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__publish_server_descriptor(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+  options_test_data_t *tdata = get_options_test_data("PublishServerDescriptor bridge\n" TEST_OPTIONS_DEFAULT_VALUES);
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_assert(!msg);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("PublishServerDescriptor humma\n" TEST_OPTIONS_DEFAULT_VALUES);
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Unrecognized value in PublishServerDescriptor");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("PublishServerDescriptor bridge, v3\n" TEST_OPTIONS_DEFAULT_VALUES);
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Bridges are not supposed to publish router descriptors to the directory authorities. Please correct your PublishServerDescriptor line.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("BridgeRelay 1\n"
+                                "PublishServerDescriptor v3\n" TEST_OPTIONS_DEFAULT_VALUES);
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Bridges are not supposed to publish router descriptors to the directory authorities. Please correct your PublishServerDescriptor line.");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("BridgeRelay 1\n" TEST_OPTIONS_DEFAULT_VALUES);
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_NE, "Bridges are not supposed to publish router descriptors to the directory authorities. Please correct your PublishServerDescriptor line.");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data("BridgeRelay 1\n"
+                                "DirPort 999\n" TEST_OPTIONS_DEFAULT_VALUES);
+
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "Can't set a DirPort on a bridge relay; disabling DirPort\n");
+  tt_assert(!tdata->opt->DirPort_lines);
+  tt_assert(!tdata->opt->DirPort_set);
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__testing(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+
+#define ENSURE_DEFAULT(varname, varval)                     \
+  STMT_BEGIN                                                \
+    free_options_test_data(tdata);                          \
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES \
+                                #varname " " #varval "\n"); \
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg); \
+  tt_str_op(msg, OP_EQ, #varname " may only be changed in testing Tor networks!"); \
+  tt_int_op(ret, OP_EQ, -1);                                            \
+                                                                        \
+  free_options_test_data(tdata); \
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES \
+                                #varname " " #varval "\n"               \
+                                "DirAuthority dizum orport=443 v3ident=E8A9C45EDE6D711294FADF8E7951F4DE6CA56B58 194.109.206.212:80 7EA6 EAD6 FD83 083C 538F 4403 8BBF A077 587D D755\n" \
+                                "TestingTorNetwork 1\n");               \
+                                                                        \
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg); \
+  if(msg) { \
+    tt_str_op(msg, OP_NE, #varname " may only be changed in testing Tor networks!"); \
+  } \
+                                                                        \
+  free_options_test_data(tdata);          \
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES \
+                                #varname " " #varval "\n"           \
+                                "___UsingTestNetworkDefaults 1\n"); \
+                                                                        \
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg); \
+  if(msg) { \
+    tt_str_op(msg, OP_NE, #varname " may only be changed in testing Tor networks!"); \
+  } \
+    STMT_END
+
+  ENSURE_DEFAULT(TestingV3AuthInitialVotingInterval, 3600);
+  ENSURE_DEFAULT(TestingV3AuthInitialVoteDelay, 3000);
+  ENSURE_DEFAULT(TestingV3AuthInitialDistDelay, 3000);
+  ENSURE_DEFAULT(TestingV3AuthVotingStartOffset, 3000);
+  ENSURE_DEFAULT(TestingAuthDirTimeToLearnReachability, 3000);
+  ENSURE_DEFAULT(TestingEstimatedDescriptorPropagationTime, 3000);
+  ENSURE_DEFAULT(TestingServerDownloadSchedule, 3000);
+  ENSURE_DEFAULT(TestingClientDownloadSchedule, 3000);
+  ENSURE_DEFAULT(TestingServerConsensusDownloadSchedule, 3000);
+  ENSURE_DEFAULT(TestingClientConsensusDownloadSchedule, 3000);
+  ENSURE_DEFAULT(TestingBridgeDownloadSchedule, 3000);
+  ENSURE_DEFAULT(TestingClientMaxIntervalWithoutRequest, 3000);
+  ENSURE_DEFAULT(TestingDirConnectionMaxStall, 3000);
+  ENSURE_DEFAULT(TestingConsensusMaxDownloadTries, 3000);
+  ENSURE_DEFAULT(TestingDescriptorMaxDownloadTries, 3000);
+  ENSURE_DEFAULT(TestingMicrodescMaxDownloadTries, 3000);
+  ENSURE_DEFAULT(TestingCertMaxDownloadTries, 3000);
+  ENSURE_DEFAULT(TestingAuthKeyLifetime, 3000);
+  ENSURE_DEFAULT(TestingLinkCertLifetime, 3000);
+  ENSURE_DEFAULT(TestingSigningKeySlop, 3000);
+  ENSURE_DEFAULT(TestingAuthKeySlop, 3000);
+  ENSURE_DEFAULT(TestingLinkKeySlop, 3000);
+
+  // TODO: TestingV3AuthInitialVotingInterval seems to check for division by 30 minutes incorrectly
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__hidserv(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  options_test_data_t *tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES);
+  tdata->opt->MinUptimeHidServDirectoryV2 = -1;
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "MinUptimeHidServDirectoryV2 option must be at least 0 seconds. Changing to 0.\n");
+  tt_int_op(tdata->opt->MinUptimeHidServDirectoryV2, OP_EQ, 0);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "RendPostPeriod 1\n" );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "RendPostPeriod option is too short; raising to 600 seconds.\n");
+  tt_int_op(tdata->opt->RendPostPeriod, OP_EQ, 600);
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__predicted_ports(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  options_test_data_t *tdata = get_options_test_data("PredictedPortsRelevanceTime 100000000\n" TEST_OPTIONS_DEFAULT_VALUES);
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "PredictedPortsRelevanceTime is too large; clipping to 3600s.\n");
+  tt_int_op(tdata->opt->PredictedPortsRelevanceTime, OP_EQ, 3600);
+
+  //  free_options_test_data(tdata);
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__path_bias(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+
+  options_test_data_t *tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "PathBiasNoticeRate 1.1\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "PathBiasNoticeRate is too high. It must be between 0 and 1.0");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "PathBiasWarnRate 1.1\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "PathBiasWarnRate is too high. It must be between 0 and 1.0");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "PathBiasExtremeRate 1.1\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "PathBiasExtremeRate is too high. It must be between 0 and 1.0");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "PathBiasNoticeUseRate 1.1\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "PathBiasNoticeUseRate is too high. It must be between 0 and 1.0");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES "PathBiasExtremeUseRate 1.1\n");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "PathBiasExtremeUseRate is too high. It must be between 0 and 1.0");
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__bandwidth(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+
+#define ENSURE_BANDWIDTH_PARAM(p) \
+  STMT_BEGIN                                                \
+  free_options_test_data(tdata); \
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES #p " 3Gb\n"); \
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg); \
+  tt_int_op(ret, OP_EQ, -1); \
+  tt_mem_op(msg, OP_EQ, #p " (3221225471) must be at most 2147483647", 40); \
+  STMT_END
+
+  ENSURE_BANDWIDTH_PARAM(BandwidthRate);
+  ENSURE_BANDWIDTH_PARAM(BandwidthBurst);
+  ENSURE_BANDWIDTH_PARAM(MaxAdvertisedBandwidth);
+  ENSURE_BANDWIDTH_PARAM(RelayBandwidthRate);
+  ENSURE_BANDWIDTH_PARAM(RelayBandwidthBurst);
+  ENSURE_BANDWIDTH_PARAM(PerConnBWRate);
+  ENSURE_BANDWIDTH_PARAM(PerConnBWBurst);
+  ENSURE_BANDWIDTH_PARAM(AuthDirFastGuarantee);
+  ENSURE_BANDWIDTH_PARAM(AuthDirGuardBWGuarantee);
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
 struct testcase_t options_tests[] = {
   { "validate", test_options_validate, TT_FORK, NULL, NULL },
   { "validate__uname_for_server", test_options_validate__uname_for_server, TT_FORK, NULL, NULL },
@@ -1071,5 +1886,21 @@ struct testcase_t options_tests[] = {
   { "validate__tlsec", test_options_validate__tlsec, TT_FORK, NULL, NULL },
   { "validate__token_bucket", test_options_validate__token_bucket, TT_FORK, NULL, NULL },
   { "validate__recommended_packages", test_options_validate__recommended_packages, TT_FORK, NULL, NULL },
+  { "validate__fetch_dir", test_options_validate__fetch_dir, TT_FORK, NULL, NULL },
+  { "validate__conn_limit", test_options_validate__conn_limit, TT_FORK, NULL, NULL },
+  { "validate__paths_needed", test_options_validate__paths_needed, TT_FORK, NULL, NULL },
+  { "validate__max_client_circuits", test_options_validate__max_client_circuits, TT_FORK, NULL, NULL },
+  { "validate__ports", test_options_validate__ports, TT_FORK, NULL, NULL },
+  { "validate__reachable_addresses", test_options_validate__reachable_addresses, TT_FORK, NULL, NULL },
+  { "validate__use_bridges", test_options_validate__use_bridges, TT_FORK, NULL, NULL },
+  { "validate__entry_nodes", test_options_validate__entry_nodes, TT_FORK, NULL, NULL },
+  { "validate__invalid_nodes", test_options_validate__invalid_nodes, TT_FORK, NULL, NULL },
+  { "validate__safe_logging", test_options_validate__safe_logging, TT_FORK, NULL, NULL },
+  { "validate__publish_server_descriptor", test_options_validate__publish_server_descriptor, TT_FORK, NULL, NULL },
+  { "validate__testing", test_options_validate__testing, TT_FORK, NULL, NULL },
+  { "validate__hidserv", test_options_validate__hidserv, TT_FORK, NULL, NULL },
+  { "validate__predicted_ports", test_options_validate__predicted_ports, TT_FORK, NULL, NULL },
+  { "validate__path_bias", test_options_validate__path_bias, TT_FORK, NULL, NULL },
+  { "validate__bandwidth", test_options_validate__bandwidth, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
