@@ -21,6 +21,7 @@
 #include "entrynodes.h"
 #include "routerparse.h"
 #include "networkstatus.h"
+#include "geoip.h"
 
 #ifdef _WIN32
 /* For mkdir() */
@@ -1586,25 +1587,42 @@ test_dir_handle_get_status_vote_current_consensus_not_enough_sigs(void* data)
   mock_ns_val->flavor = FLAV_NS;
   mock_ns_val->voters = smartlist_new();
 
+  /* init mock */
+  init_mock_options();
+
+  MOCK(get_options, mock_get_options);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
   MOCK(networkstatus_get_latest_consensus_by_flavor, mock_ns_get_by_flavor);
 
+  /* start gathering stats */
+  mock_options->DirReqStatistics = 1;
+  geoip_dirreq_stats_init(time(NULL));
+
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
-  tt_int_op(directory_handle_command_get(conn,
-    GET("/tor/status-vote/current/consensus-flavor/" HEX1 "+" HEX2), NULL, 0), OP_EQ, 0);
+
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/current/consensus-flavor/" HEX1 "+" HEX2), NULL, 0));
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
+
   tt_assert(header);
   tt_str_op(NOT_ENOUGH_CONSENSUS_SIGNATURES, OP_EQ, header);
 
+  char *stats = geoip_format_dirreq_stats(0);
+  tt_assert(stats);
+  tt_assert(strstr(stats, "not-enough-sigs=8"));
+
   done:
+    UNMOCK(get_options);
     UNMOCK(connection_write_to_buf_impl_);
     UNMOCK(networkstatus_get_latest_consensus_by_flavor);
+
     tor_free(conn);
     tor_free(header);
     smartlist_free(mock_ns_val->voters);
     tor_free(mock_ns_val);
+    tor_free(mock_options);
 }
 
 #define DIR_HANDLE_CMD(name,flags)                              \

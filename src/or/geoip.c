@@ -1207,7 +1207,8 @@ geoip_format_dirreq_stats(time_t now)
 {
   char t[ISO_TIME_LEN+1];
   int i;
-  char *v3_ips_string, *v3_reqs_string, *v3_direct_dl_string,
+  //TODO: this should be initialized to NULL
+  char *v3_ips_string = NULL, *v3_reqs_string, *v3_direct_dl_string,
        *v3_tunneled_dl_string;
   char *result;
 
