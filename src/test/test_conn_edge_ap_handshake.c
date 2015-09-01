@@ -58,7 +58,7 @@ connection_mark_unattached_ap_mock(entry_connection_t *conn, int reason)
 }
 
 static void
-test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_stream_is_done(void *data)
+test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_answer(void *data)
 {
   entry_connection_t *conn = data;
   origin_circuit_t *circuit = NULL;
@@ -82,11 +82,37 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_stream_is_done(v
     tor_free(path); 
 }
 
+static void
+test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_error(void *data)
+{
+  entry_connection_t *conn = data;
+  origin_circuit_t *circuit = NULL;
+  crypt_path_t *path = NULL;
+
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  rewrite_mock->should_close = 1;
+  rewrite_mock->end_reason = END_STREAM_REASON_MISC;
+
+  int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
+
+  tt_int_op(res, OP_EQ, -1);
+
+  done:
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+    tor_free(rewrite_mock);
+    tor_free(circuit); 
+    tor_free(path); 
+}
+
 #define CONN_EDGE_AP_HANDSHAKE(name,flags)                              \
   { #name, test_conn_edge_ap_handshake_##name, (flags), &test_rewrite_setup, NULL }
 
 struct testcase_t conn_edge_ap_handshake_tests[] =
 {
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_stream_is_done, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_with_answer, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_with_error, 0),
   END_OF_TESTCASES
 };
