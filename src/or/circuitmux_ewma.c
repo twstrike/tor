@@ -588,8 +588,8 @@ cell_ewma_tick_from_timeval(const struct timeval *now,
 }
 
 /** Tell the caller whether ewma_enabled is set */
-int
-cell_ewma_enabled(void)
+MOCK_IMPL(int,
+cell_ewma_enabled, (void))
 {
   return ewma_enabled;
 }

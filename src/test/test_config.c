@@ -11,6 +11,7 @@
 #include "or.h"
 #include "address.h"
 #include "addressmap.h"
+#include "circuitmux_ewma.h"
 #include "config.h"
 #include "confparse.h"
 #include "connection_edge.h"
@@ -4414,6 +4415,85 @@ test_config_options_act_accounting_is_enabled(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE cell_ewma_enabled
+#define NS_SUBMODULE enabled
+NS_DECL(int, cell_ewma_enabled, (void));
+
+static int
+NS(old_ewma_enabled) = 0;
+
+static int
+NS(cell_ewma_enabled)(void)
+{
+  if(CALLED(cell_ewma_enabled)){
+    CALLED(cell_ewma_enabled)++;
+    return !NS(old_ewma_enabled);
+  }
+  CALLED(cell_ewma_enabled)++;
+  return NS(old_ewma_enabled);
+}
+
+static void
+test_config_options_act_cell_ewma_enabled(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(cell_ewma_enabled);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(cell_ewma_enabled), OP_EQ, 2);
+
+ done:
+  NS_UNMOCK(accounting_is_enabled);
+  NS_UNMOCK(configure_accounting);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#define NS_SUBMODULE disabled
+NS_DECL(int, cell_ewma_enabled, (void));
+
+static int
+NS(old_ewma_enabled) = 1;
+
+static int
+NS(cell_ewma_enabled)(void)
+{
+  if(CALLED(cell_ewma_enabled)){
+    CALLED(cell_ewma_enabled)++;
+    return !NS(old_ewma_enabled);
+  }
+  CALLED(cell_ewma_enabled)++;
+  return NS(old_ewma_enabled);
+}
+
+static void
+test_config_options_act_cell_ewma_disabled(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(cell_ewma_enabled);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(cell_ewma_enabled), OP_EQ, 3);
+
+ done:
+  NS_UNMOCK(accounting_is_enabled);
+  NS_UNMOCK(configure_accounting);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
 static void
 test_config_options_act_write_pidfile(void *arg)
 {
@@ -5180,6 +5260,8 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_rend_service_load_all_keys_error, TT_FORK),
   CONFIG_TEST(options_act_accounting_parse_options_error, TT_FORK),
   CONFIG_TEST(options_act_accounting_is_enabled, TT_FORK),
+  CONFIG_TEST(options_act_cell_ewma_enabled, TT_FORK),
+  CONFIG_TEST(options_act_cell_ewma_disabled, TT_FORK),
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
