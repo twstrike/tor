@@ -1802,6 +1802,198 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
     dirserv_free_all();
 }
 
+static void
+test_dir_handle_get_status_vote_current_not_found(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/current/" HEX1), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+  tt_assert(header);
+	tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
+static void
+test_dir_handle_get_status_vote_current_d_not_found(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/current/d/" HEX1), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+  tt_assert(header);
+	tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
+static void
+test_dir_handle_get_status_vote_next_not_found(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/next/" HEX1), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+  tt_assert(header);
+	tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
+static void
+test_dir_handle_get_status_vote_next_d_not_found(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/next/d/" HEX1), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+  tt_assert(header);
+	tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
+static void
+test_dir_handle_get_status_vote_next_consensus_not_found(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/next/consensus"), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+  tt_assert(header);
+	tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
+static void
+test_dir_handle_get_status_vote_current_authority_not_found(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/current/authority"), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+  tt_assert(header);
+	tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
+static void
+test_dir_handle_get_status_vote_next_authority_not_found(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/next/authority"), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+  tt_assert(header);
+	tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
+static void
+test_dir_handle_get_status_vote_next_consensus_signatures_not_found(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL;
+  (void) data;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/next/consensus-signatures"), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      NULL, NULL, 1, 0);
+  tt_assert(header);
+	tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -1845,5 +2037,13 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(status_vote_current_consensus_not_found, 0),
   DIR_HANDLE_CMD(status_vote_current_consensus_busy, 0),
   DIR_HANDLE_CMD(status_vote_current_consensus, 0),
+  DIR_HANDLE_CMD(status_vote_current_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_current_d_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_next_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_next_d_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_next_consensus_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_current_authority_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_next_authority_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_next_consensus_signatures_not_found, 0),
   END_OF_TESTCASES
 };
