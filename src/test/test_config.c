@@ -4299,6 +4299,41 @@ test_config_options_act_init_control_cookie_authentication_error(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE rend_service_load_all_keys
+#define NS_SUBMODULE error
+NS_DECL(int, rend_service_load_all_keys, (void));
+
+static int
+NS(rend_service_load_all_keys)(void)
+{
+  CALLED(rend_service_load_all_keys)++;
+  return -1;
+}
+
+static void
+test_config_options_act_rend_service_load_all_keys_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(rend_service_load_all_keys);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(rend_service_load_all_keys), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(rend_service_load_all_keys);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+
 static void
 test_config_options_act_write_pidfile(void *arg)
 {
@@ -5062,6 +5097,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context_error, TT_FORK),
   CONFIG_TEST(options_act_policies_parse_from_options_error, TT_FORK),
   CONFIG_TEST(options_act_init_control_cookie_authentication_error, TT_FORK),
+  CONFIG_TEST(options_act_rend_service_load_all_keys_error, TT_FORK),
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),

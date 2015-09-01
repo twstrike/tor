@@ -1002,8 +1002,8 @@ rend_service_update_descriptor(rend_service_t *service)
 /** Load and/or generate private keys for all hidden services, possibly
  * including keys for client authorization.  Return 0 on success, -1 on
  * failure. */
-int
-rend_service_load_all_keys(void)
+MOCK_IMPL(int,
+rend_service_load_all_keys, (void))
 {
   SMARTLIST_FOREACH_BEGIN(rend_service_list, rend_service_t *, s) {
     if (s->private_key)
