@@ -21,6 +21,7 @@
 #include "entrynodes.h"
 #include "ext_orport.h"
 #include "geoip.h"
+#include "hibernate.h"
 #include "main.h"
 #include "nodelist.h"
 #include "policies.h"
@@ -4333,6 +4334,39 @@ test_config_options_act_rend_service_load_all_keys_error(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE accounting_parse_options
+#define NS_SUBMODULE error
+NS_DECL(int, accounting_parse_options, (const or_options_t *options, int validate_only));
+
+static int
+NS(accounting_parse_options)(const or_options_t *options, int validate_only)
+{
+  CALLED(accounting_parse_options)++;
+  return -1;
+}
+
+static void
+test_config_options_act_accounting_parse_options_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(accounting_parse_options);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(accounting_parse_options), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(accounting_parse_options);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
 
 static void
 test_config_options_act_write_pidfile(void *arg)
@@ -5098,6 +5132,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_policies_parse_from_options_error, TT_FORK),
   CONFIG_TEST(options_act_init_control_cookie_authentication_error, TT_FORK),
   CONFIG_TEST(options_act_rend_service_load_all_keys_error, TT_FORK),
+  CONFIG_TEST(options_act_accounting_parse_options_error, TT_FORK),
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
