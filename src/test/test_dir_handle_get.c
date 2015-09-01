@@ -1780,12 +1780,11 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
   tt_assert(strstr(stats, "ok=8"));
   tt_assert(strstr(stats, "dirreq-v3-ips ab=8"));
   tt_assert(strstr(stats, "dirreq-v3-reqs ab=8"));
+	tt_assert(strstr(stats, "dirreq-v3-direct-dl complete=0,timeout=0,running=4"));
 
   hist = geoip_get_request_history();
   tt_assert(hist);
   tt_str_op("ab=8", OP_EQ, hist);
-
-  //TODO test geoip_start_dirreq()
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
