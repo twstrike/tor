@@ -4777,6 +4777,38 @@ test_config_options_act_pt_configure_remaining_proxies(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE init_keys
+#define NS_SUBMODULE error
+NS_DECL(int, init_keys, (void));
+
+int
+NS(init_keys)(void)
+{
+  CALLED(init_keys)++;
+  return -1;
+};
+
+static void
+test_config_options_act_init_key_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(init_keys);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(init_keys), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(init_keys);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
 #define NS_MODULE
 NS_DECL(void, dirvote_recalculate_timing, (const or_options_t *op, time_t now));
 
@@ -4882,6 +4914,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_or_state_load_err, TT_FORK),
   CONFIG_TEST(options_act_init_ext_or_cookie_authentication_err, TT_FORK),
   CONFIG_TEST(options_act_pt_configure_remaining_proxies, TT_FORK),
+  CONFIG_TEST(options_act_init_key_error, TT_FORK),
   CONFIG_TEST(options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes, TT_FORK),
   CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
   END_OF_TESTCASES

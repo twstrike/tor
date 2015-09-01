@@ -36,7 +36,7 @@ di_digest256_map_t *construct_ntor_key_map(void);
 void ntor_key_map_free(di_digest256_map_t *map);
 
 int router_initialize_tls_context(void);
-int init_keys(void);
+MOCK_DECL(int, init_keys, (void));
 int init_keys_client(void);
 
 int check_whether_orport_reachable(void);

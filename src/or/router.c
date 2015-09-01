@@ -811,8 +811,8 @@ init_keys_client(void)
  * On OPs, this only initializes the tls context. Return 0 on success,
  * or -1 if Tor should die.
  */
-int
-init_keys(void)
+MOCK_IMPL(int,
+init_keys, (void))
 {
   char *keydir;
   const char *mydesc;
