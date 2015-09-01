@@ -915,9 +915,9 @@ connection_ap_rewrite_and_attach_if_allowed(entry_connection_t *conn,
  * <b>conn</b>, filling in the fields of <b>out</b> as we go, and modifying
  * conn->socks_request.address as appropriate.
  */
-STATIC void
-connection_ap_handshake_rewrite(entry_connection_t *conn,
-                                rewrite_result_t *out)
+MOCK_IMPL(void,
+connection_ap_handshake_rewrite, (entry_connection_t *conn,
+                                rewrite_result_t *out))
 {
   socks_request_t *socks = conn->socks_request;
   const or_options_t *options = get_options();

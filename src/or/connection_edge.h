@@ -165,8 +165,11 @@ typedef struct {
   int should_close;
 } rewrite_result_t;
 
-STATIC void connection_ap_handshake_rewrite(entry_connection_t *conn,
-                                            rewrite_result_t *out);
+MOCK_DECL(void, connection_ap_handshake_rewrite,
+           (
+             entry_connection_t *conn,
+             rewrite_result_t *out
+           ));
 #endif
 
 #endif
