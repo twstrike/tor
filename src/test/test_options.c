@@ -15,6 +15,8 @@
 
 #include "log_test_helpers.h"
 
+#include "sandbox.h"
+
 #define NS_MODULE test_options
 
 typedef struct {
@@ -437,7 +439,11 @@ test_options_validate__authdir(void *ignored)
   ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
   tt_int_op(ret, OP_EQ, -1);
   tt_str_op(msg, OP_EQ, "Failed to resolve/guess local address. See logs for details.");
+#ifdef USE_LIBSECCOMP
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "(Sandbox) getaddrinfo failed.\n");
+#else
   tt_str_op(mock_saved_log_at(0), OP_EQ, "Could not resolve local Address 'this.should.not_exist.example.org'. Failing.\n");
+#endif
 
   free_options_test_data(tdata);
   tdata = get_options_test_data("AuthoritativeDirectory 1\n"
