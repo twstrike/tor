@@ -670,8 +670,8 @@ v3_authority_check_key_expiry(void)
 
 /** Set up Tor's TLS contexts, based on our configuration and keys. Return 0
  * on success, and -1 on failure. */
-int
-router_initialize_tls_context(void)
+MOCK_IMPL(int,
+router_initialize_tls_context, (void))
 {
   unsigned int flags = 0;
   const or_options_t *options = get_options();

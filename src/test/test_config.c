@@ -4133,6 +4133,7 @@ test_config_options_act_RunAsDaemon(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE router_initialize_tls_context
 static void
 test_config_options_act_options_transition_requires_fresh_tls_context(void *arg)
 {
@@ -4169,6 +4170,58 @@ test_config_options_act_options_transition_requires_fresh_tls_context(void *arg)
   tor_free(old_options);
   (void)arg;
 }
+
+#define NS_SUBMODULE error
+NS_DECL(int, router_initialize_tls_context, (void));
+
+int
+NS(router_initialize_tls_context)(void)
+{
+  CALLED(router_initialize_tls_context)++;
+  return -1;
+};
+
+static void
+test_config_options_act_options_transition_requires_fresh_tls_context_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->V3AuthoritativeDir = 0;
+  old_options->V3AuthoritativeDir = 1;
+  old_options->DataDirectory = options->DataDirectory;
+  old_options->NumCPUs = options->NumCPUs;
+  old_options->ORPort_lines = options->ORPort_lines;
+  old_options->ServerDNSSearchDomains = options->ServerDNSSearchDomains;
+  old_options->SafeLogging_ = options->SafeLogging_;
+  old_options->ClientOnly = options->ClientOnly;
+  tt_int_op(public_server_mode(old_options),OP_EQ,public_server_mode(options));
+  old_options->Logs = options->Logs;
+  old_options->LogMessageDomains = options->LogMessageDomains;
+  options->TLSECGroup = "P256";
+  old_options->TLSECGroup = "P224";
+  crypto_pk_t *key = NULL;
+  key = pk_generate(2);
+  set_client_identity_key(key);
+  NS_MOCK(router_initialize_tls_context);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+ done:
+  NS_UNMOCK(router_initialize_tls_context);
+  UNMOCK(get_options_mutable);
+  options->V3AuthoritativeDir = 0;
+  old_options->V3AuthoritativeDir = 0;
+  options->TLSECGroup = NULL;
+  old_options->TLSECGroup = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
 
 static void
 test_config_options_act_write_pidfile(void *arg)
@@ -4897,6 +4950,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_ServerTransportPlugin_err, TT_FORK),
   CONFIG_TEST(options_act_RunAsDaemon, TT_FORK),
   CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, TT_FORK),
+  CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context_error, TT_FORK),
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
