@@ -4207,6 +4207,7 @@ test_config_options_act_options_transition_requires_fresh_tls_context_error(void
   NS_MOCK(router_initialize_tls_context);
 
   tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(router_initialize_tls_context), OP_GT, 0);
 
  done:
   NS_UNMOCK(router_initialize_tls_context);
