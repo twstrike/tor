@@ -534,8 +534,8 @@ load_policy_from_option(config_line_t *config, const char *option_name,
 
 /** Set all policies based on <b>options</b>, which should have been validated
  * first by validate_addr_policies. */
-int
-policies_parse_from_options(const or_options_t *options)
+MOCK_IMPL(int,
+policies_parse_from_options, (const or_options_t *options))
 {
   int ret = 0;
   if (load_policy_from_option(options->SocksPolicy, "SocksPolicy",

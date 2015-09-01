@@ -22,6 +22,7 @@
 #include "geoip.h"
 #include "main.h"
 #include "nodelist.h"
+#include "policies.h"
 #include "rendclient.h"
 #include "rendservice.h"
 #include "router.h"
@@ -4225,6 +4226,42 @@ test_config_options_act_options_transition_requires_fresh_tls_context_error(void
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE policies_parse_from_options
+#define NS_SUBMODULE error
+NS_DECL(int, policies_parse_from_options, (const or_options_t *options));
+
+static int
+NS(policies_parse_from_options)(const or_options_t *options)
+{
+  (void) options;
+
+  CALLED(policies_parse_from_options)++;
+  return -1;
+}
+
+static void
+test_config_options_act_policies_parse_from_options_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(policies_parse_from_options);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(policies_parse_from_options), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(policies_parse_from_options);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
 static void
 test_config_options_act_write_pidfile(void *arg)
 {
@@ -4986,6 +5023,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_RunAsDaemon, TT_FORK),
   CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, TT_FORK),
   CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context_error, TT_FORK),
+  CONFIG_TEST(options_act_policies_parse_from_options_error, TT_FORK),
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
