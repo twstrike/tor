@@ -5722,8 +5722,8 @@ get_controller_cookie_file_name(void)
 /* Initialize the cookie-based authentication system of the
  * ControlPort. If <b>enabled</b> is 0, then disable the cookie
  * authentication system.  */
-int
-init_control_cookie_authentication(int enabled)
+MOCK_IMPL(int,
+init_control_cookie_authentication, (int enabled))
 {
   char *fname = NULL;
   int retval;
