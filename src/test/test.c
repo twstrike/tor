@@ -1158,6 +1158,7 @@ extern struct testcase_t router_tests[];
 extern struct testcase_t routerkeys_tests[];
 extern struct testcase_t routerlist_tests[];
 extern struct testcase_t routerset_tests[];
+extern struct testcase_t sandbox_tests[];
 extern struct testcase_t scheduler_tests[];
 extern struct testcase_t socks_tests[];
 extern struct testcase_t status_tests[];
@@ -1208,6 +1209,7 @@ struct testgroup_t testgroups[] = {
   { "routerkeys/", routerkeys_tests },
   { "routerlist/", routerlist_tests },
   { "routerset/" , routerset_tests },
+  { "sandbox/", sandbox_tests },
   { "scheduler/", scheduler_tests },
   { "socks/", socks_tests },
   { "status/" , status_tests },
