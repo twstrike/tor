@@ -2081,6 +2081,330 @@ test_options_validate__rend(void *ignored)
 }
 
 
+
+static void
+test_options_validate__accounting(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "AccountingRule something_bad\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "AccountingRule must be 'sum' or 'max'");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "AccountingRule sum\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->AccountingRule, OP_EQ, ACCT_SUM);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "AccountingRule max\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->AccountingRule, OP_EQ, ACCT_MAX);
+
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__proxy(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpProxy 127.0.42.1\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->HTTPProxyPort, OP_EQ, 80);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpProxy 127.0.42.1:444\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->HTTPProxyPort, OP_EQ, 444);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpProxy not_so_valid!\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "HTTPProxy failed to parse or resolve. Please fix.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpProxyAuthenticator "
+                                "onetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothre"
+                                "onetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothre"
+                                "onetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothre"
+                                "onetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothre"
+                                "onetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothre"
+                                "onetwothreeonetwothreeonetwothree"
+
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "HTTPProxyAuthenticator is too long (>= 512 chars).");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpProxyAuthenticator validauth\n"
+
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+
+
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpsProxy 127.0.42.1\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->HTTPSProxyPort, OP_EQ, 443);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpsProxy 127.0.42.1:444\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->HTTPSProxyPort, OP_EQ, 444);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpsProxy not_so_valid!\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "HTTPSProxy failed to parse or resolve. Please fix.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpsProxyAuthenticator "
+                                "onetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothre"
+                                "onetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothre"
+                                "onetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothre"
+                                "onetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothre"
+                                "onetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothreonetwothre"
+                                "onetwothreeonetwothreeonetwothree"
+
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "HTTPSProxyAuthenticator is too long (>= 512 chars).");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpsProxyAuthenticator validauth\n"
+
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks4Proxy 127.0.42.1\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->Socks4ProxyPort, OP_EQ, 1080);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks4Proxy 127.0.42.1:444\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->Socks4ProxyPort, OP_EQ, 444);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks4Proxy not_so_valid!\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Socks4Proxy failed to parse or resolve. Please fix.");
+
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks5Proxy 127.0.42.1\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->Socks5ProxyPort, OP_EQ, 1080);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks5Proxy 127.0.42.1:444\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tdata->opt->Socks5ProxyPort, OP_EQ, 444);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks5Proxy not_so_valid!\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Socks5Proxy failed to parse or resolve. Please fix.");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks4Proxy 215.1.1.1\n"
+                                "Socks5Proxy 215.1.1.2\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "You have configured more than one proxy type. (Socks4Proxy|Socks5Proxy|HTTPSProxy)");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpProxy 215.1.1.1\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_EQ, "HTTPProxy configured, but no SOCKS proxy or HTTPS proxy configured. Watch out: this configuration will proxy unencrypted directory connections only.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpProxy 215.1.1.1\n"
+                                "Socks4Proxy 215.1.1.1\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "HTTPProxy configured, but no SOCKS proxy or HTTPS proxy configured. Watch out: this configuration will proxy unencrypted directory connections only.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpProxy 215.1.1.1\n"
+                                "Socks5Proxy 215.1.1.1\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "HTTPProxy configured, but no SOCKS proxy or HTTPS proxy configured. Watch out: this configuration will proxy unencrypted directory connections only.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HttpProxy 215.1.1.1\n"
+                                "HttpsProxy 215.1.1.1\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "HTTPProxy configured, but no SOCKS proxy or HTTPS proxy configured. Watch out: this configuration will proxy unencrypted directory connections only.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                );
+  tdata->opt->Socks5ProxyUsername = tor_strdup("");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Socks5ProxyUsername must be between 1 and 255 characters.");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                );
+  tdata->opt->Socks5ProxyUsername = tor_strdup("ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789"
+                                               "ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789"
+                                               "ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Socks5ProxyUsername must be between 1 and 255 characters.");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks5ProxyUsername hello_world\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Socks5ProxyPassword must be included with Socks5ProxyUsername.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks5ProxyUsername hello_world\n"
+                                );
+  tdata->opt->Socks5ProxyPassword = tor_strdup("");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Socks5ProxyPassword must be between 1 and 255 characters.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks5ProxyUsername hello_world\n"
+                                );
+  tdata->opt->Socks5ProxyPassword = tor_strdup("ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789"
+                                               "ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789"
+                                               "ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789ABCDEABCDE0123456789");
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Socks5ProxyPassword must be between 1 and 255 characters.");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks5ProxyUsername hello_world\n"
+                                "Socks5ProxyPassword world_hello\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "Socks5ProxyPassword hello_world\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Socks5ProxyPassword must be included with Socks5ProxyUsername.");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
 struct testcase_t options_tests[] = {
   { "validate", test_options_validate, TT_FORK, NULL, NULL },
   { "validate__uname_for_server", test_options_validate__uname_for_server, TT_FORK, NULL, NULL },
@@ -2118,5 +2442,7 @@ struct testcase_t options_tests[] = {
   { "validate__port_forwarding", test_options_validate__port_forwarding, TT_FORK, NULL, NULL },
   { "validate__tor2web", test_options_validate__tor2web, TT_FORK, NULL, NULL },
   { "validate__rend", test_options_validate__rend, TT_FORK, NULL, NULL },
+  { "validate__accounting", test_options_validate__accounting, TT_FORK, NULL, NULL },
+  { "validate__proxy", test_options_validate__proxy, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
