@@ -4368,6 +4368,52 @@ test_config_options_act_accounting_parse_options_error(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE accounting_is_enabled
+#define NS_SUBMODULE error
+NS_DECL(int, accounting_is_enabled, (const or_options_t *options));
+NS_DECL(void, configure_accounting, (time_t now));
+
+static int
+NS(accounting_is_enabled)(const or_options_t *options)
+{
+  (void) options;
+  CALLED(accounting_is_enabled)++;
+  return 1;
+}
+
+void
+NS(configure_accounting)(time_t now)
+{
+  (void) now;
+  CALLED(configure_accounting)++;
+}
+
+static void
+test_config_options_act_accounting_is_enabled(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(accounting_is_enabled);
+  NS_MOCK(configure_accounting);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(accounting_is_enabled), OP_GT, 0);
+  tt_int_op(CALLED(configure_accounting), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(accounting_is_enabled);
+  NS_UNMOCK(configure_accounting);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
 static void
 test_config_options_act_write_pidfile(void *arg)
 {
@@ -5133,6 +5179,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_init_control_cookie_authentication_error, TT_FORK),
   CONFIG_TEST(options_act_rend_service_load_all_keys_error, TT_FORK),
   CONFIG_TEST(options_act_accounting_parse_options_error, TT_FORK),
+  CONFIG_TEST(options_act_accounting_is_enabled, TT_FORK),
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),

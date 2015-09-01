@@ -364,8 +364,8 @@ length_of_accounting_period_containing(time_t now)
 }
 
 /** Initialize the accounting subsystem. */
-void
-configure_accounting(time_t now)
+MOCK_IMPL(void,
+configure_accounting, (time_t now))
 {
   time_t s_now;
   /* Try to remember our recorded usage. */
