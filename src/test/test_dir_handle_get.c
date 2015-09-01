@@ -1712,6 +1712,15 @@ test_dir_handle_get_status_vote_current_consensus_busy(void* data)
     dirserv_free_all();
 }
 
+NS_DECL(int, geoip_get_country_by_addr, (const tor_addr_t *addr));
+
+int
+NS(geoip_get_country_by_addr)(const tor_addr_t *addr)
+{
+  CALLED(geoip_get_country_by_addr)++;
+  return 1;
+}
+
 static void
 test_dir_handle_get_status_vote_current_consensus(void* data)
 {
@@ -1728,11 +1737,14 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
   #define NETWORK_STATUS "some network status string"
   dirserv_set_cached_consensus_networkstatus(NETWORK_STATUS, "ns", &digests, time(NULL));
 
+  NS_MOCK(geoip_get_country_by_addr);
   MOCK(get_options, mock_get_options);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   /* init geoip database */
+  clear_geoip_db();
   geoip_parse_entry("10,50,AB", AF_INET);
+	tt_str_op("ab", OP_EQ, geoip_get_country_name(1));
 
   /* start gathering stats */
   init_mock_options();
@@ -1766,21 +1778,19 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
   stats = geoip_format_dirreq_stats(time(NULL));
   tt_assert(stats);
   tt_assert(strstr(stats, "ok=8"));
-  //TODO: put some decent IP instead of ??
-  tt_assert(strstr(stats, "dirreq-v3-ips \?\?=8"));
-  //TODO: put some decent country code instead of ??
-  tt_assert(strstr(stats, "dirreq-v3-reqs \?\?=8"));
+  tt_assert(strstr(stats, "dirreq-v3-ips ab=8"));
+  tt_assert(strstr(stats, "dirreq-v3-reqs ab=8"));
 
-  //TODO: put some decent country code instead of ??
   hist = geoip_get_request_history();
   tt_assert(hist);
-  tt_str_op("\?\?=8", OP_EQ, hist);
+  tt_str_op("ab=8", OP_EQ, hist);
 
   //TODO test geoip_start_dirreq()
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
     UNMOCK(get_options);
+    NS_UNMOCK(geoip_get_country_by_addr);
     tor_free(conn);
     tor_free(header);
     tor_free(comp_body);
@@ -1789,6 +1799,7 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
     tor_free(hist);
     tor_free(mock_options);
 
+		clear_geoip_db();
     dirserv_free_all();
 }
 
