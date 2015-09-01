@@ -1461,6 +1461,25 @@ test_options_validate__use_bridges(void *ignored)
   tt_int_op(ret, OP_EQ, -1);
   tt_str_op(msg, OP_EQ, "You cannot set both UseBridges and EntryNodes.");
 
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "UseBridges 1\n");
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "If you set UseBridges, you must specify at least one bridge.");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "UseBridges 1\n"
+                                "Bridge 10.0.0.1\n"
+                                "Bridge !!!\n"
+                                );
+
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Bridge line did not parse. See logs for details.");
+
  done:
   NS_UNMOCK(geoip_get_country);
   free_options_test_data(tdata);
@@ -2404,6 +2423,289 @@ test_options_validate__proxy(void *ignored)
   tor_free(msg);
 }
 
+static void
+test_options_validate__control(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HashedControlPassword something_incorrect\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Bad HashedControlPassword: wrong length or bad encoding");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "HashedControlPassword 16:872860B76453A77D60CA2BB8C1A7042072093276A3D701AD684053EC4C\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "__HashedControlSessionPassword something_incorrect\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Bad HashedControlSessionPassword: wrong length or bad encoding");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "__HashedControlSessionPassword 16:872860B76453A77D60CA2BB8C1A7042072093276A3D701AD684053EC4C\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "__OwningControllerProcess something_incorrect\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Bad OwningControllerProcess: invalid PID");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "__OwningControllerProcess 123\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "ControlPort 127.0.0.1:1234\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_EQ, "ControlPort is open, but no authentication method has been configured.  This means that any program on your computer can reconfigure your Tor.  That's bad!  You should upgrade your Tor controller as soon as possible.\n");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "ControlPort 127.0.0.1:1234\n"
+                                "HashedControlPassword 16:872860B76453A77D60CA2BB8C1A7042072093276A3D701AD684053EC4C\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "ControlPort is open, but no authentication method has been configured.  This means that any program on your computer can reconfigure your Tor.  That's bad!  You should upgrade your Tor controller as soon as possible.\n");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "ControlPort 127.0.0.1:1234\n"
+                                "__HashedControlSessionPassword 16:872860B76453A77D60CA2BB8C1A7042072093276A3D701AD684053EC4C\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "ControlPort is open, but no authentication method has been configured.  This means that any program on your computer can reconfigure your Tor.  That's bad!  You should upgrade your Tor controller as soon as possible.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "ControlPort 127.0.0.1:1234\n"
+                                "CookieAuthentication 1\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "ControlPort is open, but no authentication method has been configured.  This means that any program on your computer can reconfigure your Tor.  That's bad!  You should upgrade your Tor controller as soon as possible.\n");
+
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "ControlSocket unix:/tmp WorldWritable\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_EQ, "ControlSocket is world writable, but no authentication method has been configured.  This means that any program on your computer can reconfigure your Tor.  That's bad!  You should upgrade your Tor controller as soon as possible.\n");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "ControlSocket unix:/tmp WorldWritable\n"
+                                "HashedControlPassword 16:872860B76453A77D60CA2BB8C1A7042072093276A3D701AD684053EC4C\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "ControlSocket is world writable, but no authentication method has been configured.  This means that any program on your computer can reconfigure your Tor.  That's bad!  You should upgrade your Tor controller as soon as possible.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "ControlSocket unix:/tmp WorldWritable\n"
+                                "__HashedControlSessionPassword 16:872860B76453A77D60CA2BB8C1A7042072093276A3D701AD684053EC4C\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "ControlSocket is world writable, but no authentication method has been configured.  This means that any program on your computer can reconfigure your Tor.  That's bad!  You should upgrade your Tor controller as soon as possible.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "ControlSocket unix:/tmp WorldWritable\n"
+                                "CookieAuthentication 1\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "ControlSocket is world writable, but no authentication method has been configured.  This means that any program on your computer can reconfigure your Tor.  That's bad!  You should upgrade your Tor controller as soon as possible.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "CookieAuthFileGroupReadable 1\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_EQ, "CookieAuthFileGroupReadable is set, but will have no effect: you must specify an explicit CookieAuthFile to have it group-readable.\n");
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "CookieAuthFileGroupReadable 1\n"
+                                "CookieAuthFile /tmp/somewhere\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "CookieAuthFileGroupReadable is set, but will have no effect: you must specify an explicit CookieAuthFile to have it group-readable.\n");
+
+
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__families(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "MyFamily home\n"
+                                "BridgeRelay 1\n"
+                                "ORListenAddress 127.0.0.1:5555\n"
+                                "ORPort 955\n"
+                                "BandwidthRate 51300\n"
+                                "BandwidthBurst 51300\n"
+                                "MaxAdvertisedBandwidth 25700\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_EQ, "Listing a family for a bridge relay is not supported: it can reveal bridge fingerprints to censors. You should also make sure you aren't listing this bridge's fingerprint in any other MyFamily.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "MyFamily home\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_str_op(mock_saved_log_at(2), OP_NE, "Listing a family for a bridge relay is not supported: it can reveal bridge fingerprints to censors. You should also make sure you aren't listing this bridge's fingerprint in any other MyFamily.\n");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "MyFamily !\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Invalid nickname '!' in MyFamily line");
+
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "NodeFamily foo\n"
+                                "NodeFamily !\n"
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_assert(!msg);
+
+
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+
+static void
+test_options_validate__addr_policies(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "ExitPolicy !!!\n"
+                                "ExitRelay 1\n"
+                                );
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Error in ExitPolicy entry.");
+
+ done:
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
+static void
+test_options_validate__dir_auth(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  char *msg;
+  options_test_data_t *tdata = NULL;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  free_options_test_data(tdata);
+  tdata = get_options_test_data(TEST_OPTIONS_DEFAULT_VALUES
+                                "DirAuthority dizum orport=443 v3ident=E8A9C45EDE6D711294FADF8E7951F4DE6CA56B58 194.109.206.212:80 7EA6 EAD6 FD83 083C 538F 4403 8BBF A077 587D D755\n" \
+                                "AlternateDirAuthority dizum orport=443 v3ident=E8A9C45EDE6D711294FADF8E7951F4DE6CA56B58 194.109.206.212:80 7EA6 EAD6 FD83 083C 538F 4403 8BBF A077 587D D755\n" \
+                                );
+  mock_clean_saved_logs();
+  ret = options_validate(tdata->old_opt, tdata->opt, tdata->def_opt, 0, &msg);
+  tt_int_op(ret, OP_EQ, -1);
+  tt_str_op(msg, OP_EQ, "Directory authority/fallback line did not parse. See logs for details.");
+  tt_str_op(mock_saved_log_at(2), OP_EQ, "You cannot set both DirAuthority and Alternate*Authority.\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  free_options_test_data(tdata);
+  tor_free(msg);
+}
+
 
 struct testcase_t options_tests[] = {
   { "validate", test_options_validate, TT_FORK, NULL, NULL },
@@ -2444,5 +2746,9 @@ struct testcase_t options_tests[] = {
   { "validate__rend", test_options_validate__rend, TT_FORK, NULL, NULL },
   { "validate__accounting", test_options_validate__accounting, TT_FORK, NULL, NULL },
   { "validate__proxy", test_options_validate__proxy, TT_FORK, NULL, NULL },
+  { "validate__control", test_options_validate__control, TT_FORK, NULL, NULL },
+  { "validate__families", test_options_validate__families, TT_FORK, NULL, NULL },
+  { "validate__addr_policies", test_options_validate__addr_policies, TT_FORK, NULL, NULL },
+  { "validate__dir_auth", test_options_validate__dir_auth, TT_FORK, NULL, NULL },
   END_OF_TESTCASES
 };
