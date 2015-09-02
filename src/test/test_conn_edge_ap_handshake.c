@@ -173,6 +173,64 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_unal
     tor_free(path);
 }
 
+static void
+test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_dns_exit(void *data)
+{
+  entry_connection_t *conn = data;
+  origin_circuit_t *circuit = NULL;
+  crypt_path_t *path = NULL;
+
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  rewrite_mock->should_close = 0;
+  rewrite_mock->exit_source = ADDRMAPSRC_DNS;
+  strlcpy(conn->socks_request->address,
+            "http://www.dns.exit",
+            sizeof(conn->socks_request->address));
+  conn->socks_request->command = SOCKS_COMMAND_CONNECT;
+
+  int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
+
+  tt_int_op(res, OP_EQ, -1);
+
+  done:
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+    tor_free(rewrite_mock);
+    tor_free(circuit);
+    tor_free(path);
+}
+
+static void
+test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_exit_but_not_remapped(void *data)
+{
+  entry_connection_t *conn = data;
+  origin_circuit_t *circuit = NULL;
+  crypt_path_t *path = NULL;
+
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  rewrite_mock->should_close = 0;
+  rewrite_mock->exit_source = ADDRMAPSRC_NONE;
+  strlcpy(conn->socks_request->address,
+            "http://www.notremapped.exit",
+            sizeof(conn->socks_request->address));
+  conn->socks_request->command = SOCKS_COMMAND_CONNECT;
+
+  int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
+
+  tt_int_op(res, OP_EQ, -1);
+
+  done:
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+    tor_free(rewrite_mock);
+    tor_free(circuit);
+    tor_free(path);
+}
+
 #define CONN_EDGE_AP_HANDSHAKE(name,flags)                              \
   { #name, test_conn_edge_ap_handshake_##name, (flags), &test_rewrite_setup, NULL }
 
@@ -182,5 +240,7 @@ struct testcase_t conn_edge_ap_handshake_tests[] =
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_with_error, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_bogus, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_unallowed_exit, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_dns_exit, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_exit_but_not_remapped, 0),
   END_OF_TESTCASES
 };
