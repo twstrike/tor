@@ -3909,6 +3909,38 @@ test_setup_option_CMD_TOR()
   return options;
 }
 
+/* MOCK_VERIFY_ALL */
+#define EVAL0(...) __VA_ARGS__
+#define EVAL1(...) EVAL0 (EVAL0 (EVAL0 (__VA_ARGS__)))
+#define EVAL2(...) EVAL1 (EVAL1 (EVAL1 (__VA_ARGS__)))
+#define EVAL3(...) EVAL2 (EVAL2 (EVAL2 (__VA_ARGS__)))
+#define EVAL4(...) EVAL3 (EVAL3 (EVAL3 (__VA_ARGS__)))
+#define EVAL(...)  EVAL4 (EVAL4 (EVAL4 (__VA_ARGS__)))
+
+#define MAP_END(...)
+#define MAP_OUT
+
+#define MAP_GET_END() 0, MAP_END
+#define MAP_NEXT0(test, next, ...) next MAP_OUT
+#define MAP_NEXT1(test, next) MAP_NEXT0 (test, next, 0)
+#define MAP_NEXT(test, next)  MAP_NEXT1 (MAP_GET_END test, next)
+
+#define MAP0(f, x, peek, ...) f(x); MAP_NEXT (peek, MAP1) (f, peek, __VA_ARGS__)
+#define MAP1(f, x, peek, ...) f(x); MAP_NEXT (peek, MAP0) (f, peek, __VA_ARGS__)
+#define MAP(f, ...) EVAL (MAP1 (f, __VA_ARGS__, (), 0))
+
+#define VERIFY(x) \
+  tt_int_op(CALLED(x), OP_GT, 0);
+
+#define F_MOCK_VERIFY_ALL(f,...)    \
+  MAP(NS_MOCK, __VA_ARGS__)         \
+  f;                                \
+  MAP(VERIFY, __VA_ARGS__)          \
+
+#define UNMOCK_ALL(...)             \
+  MAP(NS_UNMOCK, __VA_ARGS__)       \
+/* MOCK_VERIFY_ALL */
+
 static void
 test_config_options_act_not_DisableDebuggerAttachment(void *arg)
 {
@@ -5082,18 +5114,17 @@ test_config_options_act_pt_configure_remaining_proxies(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  NS_MOCK(pt_proxies_configuration_pending);
-  NS_MOCK(net_is_disabled);
-  NS_MOCK(pt_configure_remaining_proxies);
-
-  tt_int_op(options_act(old_options), OP_EQ, 0);
-  tt_int_op(CALLED(pt_proxies_configuration_pending), OP_GT, 0);
-  tt_int_op(CALLED(net_is_disabled), OP_GT, 0);
+  F_MOCK_VERIFY_ALL( do{
+          tt_int_op(options_act(old_options), OP_EQ, 0);
+          }while(0),
+          pt_proxies_configuration_pending,
+          net_is_disabled,
+          pt_configure_remaining_proxies);
 
  done:
-  NS_UNMOCK(pt_proxies_configuration_pending);
-  NS_UNMOCK(net_is_disabled);
-  NS_UNMOCK(pt_configure_remaining_proxies);
+  UNMOCK_ALL(pt_proxies_configuration_pending,
+          net_is_disabled,
+          pt_configure_remaining_proxies);
   tor_free(options);
   tor_free(old_options);
   (void)arg;
