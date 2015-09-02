@@ -4538,6 +4538,7 @@ char *
 NS(alloc_http_authenticator)(const char *authenticator)
 {
     (void)authenticator;
+    CALLED(alloc_http_authenticator)++;
     return NULL;
 }
 
@@ -4547,13 +4548,54 @@ test_config_options_act_BridgePassword_error(void *arg)
   or_options_t *options, *old_options;
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
+  options->BridgePassword = "some password";
 
   NS_MOCK(alloc_http_authenticator);
-  options->BridgePassword = "some password";
+
   tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(alloc_http_authenticator), OP_GT, 0);
 
  done:
   NS_UNMOCK(alloc_http_authenticator);
+  UNMOCK(get_options_mutable);
+  options->BridgePassword = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE routerset_add_unknown_ccs
+#define NS_SUBMODULE error
+
+NS_DECL(int, routerset_add_unknown_ccs, (routerset_t **setp, int only_if_some_cc_set));
+
+int
+NS(routerset_add_unknown_ccs)(routerset_t **setp, int only_if_some_cc_set)
+{
+    (void)setp;
+    (void)only_if_some_cc_set;
+    CALLED(routerset_add_unknown_ccs)++;
+    return 1;
+}
+
+static void
+test_config_options_act_routerset_add_unknown_ccs_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(routerset_add_unknown_ccs);
+
+  options->BridgePassword = "some password";
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(routerset_add_unknown_ccs), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(routerset_add_unknown_ccs);
   UNMOCK(get_options_mutable);
   options->BridgePassword = NULL;
   tor_free(options);
@@ -5400,6 +5442,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword_error, TT_FORK),
+  CONFIG_TEST(options_act_routerset_add_unknown_ccs_error, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
   CONFIG_TEST(options_act_Statistics_private_server_mode, TT_FORK),
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
