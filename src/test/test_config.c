@@ -5560,7 +5560,7 @@ test_config_options_act_transition_affects_workers_inform_testing_reachability(v
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
-#define NS_MODULE revise_automap_entries_branch
+#define NS_MODULE addressmap_clear_invalid_automaps
 NS_DECL(void, addressmap_clear_invalid_automaps, (const or_options_t *options));
 
 void
@@ -5578,6 +5578,60 @@ test_config_options_act_revise_automap_entries(void *arg)
 
   options = test_setup_option_CMD_TOR();
   options->AutomapHostsOnResolve = 0;
+
+  NS_MOCK(addressmap_clear_invalid_automaps);
+  options_act(old_options);
+
+  tt_int_op(CALLED(addressmap_clear_invalid_automaps), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(options);
+  tor_free(old_options);
+  NS_UNMOCK(addressmap_clear_invalid_automaps);
+}
+
+static void
+test_config_options_act_VirtualAddrNetworkIPv4(void *arg)
+{
+  smartlist_t *list = NULL;
+  list = smartlist_new();
+
+  or_options_t *options, *old_options;
+  options = test_setup_option_CMD_TOR();
+  options->VirtualAddrNetworkIPv4 = "127.192.0.0/00";
+  options->AutomapHostsSuffixes = list;
+
+  old_options = options_new();
+  old_options->VirtualAddrNetworkIPv4 = "127.192.9.9/99";
+  smartlist_add(list, tor_strdup("banana"));
+  old_options->AutomapHostsSuffixes = list;
+
+  NS_MOCK(addressmap_clear_invalid_automaps);
+  options_act(old_options);
+
+  tt_int_op(CALLED(addressmap_clear_invalid_automaps), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(options);
+  tor_free(old_options);
+  NS_UNMOCK(addressmap_clear_invalid_automaps);
+}
+
+static void
+test_config_options_act_TrackHostExits(void *arg)
+{
+  smartlist_t *list = NULL;
+  list = smartlist_new();
+  smartlist_add(list, tor_strndup("foo", 3));
+
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->TrackHostExits = NULL;
+
+  options = test_setup_option_CMD_TOR();
+  options->TrackHostExits = list;
 
   NS_MOCK(addressmap_clear_invalid_automaps);
   options_act(old_options);
@@ -5653,5 +5707,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_transition_affects_workers_cpu_init, TT_FORK),
   CONFIG_TEST(options_act_transition_affects_workers_inform_testing_reachability, TT_FORK),
   CONFIG_TEST(options_act_revise_automap_entries, TT_FORK),
+  CONFIG_TEST(options_act_VirtualAddrNetworkIPv4, TT_FORK),
+  CONFIG_TEST(options_act_TrackHostExits, TT_FORK),
   END_OF_TESTCASES
 };

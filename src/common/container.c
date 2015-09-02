@@ -248,8 +248,8 @@ smartlist_contains_int_as_string(const smartlist_t *sl, int num)
 
 /** Return true iff the two lists contain the same strings in the same
  * order, or if they are both NULL. */
-int
-smartlist_strings_eq(const smartlist_t *sl1, const smartlist_t *sl2)
+MOCK_IMPL(int,
+smartlist_strings_eq, (const smartlist_t *sl1, const smartlist_t *sl2))
 {
   if (sl1 == NULL)
     return sl2 == NULL;
