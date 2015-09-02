@@ -4652,6 +4652,101 @@ test_config_options_act_circuit_change_by_Bridges_line_update(void *arg)
 }
 
 static void
+test_config_options_act_circuit_change_by_Nodes_update(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->UseEntryGuards = 0;
+  old_options->UseEntryGuards = 1;
+  options->UseBridges = 1;
+  old_options->UseBridges = 1;
+
+  //Bridge not change
+  options->Bridges = tor_malloc_zero(sizeof(config_line_t));
+  options->Bridges->key = tor_strdup("Bridges");
+  options->Bridges->value = tor_strdup("192.0.2.1:4123");
+  options->Bridges->next = NULL;
+  old_options->Bridges = options->Bridges;
+
+  //ExcludeNodes change
+  options->ExcludeNodes = routerset_new();
+  smartlist_add(options->ExcludeNodes->list, tor_strndup("foo", 3));
+  old_options->ExcludeNodes = NULL;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //ExcludeNodes not change
+  options->ExcludeNodes = routerset_new();
+  smartlist_add(options->ExcludeNodes->list, tor_strndup("foo", 3));
+  old_options->ExcludeNodes = options->ExcludeNodes;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //ExcludeExitNodes change
+  options->ExcludeExitNodes = routerset_new();
+  smartlist_add(options->ExcludeExitNodes->list, tor_strndup("foo", 3));
+  old_options->ExcludeExitNodes = NULL;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //ExcludeExitNodes not change
+  options->ExcludeExitNodes = routerset_new();
+  smartlist_add(options->ExcludeExitNodes->list, tor_strndup("foo", 3));
+  old_options->ExcludeExitNodes = options->ExcludeExitNodes;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //EntryNodes change
+  options->EntryNodes = routerset_new();
+  smartlist_add(options->EntryNodes->list, tor_strndup("foo", 3));
+  old_options->EntryNodes = NULL;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //EntryNodes not change
+  options->EntryNodes = routerset_new();
+  smartlist_add(options->EntryNodes->list, tor_strndup("foo", 3));
+  old_options->EntryNodes = options->EntryNodes;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //ExitNodes change
+  options->ExitNodes = routerset_new();
+  smartlist_add(options->ExitNodes->list, tor_strndup("foo", 3));
+  old_options->ExitNodes = NULL;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //ExitNodes not change
+  options->ExitNodes = routerset_new();
+  smartlist_add(options->ExitNodes->list, tor_strndup("foo", 3));
+  old_options->ExitNodes = options->ExitNodes;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //Tor2webRendezvousPoints change
+  options->Tor2webRendezvousPoints = routerset_new();
+  smartlist_add(options->Tor2webRendezvousPoints->list, tor_strndup("foo", 3));
+  old_options->Tor2webRendezvousPoints = NULL;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //Tor2webRendezvousPoints not change
+  options->Tor2webRendezvousPoints = routerset_new();
+  smartlist_add(options->Tor2webRendezvousPoints->list, tor_strndup("foo", 3));
+  old_options->Tor2webRendezvousPoints = options->Tor2webRendezvousPoints;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //StrictNodes change
+  options->StrictNodes = 1;
+  old_options->StrictNodes = 0;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(options->EntryNodes);
+  tor_free(options->ExitNodes);
+  tor_free(options->ExcludeNodes);
+  tor_free(options->ExcludeExitNodes);
+  tor_free(options->Tor2webRendezvousPoints);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
 test_config_options_act_BridgeRelay(void *arg)
 {
   or_options_t *options, *old_options;
@@ -5503,6 +5598,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_routerset_add_unknown_ccs_error, TT_FORK),
   CONFIG_TEST(options_act_circuit_change_by_UseBridges, TT_FORK),
   CONFIG_TEST(options_act_circuit_change_by_Bridges_line_update, TT_FORK),
+  CONFIG_TEST(options_act_circuit_change_by_Nodes_update, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
   CONFIG_TEST(options_act_Statistics_private_server_mode, TT_FORK),
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
