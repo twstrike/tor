@@ -759,7 +759,8 @@ connection_or_digest_is_known_relay(const char *id_digest)
  * If <b>reset</b> is true, set the bucket to be full.  Otherwise, just
  * clip the bucket if it happens to be <em>too</em> full.
  */
-static void connection_or_update_token_buckets_helper(or_connection_t *conn, int reset,
+static void
+connection_or_update_token_buckets_helper(or_connection_t *conn, int reset,
                                           const or_options_t *options)
 {
   int rate, burst; /* per-connection rate limiting params */
