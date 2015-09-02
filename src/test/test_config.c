@@ -5560,6 +5560,38 @@ test_config_options_act_transition_affects_workers_inform_testing_reachability(v
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+#define NS_MODULE revise_automap_entries_branch
+NS_DECL(void, addressmap_clear_invalid_automaps, (const or_options_t *options));
+
+void
+NS(addressmap_clear_invalid_automaps)(const or_options_t *options)
+{
+  CALLED(addressmap_clear_invalid_automaps)++;
+}
+
+static void
+test_config_options_act_revise_automap_entries(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->AutomapHostsOnResolve = 1;
+
+  options = test_setup_option_CMD_TOR();
+  options->AutomapHostsOnResolve = 0;
+
+  NS_MOCK(addressmap_clear_invalid_automaps);
+  options_act(old_options);
+
+  tt_int_op(CALLED(addressmap_clear_invalid_automaps), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(options);
+  tor_free(old_options);
+  NS_UNMOCK(addressmap_clear_invalid_automaps);
+}
+#undef NS_MODULE
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -5620,5 +5652,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_updates_token_buckets_if_PerConnBWRate_changes, TT_FORK),
   CONFIG_TEST(options_act_transition_affects_workers_cpu_init, TT_FORK),
   CONFIG_TEST(options_act_transition_affects_workers_inform_testing_reachability, TT_FORK),
+  CONFIG_TEST(options_act_revise_automap_entries, TT_FORK),
   END_OF_TESTCASES
 };

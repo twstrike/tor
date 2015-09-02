@@ -242,8 +242,8 @@ addressmap_address_should_automap(const char *address,
  * source address no longer matches AutomapHostsSuffixes, which is
  * no longer allowed by AutomapHostsOnResolve, or for which the
  * target address is no longer in the virtual network. */
-void
-addressmap_clear_invalid_automaps(const or_options_t *options)
+MOCK_IMPL(void,
+addressmap_clear_invalid_automaps, (const or_options_t *options))
 {
   int clear_all = !options->AutomapHostsOnResolve;
   const smartlist_t *suffixes = options->AutomapHostsSuffixes;
