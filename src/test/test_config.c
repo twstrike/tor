@@ -4092,12 +4092,12 @@ test_config_options_act_ServerTransportPlugin_err(void *arg)
   tt_int_op(CALLED(server_mode), OP_GT, 0);
 
  done:
+  NS_UNMOCK(server_mode);
   UNMOCK(get_options_mutable);
   tor_free(test_serverTransportPlugin->key);
   tor_free(test_serverTransportPlugin->value);
   tor_free(test_serverTransportPlugin);
   options->ServerTransportPlugin = NULL;
-  NS_UNMOCK(server_mode);
   tor_free(options);
   tor_free(old_options);
   (void)arg;
@@ -4128,8 +4128,8 @@ test_config_options_act_RunAsDaemon(void *arg)
   tt_int_op(CALLED(finish_daemon), OP_GT, 0);
 
  done:
-  UNMOCK(get_options_mutable);
   NS_UNMOCK(finish_daemon);
+  UNMOCK(get_options_mutable);
   options->RunAsDaemon = 0;
   tor_free(options);
   tor_free(old_options);
@@ -4446,8 +4446,7 @@ test_config_options_act_cell_ewma_enabled(void *arg)
   tt_int_op(CALLED(cell_ewma_enabled), OP_EQ, 2);
 
  done:
-  NS_UNMOCK(accounting_is_enabled);
-  NS_UNMOCK(configure_accounting);
+  NS_UNMOCK(cell_ewma_enabled);
   UNMOCK(get_options_mutable);
   tor_free(options);
   tor_free(old_options);
@@ -4484,8 +4483,7 @@ test_config_options_act_cell_ewma_disabled(void *arg)
   tt_int_op(CALLED(cell_ewma_enabled), OP_EQ, 3);
 
  done:
-  NS_UNMOCK(accounting_is_enabled);
-  NS_UNMOCK(configure_accounting);
+  NS_UNMOCK(cell_ewma_enabled);
   UNMOCK(get_options_mutable);
   tor_free(options);
   tor_free(old_options);
@@ -4582,9 +4580,9 @@ test_config_options_act_Statistics_private_server_mode(void *arg)
   tt_int_op(CALLED(public_server_mode), OP_GT, 0);
 
  done:
+  NS_UNMOCK(public_server_mode);
   UNMOCK(get_options_mutable);
   options->CellStatistics = 0;
-  NS_UNMOCK(public_server_mode);
   tor_free(options);
   tor_free(old_options);
   (void)arg;
@@ -4970,6 +4968,7 @@ test_config_options_act_try_locking_err(void *arg)
   NS_MOCK(try_locking);
 
   tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(have_lockfile), OP_GT, 0);
   tt_int_op(CALLED(try_locking), OP_GT, 0);
 
  done:
@@ -5089,6 +5088,7 @@ test_config_options_act_pt_configure_remaining_proxies(void *arg)
   tt_int_op(options_act(old_options), OP_EQ, 0);
   tt_int_op(CALLED(pt_proxies_configuration_pending), OP_GT, 0);
   tt_int_op(CALLED(net_is_disabled), OP_GT, 0);
+  tt_int_op(CALLED(pt_configure_remaining_proxies), OP_GT, 0);
 
  done:
   NS_UNMOCK(pt_proxies_configuration_pending);
@@ -5159,10 +5159,10 @@ test_config_options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes(void
   tt_int_op(CALLED(dirvote_recalculate_timing), OP_EQ, 1);
 
  done:
-  (void)arg;
   NS_UNMOCK(dirvote_recalculate_timing);
   tor_free(options);
   tor_free(old_options);
+  (void)arg;
 }
 #undef NS_MODULE
 
