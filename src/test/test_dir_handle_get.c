@@ -1666,53 +1666,6 @@ test_dir_handle_get_status_vote_current_consensus_not_found(void* data)
     tor_free(mock_options);
 }
 
-static void
-test_dir_handle_get_status_vote_current_consensus_busy(void* data)
-{
-  dir_connection_t *conn = NULL;
-  char *header = NULL;
-  (void) data;
-
-  dirserv_free_all();
-
-  time_t now = time(NULL);
-  digests_t digests;
-  dirserv_set_cached_consensus_networkstatus("network status", "ns", &digests, now-3600);
-
-  init_mock_options();
-
-  MOCK(get_options, mock_get_options);
-  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
-
-  /* start gathering stats */
-  mock_options->DirReqStatistics = 1;
-  geoip_dirreq_stats_init(time(NULL));
-
-  // Make it busy
-  mock_options->CountPrivateBandwidth = 1;
-
-  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
-  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
-    GET("/tor/status-vote/current/consensus-ns"), NULL, 0));
-
-  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      NULL, NULL, 1, 0);
-  tt_assert(header);
-  tt_str_op(SERVER_BUSY, OP_EQ, header);
-
-  char *stats = geoip_format_dirreq_stats(time(NULL));
-  tt_assert(stats);
-  tt_assert(strstr(stats, "busy=8"));
-
-  done:
-    UNMOCK(connection_write_to_buf_impl_);
-    UNMOCK(get_options);
-    tor_free(conn);
-    tor_free(header);
-    tor_free(mock_options);
-    dirserv_free_all();
-}
-
 NS_DECL(int, geoip_get_country_by_addr, (const tor_addr_t *addr));
 
 int
@@ -1723,34 +1676,23 @@ NS(geoip_get_country_by_addr)(const tor_addr_t *addr)
 }
 
 static void
-test_dir_handle_get_status_vote_current_consensus(void* data)
+status_vote_current_consensus_ns_test(char **header, char **body, size_t *body_len)
 {
   digests_t digests;
   dir_connection_t *conn = NULL;
-  char *header = NULL;
-  char *body = NULL, *comp_body = NULL;
-  size_t body_used = 0, comp_body_used = 0;
-  char *stats = NULL, *hist = NULL;
-  (void) data;
-
-  dirserv_free_all();
 
   #define NETWORK_STATUS "some network status string"
   dirserv_set_cached_consensus_networkstatus(NETWORK_STATUS, "ns", &digests, time(NULL));
 
-  NS_MOCK(geoip_get_country_by_addr);
-  MOCK(get_options, mock_get_options);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
-  /* init geoip database */
-  clear_geoip_db();
-  geoip_parse_entry("10,50,AB", AF_INET);
-  tt_str_op("ab", OP_EQ, geoip_get_country_name(1));
-
-  /* start gathering stats */
-  init_mock_options();
+  tt_assert(mock_options);
   mock_options->DirReqStatistics = 1;
   geoip_dirreq_stats_init(time(NULL));
+
+  /* init geoip database */
+  geoip_parse_entry("10,50,AB", AF_INET);
+  tt_str_op("ab", OP_EQ, geoip_get_country_name(1));
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   TO_CONN(conn)->address = "127.0.0.1";
@@ -1758,8 +1700,32 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
   tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
     GET("/tor/status-vote/current/consensus-ns"), NULL, 0));
 
-  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      &comp_body, &comp_body_used, strlen(NETWORK_STATUS)+7, 0);
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, header, MAX_HEADERS_SIZE,
+                      body, body_len, strlen(NETWORK_STATUS)+7, 0);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+}
+
+static void
+test_dir_handle_get_status_vote_current_consensus(void* data)
+{
+  char *header = NULL;
+  char *body = NULL, *comp_body = NULL;
+  size_t body_used = 0, comp_body_used = 0;
+  char *stats = NULL, *hist = NULL;
+  (void) data;
+
+  dirserv_free_all();
+  clear_geoip_db();
+
+  NS_MOCK(geoip_get_country_by_addr);
+  MOCK(get_options, mock_get_options);
+
+  init_mock_options();
+
+  status_vote_current_consensus_ns_test(&header, &comp_body, &comp_body_used);
   tt_assert(header);
 
   tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
@@ -1778,6 +1744,7 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
 
   stats = geoip_format_dirreq_stats(time(NULL));
   tt_assert(stats);
+
   tt_assert(strstr(stats, "ok=8"));
   tt_assert(strstr(stats, "dirreq-v3-ips ab=8"));
   tt_assert(strstr(stats, "dirreq-v3-reqs ab=8"));
@@ -1788,10 +1755,8 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
   tt_str_op("ab=8", OP_EQ, hist);
 
   done:
-    UNMOCK(connection_write_to_buf_impl_);
-    UNMOCK(get_options);
     NS_UNMOCK(geoip_get_country_by_addr);
-    tor_free(conn);
+    UNMOCK(get_options);
     tor_free(header);
     tor_free(comp_body);
     tor_free(body);
@@ -1799,9 +1764,46 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
     tor_free(hist);
     tor_free(mock_options);
 
-    clear_geoip_db();
     dirserv_free_all();
+    clear_geoip_db();
 }
+
+static void
+test_dir_handle_get_status_vote_current_consensus_busy(void* data)
+{
+  char *header = NULL;
+  char *body = NULL;
+  size_t body_used = 0;
+  (void) data;
+
+  dirserv_free_all();
+  clear_geoip_db();
+
+  MOCK(get_options, mock_get_options);
+
+  // Make it busy
+  init_mock_options();
+  mock_options->CountPrivateBandwidth = 1;
+
+  status_vote_current_consensus_ns_test(&header, &body, &body_used);
+  tt_assert(header);
+
+  tt_str_op(SERVER_BUSY, OP_EQ, header);
+
+  char *stats = geoip_format_dirreq_stats(time(NULL));
+  tt_assert(stats);
+  tt_assert(strstr(stats, "busy=8"));
+
+  done:
+    UNMOCK(get_options);
+    tor_free(header);
+    tor_free(body);
+    tor_free(mock_options);
+
+    dirserv_free_all();
+    clear_geoip_db();
+}
+
 
 static void
 test_dir_handle_get_status_vote_current_not_found(void* data)
@@ -1971,30 +1973,6 @@ test_dir_handle_get_status_vote_next_authority_not_found(void* data)
     tor_free(header);
 }
 
-static void
-test_dir_handle_get_status_vote_next_consensus_signatures_not_found(void* data)
-{
-  dir_connection_t *conn = NULL;
-  char *header = NULL;
-  (void) data;
-
-  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
-
-  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
-  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
-    GET("/tor/status-vote/next/consensus-signatures"), NULL, 0));
-
-  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      NULL, NULL, 1, 0);
-  tt_assert(header);
-  tt_str_op(NOT_FOUND, OP_EQ, header);
-
-  done:
-    UNMOCK(connection_write_to_buf_impl_);
-    tor_free(conn);
-    tor_free(header);
-}
-
 NS_DECL(const char*,
 dirvote_get_pending_consensus, (consensus_flavor_t flav));
 
@@ -2070,6 +2048,42 @@ test_dir_handle_get_status_vote_next_consensus_busy(void* data)
     tor_free(mock_options);
 }
 
+static void
+status_vote_next_consensus_signatures_test(char **header, char **body, size_t *body_used)
+{
+  dir_connection_t *conn = NULL;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/next/consensus-signatures"), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, header, MAX_HEADERS_SIZE,
+                      body, body_used, 22, 0);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+}
+
+static void
+test_dir_handle_get_status_vote_next_consensus_signatures_not_found(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL, *body = NULL;
+  size_t body_used;
+  (void) data;
+
+  status_vote_next_consensus_signatures_test(&header, &body, &body_used);
+
+  tt_assert(header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  done:
+    tor_free(conn);
+    tor_free(header);
+}
+
 NS_DECL(const char*,
 dirvote_get_pending_detached_signatures, (void));
 
@@ -2082,20 +2096,13 @@ NS(dirvote_get_pending_detached_signatures)(void)
 static void
 test_dir_handle_get_status_vote_next_consensus_signatures(void* data)
 {
-  dir_connection_t *conn = NULL;
   char *header = NULL, *body = NULL;
   size_t body_used = 0;
   (void) data;
 
   NS_MOCK(dirvote_get_pending_detached_signatures);
-  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
-  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
-  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
-    GET("/tor/status-vote/next/consensus-signatures"), NULL, 0));
-
-  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      &body, &body_used, 22, 0);
+  status_vote_next_consensus_signatures_test(&header, &body, &body_used);
   tt_assert(header);
 
   tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
@@ -2107,9 +2114,8 @@ test_dir_handle_get_status_vote_next_consensus_signatures(void* data)
 
   done:
     NS_UNMOCK(dirvote_get_pending_detached_signatures);
-    UNMOCK(connection_write_to_buf_impl_);
-    tor_free(conn);
     tor_free(header);
+    tor_free(body);
 }
 
 const char* VOTE_BODY_V3 = 
