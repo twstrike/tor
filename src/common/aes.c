@@ -101,7 +101,10 @@ aes_cipher_free(aes_cnt_cipher_t *cipher)
     return;
   EVP_CIPHER_CTX_cleanup(&cipher->evp);
   memwipe(cipher, 0, sizeof(aes_cnt_cipher_t));
+
+  /* LCOV_EXCL_START since the cipher will never be NULL here */
   tor_free(cipher);
+  /* LCOV_EXCL_STOP */
 }
 void
 aes_crypt(aes_cnt_cipher_t *cipher, const char *input, size_t len,
@@ -493,4 +496,3 @@ aes_set_iv(aes_cnt_cipher_t *cipher, const char *iv)
 }
 
 #endif
-
