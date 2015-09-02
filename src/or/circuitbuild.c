@@ -704,8 +704,8 @@ circuit_deliver_create_cell(circuit_t *circ, const create_cell_t *create_cell,
 /** We've decided to start our reachability testing. If all
  * is set, log this to the user. Return 1 if we did, or 0 if
  * we chose not to log anything. */
-int
-inform_testing_reachability(void)
+MOCK_IMPL(int,
+inform_testing_reachability, (void))
 {
   char dirbuf[128];
   char *address;

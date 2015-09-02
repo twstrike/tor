@@ -12,6 +12,7 @@
 #include "address.h"
 #include "addressmap.h"
 #include "circuitmux_ewma.h"
+#include "circuitbuild.h"
 #include "config.h"
 #include "confparse.h"
 #include "connection.h"
@@ -5316,6 +5317,54 @@ test_config_options_act_transition_affects_workers(void *arg)
 }
 #undef NS_MODULE
 
+#define NS_MODULE
+NS_DECL(int, have_completed_a_circuit, (void));
+
+int
+NS(have_completed_a_circuit)(void)
+{
+  return 1;
+}
+
+NS_DECL(int, inform_testing_reachability, (void));
+
+int
+NS(inform_testing_reachability)(void)
+{
+  CALLED(inform_testing_reachability)++;
+  return 1;
+}
+
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  return 0;
+}
+
+static void
+test_config_options_act_transition_affects_workers_inform_testing_reachability(void *arg)
+{
+  or_options_t *old_options;
+  old_options = setup_transition_affects_workers_branch();
+
+  NS_MOCK(have_completed_a_circuit);
+  NS_MOCK(inform_testing_reachability);
+  NS_MOCK(dns_reset);
+  options_act(old_options);
+
+  tt_int_op(CALLED(inform_testing_reachability), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(old_options);
+  NS_UNMOCK(have_completed_a_circuit);
+  NS_UNMOCK(inform_testing_reachability);
+  NS_UNMOCK(dns_reset);
+}
+#undef NS_MODULE
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -5371,5 +5420,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
   CONFIG_TEST(options_act_updates_token_buckets_if_PerConnBWRate_changes, TT_FORK),
   CONFIG_TEST(options_act_transition_affects_workers, TT_FORK),
+  CONFIG_TEST(options_act_transition_affects_workers_inform_testing_reachability, TT_FORK),
   END_OF_TESTCASES
 };
