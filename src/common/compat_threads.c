@@ -47,7 +47,9 @@ tor_mutex_free(tor_mutex_t *m)
   if (!m)
     return;
   tor_mutex_uninit(m);
+  /* LCOV_EXCL_START since the m will never be NULL here */
   tor_free(m);
+  /* LCOV_EXCL_STOP */
 }
 
 /** Allocate and return a new condition variable. */
@@ -56,7 +58,9 @@ tor_cond_new(void)
 {
   tor_cond_t *cond = tor_malloc(sizeof(tor_cond_t));
   if (tor_cond_init(cond)<0)
-    tor_free(cond);
+    tor_free(cond); /* LCOV_EXCL_START since the cond will never be NULL here */
+  /* LCOV_EXCL_STOP */
+
   return cond;
 }
 
@@ -67,7 +71,9 @@ tor_cond_free(tor_cond_t *c)
   if (!c)
     return;
   tor_cond_uninit(c);
+  /* LCOV_EXCL_START since the c will never be NULL here */
   tor_free(c);
+  /* LCOV_EXCL_STOP */
 }
 
 /** Identity of the "main" thread */
@@ -314,4 +320,3 @@ alert_sockets_close(alert_sockets_t *socks)
   }
   socks->read_fd = socks->write_fd = -1;
 }
-
