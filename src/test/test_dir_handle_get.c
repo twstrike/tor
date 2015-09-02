@@ -2206,6 +2206,78 @@ const char* VOTE_BODY_V3 =
 "-----END SIGNATURE-----\n";
 
 static void
+test_dir_handle_get_status_vote_next_authority(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL, *body = NULL;
+  const char *msg_out = NULL;
+  int status_out = 0;
+  size_t body_used = 0;
+  dir_server_t *ds = NULL;
+  (void) data;
+
+  clear_dir_servers();
+  routerlist_free_all();
+  dirvote_free_all();
+
+  mock_cert = authority_cert_parse_from_string(TEST_CERTIFICATE, NULL);
+
+  /* create a trusted ds */
+  ds = trusted_dir_server_new("ds", "127.0.0.1", 9059, 9060, "", NULL, V3_DIRINFO, 1.0);
+  tt_assert(ds);
+  dir_server_add(ds);
+
+  /* ds v3_identity_digest is the certificate's identity_key */
+  base16_decode(ds->v3_identity_digest, DIGEST_LEN, TEST_CERT_IDENT_KEY, HEX_DIGEST_LEN);
+  tt_int_op(0, OP_EQ, trusted_dirs_load_certs_from_string(TEST_CERTIFICATE,
+    TRUSTED_DIRS_CERTS_SRC_DL_BY_ID_DIGEST, 1));
+
+  init_mock_options();
+  mock_options->AuthoritativeDir = 1;
+  mock_options->V3AuthoritativeDir = 1;
+  mock_options->TestingV3AuthVotingStartOffset = 0;
+  mock_options->TestingV3AuthInitialVotingInterval = 1;
+  mock_options->TestingV3AuthInitialVoteDelay = 1;
+  mock_options->TestingV3AuthInitialDistDelay = 1;
+
+  time_t now = 1441223455 -1;
+  dirvote_recalculate_timing(mock_options, now);
+
+  struct pending_vote_t *vote = dirvote_add_vote(VOTE_BODY_V3, &msg_out, &status_out);
+  tt_assert(vote);
+
+  MOCK(get_my_v3_authority_cert, get_my_v3_authority_cert_m);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/next/authority"), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, strlen(VOTE_BODY_V3)+1, 0);
+
+  tt_assert(header);
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Content-Length: 4135\r\n"));
+
+  tt_str_op(VOTE_BODY_V3, OP_EQ, body);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    UNMOCK(get_my_v3_authority_cert);
+    tor_free(conn);
+    tor_free(header);
+    tor_free(mock_cert);
+
+    clear_dir_servers();
+    routerlist_free_all();
+    dirvote_free_all();
+}
+
+static void
 test_dir_handle_get_status_vote_current_authority(void* data)
 {
   dir_connection_t *conn = NULL;
@@ -2334,6 +2406,7 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(status_vote_next_consensus_signatures_not_found, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus_signatures, 0),
+  DIR_HANDLE_CMD(status_vote_next_authority, 0),
   DIR_HANDLE_CMD(status_vote_current_authority, 0),
   END_OF_TESTCASES
 };
