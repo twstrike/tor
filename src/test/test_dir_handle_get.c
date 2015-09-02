@@ -2070,6 +2070,48 @@ test_dir_handle_get_status_vote_next_consensus_busy(void* data)
     tor_free(mock_options);
 }
 
+NS_DECL(const char*,
+dirvote_get_pending_detached_signatures, (void));
+
+const char*
+NS(dirvote_get_pending_detached_signatures)(void)
+{
+  return "pending detached sigs";
+}
+
+static void
+test_dir_handle_get_status_vote_next_consensus_signatures(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL, *body = NULL;
+  size_t body_used = 0;
+  (void) data;
+
+  NS_MOCK(dirvote_get_pending_detached_signatures);
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/next/consensus-signatures"), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
+                      &body, &body_used, 22, 0);
+  tt_assert(header);
+
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Content-Length: 21\r\n"));
+
+  tt_str_op("pending detached sigs", OP_EQ, body);
+
+  done:
+    NS_UNMOCK(dirvote_get_pending_detached_signatures);
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+    tor_free(header);
+}
+
 #define DIR_HANDLE_CMD(name,flags)                              \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
@@ -2123,5 +2165,6 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(status_vote_next_authority_not_found, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus_signatures_not_found, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus, 0),
+  DIR_HANDLE_CMD(status_vote_next_consensus_signatures, 0),
   END_OF_TESTCASES
 };

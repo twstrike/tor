@@ -3382,8 +3382,8 @@ dirvote_get_pending_consensus, (consensus_flavor_t flav))
 
 /** Return the signatures that we know for the consensus that we're currently
  * trying to build. */
-const char *
-dirvote_get_pending_detached_signatures(void)
+MOCK_IMPL(const char *,
+dirvote_get_pending_detached_signatures, (void))
 {
   return pending_consensus_signatures;
 }
