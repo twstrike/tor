@@ -47,6 +47,19 @@ mock_saved_log_at(int ix)
 }
 
 int
+mock_saved_severity_at(int ix)
+{
+  int saved_log_count = mock_saved_log_number();
+  if(ix < 0) {
+    ix = saved_log_count + ix;
+  }
+
+  if (saved_log_count <= ix)
+    return -1;
+  return ((mock_saved_log_entry_t *)smartlist_get(saved_logs, ix))->severity;
+}
+
+int
 mock_saved_log_number(void)
 {
   if (!saved_logs)

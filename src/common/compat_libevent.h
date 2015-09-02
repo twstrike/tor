@@ -91,5 +91,10 @@ void tor_gettimeofday_cache_set(const struct timeval *tv);
 #endif
 void tor_gettimeofday_cached_monotonic(struct timeval *tv);
 
+
+#ifdef COMPAT_LIBEVENT_PRIVATE
+STATIC void
+libevent_logging_callback(int severity, const char *msg);
 #endif
 
+#endif

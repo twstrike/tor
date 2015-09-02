@@ -11,6 +11,7 @@
 
 #include "orconfig.h"
 #include "compat.h"
+#define COMPAT_LIBEVENT_PRIVATE
 #include "compat_libevent.h"
 
 #include "crypto.h"
@@ -60,7 +61,7 @@ typedef uint32_t le_version_t;
 static const char *suppress_msg = NULL;
 /** Callback function passed to event_set_log() so we can intercept
  * log messages from libevent. */
-static void
+STATIC void
 libevent_logging_callback(int severity, const char *msg)
 {
   char buf[1024];
@@ -653,4 +654,3 @@ tor_gettimeofday_cached_monotonic(struct timeval *tv)
     memcpy(&last_tv, tv, sizeof(struct timeval));
   }
 }
-
