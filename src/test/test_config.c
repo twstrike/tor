@@ -3963,8 +3963,7 @@ test_config_options_act_DirAuthority_line_err(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  config_line_t *test_dir_authority = tor_malloc(sizeof(config_line_t));
-  memset(test_dir_authority, 0, sizeof(config_line_t));
+  config_line_t *test_dir_authority = tor_malloc_zero(sizeof(config_line_t));
   test_dir_authority->key = tor_strdup("DirAuthority");
   test_dir_authority->value = tor_strdup("D0");
   options->DirAuthorities = test_dir_authority;
@@ -3991,8 +3990,7 @@ test_config_options_act_Bridge(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  config_line_t *test_bridges = tor_malloc(sizeof(config_line_t));
-  memset(test_bridges, 0, sizeof(config_line_t));
+  config_line_t *test_bridges = tor_malloc_zero(sizeof(config_line_t));
   test_bridges->key = tor_strdup("Bridges");
   test_bridges->value = tor_strdup("192.0.2.1:4123");
   test_bridges->next = NULL;
@@ -4018,8 +4016,7 @@ test_config_options_act_Bridge_err(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  config_line_t *test_bridges = tor_malloc(sizeof(config_line_t));
-  memset(test_bridges, 0, sizeof(config_line_t));
+  config_line_t *test_bridges = tor_malloc_zero(sizeof(config_line_t));
   test_bridges->key = tor_strdup("NotBridges");
   test_bridges->value = tor_strdup("some not correct format of Bridge");
   test_bridges->next = NULL;
@@ -4045,8 +4042,7 @@ test_config_options_act_ClientTransportPlugin_err(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  config_line_t *test_clientTransportPlugin = tor_malloc(sizeof(config_line_t));
-  memset(test_clientTransportPlugin, 0, sizeof(config_line_t));
+  config_line_t *test_clientTransportPlugin = tor_malloc_zero(sizeof(config_line_t));
   test_clientTransportPlugin->key = tor_strdup("ClientTransportPlugin");
   test_clientTransportPlugin->value = tor_strdup("some not correct format of ClientTransportPlugin");
   options->ClientTransportPlugin = test_clientTransportPlugin;
@@ -4084,8 +4080,7 @@ test_config_options_act_ServerTransportPlugin_err(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  config_line_t *test_serverTransportPlugin = tor_malloc(sizeof(config_line_t));
-  memset(test_serverTransportPlugin, 0, sizeof(config_line_t));
+  config_line_t *test_serverTransportPlugin = tor_malloc_zero(sizeof(config_line_t));
   test_serverTransportPlugin->key = tor_strdup("ServerTransportPlugin");
   test_serverTransportPlugin->value = tor_strdup("some not correct format of ServerTransportPlugin");
   options->ServerTransportPlugin = test_serverTransportPlugin;
