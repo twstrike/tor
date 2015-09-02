@@ -4600,6 +4600,58 @@ test_config_options_act_routerset_add_unknown_ccs_error(void *arg)
 #undef NS_MODULE
 
 static void
+test_config_options_act_circuit_change_by_UseBridges(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->UseEntryGuards = 0;
+  old_options->UseEntryGuards = 1;
+  options->UseBridges = 1;
+  old_options->UseBridges = 0;
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_circuit_change_by_Bridges_line_update(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->UseEntryGuards = 0;
+  old_options->UseEntryGuards = 1;
+  options->UseBridges = 1;
+  old_options->UseBridges = 1;
+
+  options->Bridges = tor_malloc_zero(sizeof(config_line_t));
+  options->Bridges->key = tor_strdup("Bridges");
+  options->Bridges->value = tor_strdup("192.0.2.1:4123");
+  options->Bridges->next = NULL;
+
+  old_options->Bridges = tor_malloc_zero(sizeof(config_line_t));
+  old_options->Bridges->key = tor_strdup("Bridges");
+  old_options->Bridges->value = tor_strdup("192.0.2.1:4124");
+  old_options->Bridges->next = NULL;
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
 test_config_options_act_BridgeRelay(void *arg)
 {
   or_options_t *options, *old_options;
@@ -5449,6 +5501,8 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword_error, TT_FORK),
   CONFIG_TEST(options_act_routerset_add_unknown_ccs_error, TT_FORK),
+  CONFIG_TEST(options_act_circuit_change_by_UseBridges, TT_FORK),
+  CONFIG_TEST(options_act_circuit_change_by_Bridges_line_update, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
   CONFIG_TEST(options_act_Statistics_private_server_mode, TT_FORK),
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
