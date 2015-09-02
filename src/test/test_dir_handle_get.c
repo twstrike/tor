@@ -1580,7 +1580,7 @@ mock_ns_get_by_flavor(consensus_flavor_t f)
 }
 
 static void
-test_dir_handle_get_status_vote_current_consensus_not_enough_sigs(void* data)
+test_dir_handle_get_status_vote_current_consensus_ns_not_enough_sigs(void* data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -1630,7 +1630,7 @@ test_dir_handle_get_status_vote_current_consensus_not_enough_sigs(void* data)
 }
 
 static void
-test_dir_handle_get_status_vote_current_consensus_not_found(void* data)
+test_dir_handle_get_status_vote_current_consensus_ns_not_found(void* data)
 {
   dir_connection_t *conn = NULL;
   char *header = NULL;
@@ -1709,7 +1709,7 @@ status_vote_current_consensus_ns_test(char **header, char **body, size_t *body_l
 }
 
 static void
-test_dir_handle_get_status_vote_current_consensus(void* data)
+test_dir_handle_get_status_vote_current_consensus_ns(void* data)
 {
   char *header = NULL;
   char *body = NULL, *comp_body = NULL;
@@ -1769,7 +1769,7 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
 }
 
 static void
-test_dir_handle_get_status_vote_current_consensus_busy(void* data)
+test_dir_handle_get_status_vote_current_consensus_ns_busy(void* data)
 {
   char *header = NULL;
   char *body = NULL;
@@ -2082,6 +2082,7 @@ test_dir_handle_get_status_vote_next_consensus_signatures_not_found(void* data)
   done:
     tor_free(conn);
     tor_free(header);
+    tor_free(body);
 }
 
 NS_DECL(const char*,
@@ -2116,6 +2117,35 @@ test_dir_handle_get_status_vote_next_consensus_signatures(void* data)
     NS_UNMOCK(dirvote_get_pending_detached_signatures);
     tor_free(header);
     tor_free(body);
+}
+
+static void
+test_dir_handle_get_status_vote_next_consensus_signatures_busy(void* data)
+{
+  dir_connection_t *conn = NULL;
+  char *header = NULL, *body = NULL;
+  size_t body_used;
+  (void) data;
+
+  NS_MOCK(dirvote_get_pending_detached_signatures);
+  MOCK(get_options, mock_get_options);
+
+  //Make it busy
+  init_mock_options();
+  mock_options->CountPrivateBandwidth = 1;
+
+  status_vote_next_consensus_signatures_test(&header, &body, &body_used);
+
+  tt_assert(header);
+  tt_str_op(SERVER_BUSY, OP_EQ, header);
+
+  done:
+    UNMOCK(get_options);
+    NS_UNMOCK(dirvote_get_pending_detached_signatures);
+    tor_free(conn);
+    tor_free(header);
+    tor_free(body);
+    tor_free(mock_options);
 }
 
 const char* VOTE_BODY_V3 = 
@@ -2397,22 +2427,23 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(server_keys_sk, 0),
   DIR_HANDLE_CMD(server_keys_fpsk_not_found, 0),
   DIR_HANDLE_CMD(server_keys_fpsk, 0),
-  DIR_HANDLE_CMD(status_vote_current_consensus_not_enough_sigs, 0),
-  DIR_HANDLE_CMD(status_vote_current_consensus_not_found, 0),
-  DIR_HANDLE_CMD(status_vote_current_consensus_busy, 0),
-  DIR_HANDLE_CMD(status_vote_current_consensus, 0),
+  DIR_HANDLE_CMD(status_vote_current_consensus_ns_not_enough_sigs, 0),
+  DIR_HANDLE_CMD(status_vote_current_consensus_ns_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_current_consensus_ns_busy, 0),
+  DIR_HANDLE_CMD(status_vote_current_consensus_ns, 0),
   DIR_HANDLE_CMD(status_vote_current_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_current_authority_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_current_authority, 0),
   DIR_HANDLE_CMD(status_vote_current_d_not_found, 0),
   DIR_HANDLE_CMD(status_vote_next_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_next_authority_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_next_authority, 0),
   DIR_HANDLE_CMD(status_vote_next_d_not_found, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus_not_found, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus_busy, 0),
-  DIR_HANDLE_CMD(status_vote_current_authority_not_found, 0),
-  DIR_HANDLE_CMD(status_vote_next_authority_not_found, 0),
-  DIR_HANDLE_CMD(status_vote_next_consensus_signatures_not_found, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus, 0),
+  DIR_HANDLE_CMD(status_vote_next_consensus_signatures_not_found, 0),
+  DIR_HANDLE_CMD(status_vote_next_consensus_signatures_busy, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus_signatures, 0),
-  DIR_HANDLE_CMD(status_vote_next_authority, 0),
-  DIR_HANDLE_CMD(status_vote_current_authority, 0),
   END_OF_TESTCASES
 };
