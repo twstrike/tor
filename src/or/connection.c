@@ -4419,8 +4419,8 @@ connection_state_is_connecting(connection_t *conn)
 /** Allocates a base64'ed authenticator for use in http or https
  * auth, based on the input string <b>authenticator</b>. Returns it
  * if success, else returns NULL. */
-char *
-alloc_http_authenticator(const char *authenticator)
+MOCK_IMPL(char *,
+alloc_http_authenticator, (const char *authenticator))
 {
   /* an authenticator in Basic authentication
    * is just the string "username:password" */

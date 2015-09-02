@@ -203,7 +203,7 @@ int connection_is_listener(connection_t *conn);
 int connection_state_is_open(connection_t *conn);
 int connection_state_is_connecting(connection_t *conn);
 
-char *alloc_http_authenticator(const char *authenticator);
+MOCK_DECL(char *, alloc_http_authenticator, (const char *authenticator));
 
 void assert_connection_ok(connection_t *conn, time_t now);
 int connection_or_nonopen_was_started_here(or_connection_t *conn);

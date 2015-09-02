@@ -14,6 +14,7 @@
 #include "circuitmux_ewma.h"
 #include "config.h"
 #include "confparse.h"
+#include "connection.h"
 #include "connection_edge.h"
 #include "connection_or.h"
 #include "control.h"
@@ -4510,6 +4511,7 @@ test_config_options_act_write_pidfile(void *arg)
   (void)arg;
 }
 
+#define NS_MODULE alloc_http_authenticator
 static void
 test_config_options_act_BridgePassword(void *arg)
 {
@@ -4527,6 +4529,37 @@ test_config_options_act_BridgePassword(void *arg)
   tor_free(old_options);
   (void)arg;
 }
+
+#define NS_SUBMODULE null
+NS_DECL(char *, alloc_http_authenticator, (const char *authenticator));
+char *
+NS(alloc_http_authenticator)(const char *authenticator)
+{
+    (void)authenticator;
+    return NULL;
+}
+
+static void
+test_config_options_act_BridgePassword_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(alloc_http_authenticator);
+  options->BridgePassword = "some password";
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+ done:
+  NS_UNMOCK(alloc_http_authenticator);
+  UNMOCK(get_options_mutable);
+  options->BridgePassword = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
 
 static void
 test_config_options_act_BridgeRelay(void *arg)
@@ -5264,6 +5297,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_cell_ewma_disabled, TT_FORK),
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
+  CONFIG_TEST(options_act_BridgePassword_error, TT_FORK),
   CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
   CONFIG_TEST(options_act_Statistics_private_server_mode, TT_FORK),
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
