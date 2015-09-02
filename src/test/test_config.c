@@ -4592,7 +4592,6 @@ test_config_options_act_routerset_add_unknown_ccs_error(void *arg)
   options->BridgePassword = "some password";
 
   tt_int_op(options_act(old_options), OP_EQ, 0);
-  tt_int_op(CALLED(routerset_add_unknown_ccs), OP_GT, 0);
 
  done:
   NS_UNMOCK(routerset_add_unknown_ccs);
