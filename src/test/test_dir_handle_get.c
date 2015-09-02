@@ -1745,7 +1745,7 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
   /* init geoip database */
   clear_geoip_db();
   geoip_parse_entry("10,50,AB", AF_INET);
-	tt_str_op("ab", OP_EQ, geoip_get_country_name(1));
+  tt_str_op("ab", OP_EQ, geoip_get_country_name(1));
 
   /* start gathering stats */
   init_mock_options();
@@ -1781,7 +1781,7 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
   tt_assert(strstr(stats, "ok=8"));
   tt_assert(strstr(stats, "dirreq-v3-ips ab=8"));
   tt_assert(strstr(stats, "dirreq-v3-reqs ab=8"));
-	tt_assert(strstr(stats, "dirreq-v3-direct-dl complete=0,timeout=0,running=4"));
+  tt_assert(strstr(stats, "dirreq-v3-direct-dl complete=0,timeout=0,running=4"));
 
   hist = geoip_get_request_history();
   tt_assert(hist);
@@ -1799,7 +1799,7 @@ test_dir_handle_get_status_vote_current_consensus(void* data)
     tor_free(hist);
     tor_free(mock_options);
 
-		clear_geoip_db();
+    clear_geoip_db();
     dirserv_free_all();
 }
 
@@ -1819,7 +1819,7 @@ test_dir_handle_get_status_vote_current_not_found(void* data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
   tt_assert(header);
-	tt_str_op(NOT_FOUND, OP_EQ, header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -1843,7 +1843,7 @@ test_dir_handle_get_status_vote_current_d_not_found(void* data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
   tt_assert(header);
-	tt_str_op(NOT_FOUND, OP_EQ, header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -1867,7 +1867,7 @@ test_dir_handle_get_status_vote_next_not_found(void* data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
   tt_assert(header);
-	tt_str_op(NOT_FOUND, OP_EQ, header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -1891,7 +1891,7 @@ test_dir_handle_get_status_vote_next_d_not_found(void* data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
   tt_assert(header);
-	tt_str_op(NOT_FOUND, OP_EQ, header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -1915,7 +1915,7 @@ test_dir_handle_get_status_vote_next_consensus_not_found(void* data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
   tt_assert(header);
-	tt_str_op(NOT_FOUND, OP_EQ, header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -1939,7 +1939,7 @@ test_dir_handle_get_status_vote_current_authority_not_found(void* data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
   tt_assert(header);
-	tt_str_op(NOT_FOUND, OP_EQ, header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -1963,7 +1963,7 @@ test_dir_handle_get_status_vote_next_authority_not_found(void* data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
   tt_assert(header);
-	tt_str_op(NOT_FOUND, OP_EQ, header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -1987,7 +1987,7 @@ test_dir_handle_get_status_vote_next_consensus_signatures_not_found(void* data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
   tt_assert(header);
-	tt_str_op(NOT_FOUND, OP_EQ, header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
 
   done:
     UNMOCK(connection_write_to_buf_impl_);
@@ -2001,7 +2001,7 @@ dirvote_get_pending_consensus, (consensus_flavor_t flav));
 const char*
 NS(dirvote_get_pending_consensus)(consensus_flavor_t flav)
 {
-	return "pending consensus";
+  return "pending consensus";
 }
 
 static void
@@ -2012,7 +2012,7 @@ test_dir_handle_get_status_vote_next_consensus(void* data)
   size_t body_used = 0;
   (void) data;
 
-	NS_MOCK(dirvote_get_pending_consensus);
+  NS_MOCK(dirvote_get_pending_consensus);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
 
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
@@ -2028,10 +2028,10 @@ test_dir_handle_get_status_vote_next_consensus(void* data)
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
   tt_assert(strstr(header, "Content-Length: 17\r\n"));
 
-	tt_str_op("pending consensus", OP_EQ, body);
+  tt_str_op("pending consensus", OP_EQ, body);
 
   done:
-		NS_UNMOCK(dirvote_get_pending_consensus);
+    NS_UNMOCK(dirvote_get_pending_consensus);
     UNMOCK(connection_write_to_buf_impl_);
     tor_free(conn);
     tor_free(header);
@@ -2044,7 +2044,7 @@ test_dir_handle_get_status_vote_next_consensus_busy(void* data)
   char *header = NULL;
   (void) data;
 
-	NS_MOCK(dirvote_get_pending_consensus);
+  NS_MOCK(dirvote_get_pending_consensus);
   MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
   MOCK(get_options, mock_get_options);
 
@@ -2059,15 +2059,15 @@ test_dir_handle_get_status_vote_next_consensus_busy(void* data)
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
   tt_assert(header);
-	tt_str_op(SERVER_BUSY, OP_EQ, header);
+  tt_str_op(SERVER_BUSY, OP_EQ, header);
 
   done:
-		UNMOCK(get_options);
-		NS_UNMOCK(dirvote_get_pending_consensus);
+    UNMOCK(get_options);
+    NS_UNMOCK(dirvote_get_pending_consensus);
     UNMOCK(connection_write_to_buf_impl_);
     tor_free(conn);
     tor_free(header);
-		tor_free(mock_options);
+    tor_free(mock_options);
 }
 
 #define DIR_HANDLE_CMD(name,flags)                              \
