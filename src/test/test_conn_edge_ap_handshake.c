@@ -3,10 +3,12 @@
  * Copyright (c) 2007-2015, The Tor Project, Inc. */
 /* See LICENSE for licensing information */
 
+#define CONNECTION_PRIVATE
+#define CONNECTION_EDGE_PRIVATE
+
 #include "or.h"
 #include "config.h"
 #include "connection.h"
-#define CONNECTION_EDGE_PRIVATE
 #include "connection_edge.h"
 #include "connection_or.h"
 #include "addressmap.h"
@@ -51,10 +53,12 @@ connection_ap_handshake_rewrite_mock(entry_connection_t *conn, rewrite_result_t 
 }
 
 static void
-connection_mark_unattached_ap_mock(entry_connection_t *conn, int reason)
+connection_mark_unattached_ap_mock(entry_connection_t *conn, int reason, int line, const char *file)
 {
   tor_assert(reason);
   (void) conn;
+  (void) line;
+  (void) file;
 }
 
 static void
