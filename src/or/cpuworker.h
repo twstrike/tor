@@ -12,7 +12,7 @@
 #ifndef TOR_CPUWORKER_H
 #define TOR_CPUWORKER_H
 
-void cpu_init(void);
+MOCK_DECL(void, cpu_init, (void));
 void cpuworkers_rotate_keyinfo(void);
 
 struct create_cell_t;

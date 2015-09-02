@@ -1916,8 +1916,8 @@ got_libevent_error(void)
 /** Called when our IP address seems to have changed. <b>at_interface</b>
  * should be true if we detected a change in our interface, and false if we
  * detected a change in our published address. */
-void
-ip_address_changed(int at_interface)
+MOCK_IMPL(void,
+ip_address_changed, (int at_interface))
 {
   int server = server_mode(get_options());
 

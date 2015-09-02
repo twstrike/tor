@@ -18,6 +18,7 @@
 #include "connection_edge.h"
 #include "connection_or.h"
 #include "control.h"
+#include "cpuworker.h"
 #include "dirvote.h"
 #include "dns.h"
 #include "entrynodes.h"
@@ -5263,6 +5264,58 @@ test_config_options_act_updates_token_buckets_if_PerConnBWRate_changes(void *arg
 }
 #undef NS_MODULE
 
+static or_options_t * setup_transition_affects_workers_branch(void)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->NumCPUs = 0;
+  old_options->ClientOnly = 1;
+
+  options = test_setup_option_CMD_TOR();
+  options->NumCPUs = 1;
+  options->ORPort_set = 1;
+
+  return old_options;
+}
+
+#define NS_MODULE
+NS_DECL(void, cpu_init, (void));
+
+void
+NS(cpu_init)(void)
+{
+  CALLED(cpu_init)++;
+}
+
+NS_DECL(void, ip_address_changed, (int at_interface));
+
+void
+NS(ip_address_changed)(int at_interface)
+{
+  CALLED(ip_address_changed)++;
+}
+
+static void
+test_config_options_act_transition_affects_workers(void *arg)
+{
+  or_options_t *old_options;
+  old_options = setup_transition_affects_workers_branch();
+
+  NS_MOCK(cpu_init);
+  NS_MOCK(ip_address_changed);
+  options_act(old_options);
+
+  tt_int_op(CALLED(cpu_init), OP_EQ, 1);
+  tt_int_op(CALLED(ip_address_changed), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(old_options);
+  NS_UNMOCK(cpu_init);
+  NS_UNMOCK(ip_address_changed);
+}
+#undef NS_MODULE
+
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
 
@@ -5317,5 +5370,6 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes, TT_FORK),
   CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
   CONFIG_TEST(options_act_updates_token_buckets_if_PerConnBWRate_changes, TT_FORK),
+  CONFIG_TEST(options_act_transition_affects_workers, TT_FORK),
   END_OF_TESTCASES
 };

@@ -74,8 +74,8 @@ replyqueue_process_cb(evutil_socket_t sock, short events, void *arg)
 /** Initialize the cpuworker subsystem. It is OK to call this more than once
  * during Tor's lifetime.
  */
-void
-cpu_init(void)
+MOCK_IMPL(void,
+cpu_init, (void))
 {
   if (!replyqueue) {
     replyqueue = replyqueue_new(0);
