@@ -5210,7 +5210,7 @@ test_config_options_act_init_key_error(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
-#define NS_MODULE
+#define NS_MODULE dirvote_recalculate_timing
 NS_DECL(void, dirvote_recalculate_timing, (const or_options_t *op, time_t now));
 
 static void
@@ -5243,7 +5243,7 @@ test_config_options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes(void
 }
 #undef NS_MODULE
 
-#define NS_MODULE
+#define NS_MODULE router_dir_info_changed
 NS_DECL(void, router_dir_info_changed, (void));
 
 static void
@@ -5274,7 +5274,7 @@ test_config_options_act_calls_update_router_when_changes_status(void *arg)
 }
 #undef NS_MODULE
 
-#define NS_MODULE
+#define NS_MODULE connection_or_update_token_buckets
 NS_DECL(void, connection_or_update_token_buckets,
         (smartlist_t *conns, const or_options_t *options));
 
@@ -5321,7 +5321,16 @@ static or_options_t * setup_transition_affects_workers_branch(void)
   return old_options;
 }
 
-#define NS_MODULE
+#define NS_MODULE transition_affects_workers
+#define NS_SUBMODULE cpu_init_ip_address_changed
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  return 0;
+}
+
 NS_DECL(void, cpu_init, (void));
 
 void
@@ -5339,13 +5348,14 @@ NS(ip_address_changed)(int at_interface)
 }
 
 static void
-test_config_options_act_transition_affects_workers(void *arg)
+test_config_options_act_transition_affects_workers_cpu_init(void *arg)
 {
   or_options_t *old_options;
   old_options = setup_transition_affects_workers_branch();
 
   NS_MOCK(cpu_init);
   NS_MOCK(ip_address_changed);
+  NS_MOCK(dns_reset);
   options_act(old_options);
 
   tt_int_op(CALLED(cpu_init), OP_EQ, 1);
@@ -5356,10 +5366,11 @@ test_config_options_act_transition_affects_workers(void *arg)
   tor_free(old_options);
   NS_UNMOCK(cpu_init);
   NS_UNMOCK(ip_address_changed);
+  NS_UNMOCK(dns_reset);
 }
-#undef NS_MODULE
+#undef NS_SUBMODULE
 
-#define NS_MODULE
+#define NS_SUBMODULE inform_testing_reachability
 NS_DECL(int, have_completed_a_circuit, (void));
 
 int
@@ -5405,6 +5416,7 @@ test_config_options_act_transition_affects_workers_inform_testing_reachability(v
   NS_UNMOCK(inform_testing_reachability);
   NS_UNMOCK(dns_reset);
 }
+#undef NS_SUBMODULE
 #undef NS_MODULE
 
 #define CONFIG_TEST(name, flags)                          \
@@ -5462,7 +5474,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes, TT_FORK),
   CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
   CONFIG_TEST(options_act_updates_token_buckets_if_PerConnBWRate_changes, TT_FORK),
-  CONFIG_TEST(options_act_transition_affects_workers, TT_FORK),
+  CONFIG_TEST(options_act_transition_affects_workers_cpu_init, TT_FORK),
   CONFIG_TEST(options_act_transition_affects_workers_inform_testing_reachability, TT_FORK),
   END_OF_TESTCASES
 };
