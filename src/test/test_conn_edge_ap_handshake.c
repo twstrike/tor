@@ -231,6 +231,48 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_exit
     tor_free(path);
 }
 
+static or_options_t *options_mock = NULL;
+static const or_options_t *
+get_options_mock(void)
+{
+  tor_assert(options_mock);
+  return options_mock;
+}
+
+static void
+test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed(void *data)
+{
+  entry_connection_t *conn = data;
+  origin_circuit_t *circuit = NULL;
+  crypt_path_t *path = NULL;
+
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  rewrite_mock->should_close = 0;
+  rewrite_mock->exit_source = ADDRMAPSRC_NONE;
+  strlcpy(conn->socks_request->address,
+            "http://malformed..exit",
+            sizeof(conn->socks_request->address));
+  conn->socks_request->command = SOCKS_COMMAND_CONNECT;
+  options_mock = tor_malloc_zero(sizeof(options_mock));
+  MOCK(get_options, get_options_mock);
+  options_mock->AllowDotExit = 1;
+
+  int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
+
+  tt_int_op(res, OP_EQ, -1);
+
+  done:
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+    UNMOCK(get_options);
+    tor_free(rewrite_mock);
+    tor_free(circuit);
+    tor_free(path);
+    tor_free(options_mock);
+}
+
 #define CONN_EDGE_AP_HANDSHAKE(name,flags)                              \
   { #name, test_conn_edge_ap_handshake_##name, (flags), &test_rewrite_setup, NULL }
 
@@ -242,5 +284,6 @@ struct testcase_t conn_edge_ap_handshake_tests[] =
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_unallowed_exit, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_dns_exit, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_exit_but_not_remapped, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed, 0),
   END_OF_TESTCASES
 };
