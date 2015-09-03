@@ -42,7 +42,6 @@ static struct testcase_setup_t test_rewrite_setup = {
 };
 
 static rewrite_result_t *rewrite_mock = NULL; 
-
 static void
 connection_ap_handshake_rewrite_mock(entry_connection_t *conn,
                                        rewrite_result_t *result)
@@ -54,6 +53,7 @@ connection_ap_handshake_rewrite_mock(entry_connection_t *conn,
   (void) conn;
 }
 
+static int unattachment_reason_spy;
 static void
 connection_mark_unattached_ap_mock(entry_connection_t *conn,
                                      int reason,
@@ -61,6 +61,7 @@ connection_mark_unattached_ap_mock(entry_connection_t *conn,
                                      const char *file)
 {
   tor_assert(reason);
+  unattachment_reason_spy = reason;
   (void) conn;
   (void) line;
   (void) file;
@@ -134,6 +135,7 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_bogu
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
 
+  tt_int_op(unattachment_reason_spy, OP_EQ, END_STREAM_REASON_TORPROTOCOL);
   tt_int_op(res, OP_EQ, -1);
 
   done:
@@ -163,6 +165,7 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_unal
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
 
+  tt_int_op(unattachment_reason_spy, OP_EQ, END_STREAM_REASON_TORPROTOCOL);
   tt_int_op(res, OP_EQ, -1);
 
   done:
@@ -192,6 +195,7 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_dns_
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
 
+  tt_int_op(unattachment_reason_spy, OP_EQ, END_STREAM_REASON_TORPROTOCOL);
   tt_int_op(res, OP_EQ, -1);
 
   done:
@@ -221,6 +225,7 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_exit
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
 
+  tt_int_op(unattachment_reason_spy, OP_EQ, END_STREAM_REASON_TORPROTOCOL);
   tt_int_op(res, OP_EQ, -1);
 
   done:
@@ -261,6 +266,7 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_is_allowed_
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
 
+  tt_int_op(unattachment_reason_spy, OP_EQ, END_STREAM_REASON_TORPROTOCOL);
   tt_int_op(res, OP_EQ, -1);
 
   done:
