@@ -4561,6 +4561,29 @@ test_config_options_act_BridgePassword_error(void *arg)
 #undef NS_SUBMODULE
 #undef NS_MODULE
 
+static void
+test_config_options_act_parse_outbound_addresses_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+  options->BridgePassword = "some password";
+
+  options->OutboundBindAddress = tor_malloc_zero(sizeof(config_line_t));
+  options->OutboundBindAddress->key = tor_strdup("OutboundBindAddress");
+  options->OutboundBindAddress->value = tor_strdup("some invalid address");
+  options->OutboundBindAddress->next = NULL;
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+ done:
+  UNMOCK(get_options_mutable);
+  options->OutboundBindAddress = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
 #define NS_MODULE routerset_add_unknown_ccs
 #define NS_SUBMODULE error
 
@@ -5707,6 +5730,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_write_pidfile, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword, TT_FORK),
   CONFIG_TEST(options_act_BridgePassword_error, TT_FORK),
+  CONFIG_TEST(options_act_parse_outbound_addresses_error, TT_FORK),
   CONFIG_TEST(options_act_routerset_add_unknown_ccs_error, TT_FORK),
   CONFIG_TEST(options_act_circuit_change_by_UseBridges, TT_FORK),
   CONFIG_TEST(options_act_circuit_change_by_Bridges_line_update, TT_FORK),

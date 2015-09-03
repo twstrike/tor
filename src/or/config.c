@@ -1635,13 +1635,11 @@ options_act(const or_options_t *old_options)
     tor_free(http_authenticator);
   }
 
-  /* LCOV_EXCL_START */
   if (parse_outbound_addresses(options, 0, &msg) < 0) {
     log_warn(LD_BUG, "Failed parsing outbound bind addresses: %s", msg);
     tor_free(msg);
     return -1;
   }
-  /* LCOV_EXCL_STOP */
 
   config_maybe_load_geoip_files_(options, old_options);
 
