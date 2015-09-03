@@ -1386,10 +1386,12 @@ options_act(const or_options_t *old_options)
     if (options->DisableDebuggerAttachment && !disabled_debugger_attach &&
         running_tor) {
       int ok = tor_disable_debugger_attach();
+      /* LCOV_EXCL_START since the warned_debugger_attach is 0 we can't reach inside. */
       if (warned_debugger_attach && ok == 1) {
         log_notice(LD_CONFIG, "Disabled attaching debuggers for unprivileged "
                    "users.");
       }
+      /* LCOV_EXCL_STOP */
       disabled_debugger_attach = (ok == 1);
     } else if (!options->DisableDebuggerAttachment &&
                !warned_debugger_attach) {
