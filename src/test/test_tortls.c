@@ -11,6 +11,11 @@
 #include "tortls.h"
 
 #include "test.h"
+#include "log_test_helpers.h"
+
+#include <openssl/err.h>
+
+#define NS_MODULE tortls
 
 static void
 test_tortls_errno_to_tls_error(void *data)
@@ -113,13 +118,299 @@ test_tortls_tor_tls_get_error(void *data)
   crypto_pk_free(key2);
 }
 
-#define LOCAL_TEST_CASE(name) \
-  { #name, test_tortls_##name, 0, NULL, NULL }
+static void
+test_tortls_get_state_description(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+  char *buf;
+  SSL_CTX *ctx;
+
+  SSL_library_init();
+  SSL_load_error_strings();
+
+  ctx = SSL_CTX_new(SSLv23_method());
+
+  buf = tor_malloc_zero(1000);
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+
+  tor_tls_get_state_description(NULL, buf, 20);
+  tt_str_op(buf, OP_EQ, "(No SSL object)");
+
+  tls->ssl = NULL;
+  tor_tls_get_state_description(tls, buf, 20);
+  tt_str_op(buf, OP_EQ, "(No SSL object)");
+
+  tls->ssl = SSL_new(ctx);
+  tor_tls_get_state_description(tls, buf, 200);
+  tt_str_op(buf, OP_EQ, "before/accept initialization in HANDSHAKE");
+
+  tls->state = TOR_TLS_ST_OPEN;
+  tor_tls_get_state_description(tls, buf, 200);
+  tt_str_op(buf, OP_EQ, "before/accept initialization in OPEN");
+
+  tls->state = TOR_TLS_ST_GOTCLOSE;
+  tor_tls_get_state_description(tls, buf, 200);
+  tt_str_op(buf, OP_EQ, "before/accept initialization in GOTCLOSE");
+
+  tls->state = TOR_TLS_ST_SENTCLOSE;
+  tor_tls_get_state_description(tls, buf, 200);
+  tt_str_op(buf, OP_EQ, "before/accept initialization in SENTCLOSE");
+
+  tls->state = TOR_TLS_ST_CLOSED;
+  tor_tls_get_state_description(tls, buf, 200);
+  tt_str_op(buf, OP_EQ, "before/accept initialization in CLOSED");
+
+  tls->state = TOR_TLS_ST_RENEGOTIATE;
+  tor_tls_get_state_description(tls, buf, 200);
+  tt_str_op(buf, OP_EQ, "before/accept initialization in RENEGOTIATE");
+
+  tls->state = TOR_TLS_ST_BUFFEREVENT;
+  tor_tls_get_state_description(tls, buf, 200);
+  tt_str_op(buf, OP_EQ, "before/accept initialization");
+
+  tls->state = 7;
+  tor_tls_get_state_description(tls, buf, 200);
+  tt_str_op(buf, OP_EQ, "before/accept initialization in unknown TLS state");
+
+ done:
+  SSL_CTX_free(ctx);
+  tor_free(buf);
+  tor_free(tls);
+}
+
+extern int tor_tls_object_ex_data_index;
+
+static void
+test_tortls_get_by_ssl(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+  tor_tls_t *res;
+  SSL_CTX *ctx;
+  SSL *ssl;
+
+  SSL_library_init();
+  SSL_load_error_strings();
+  tor_tls_allocate_tor_tls_object_ex_data_index();
+
+  ctx = SSL_CTX_new(SSLv23_method());
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+
+  ssl = SSL_new(ctx);
+
+  res = tor_tls_get_by_ssl(ssl);
+  tt_assert(!res);
+
+  SSL_set_ex_data(ssl, tor_tls_object_ex_data_index, tls);
+
+  res = tor_tls_get_by_ssl(ssl);
+  tt_assert(res == tls);
+
+ done:
+  SSL_free(ssl);
+  SSL_CTX_free(ctx);
+  tor_free(tls);
+}
+
+static void
+test_tortls_allocate_tor_tls_object_ex_data_index(void *ignored)
+{
+  (void)ignored;
+  int first;
+
+  tor_tls_allocate_tor_tls_object_ex_data_index();
+
+  first = tor_tls_object_ex_data_index;
+  tor_tls_allocate_tor_tls_object_ex_data_index();
+  tt_int_op(first, OP_EQ, tor_tls_object_ex_data_index);
+
+ done:
+  (void)0;
+}
+
+static void
+test_tortls_log_one_error(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+  SSL_CTX *ctx;
+  SSL *ssl = NULL;
+
+  SSL_library_init();
+  SSL_load_error_strings();
+
+  ctx = SSL_CTX_new(SSLv23_method());
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  int previous_log = setup_capture_of_logs(LOG_INFO);
+
+  tor_tls_log_one_error(NULL, 0, LOG_WARN, 0, "something");
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error while something: (null) (in (null):(null):---)\n");
+
+  mock_clean_saved_logs();
+  tor_tls_log_one_error(tls, 0, LOG_WARN, 0, NULL);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error: (null) (in (null):(null):---)\n");
+
+  mock_clean_saved_logs();
+  tls->address = "127.hello";
+  tor_tls_log_one_error(tls, 0, LOG_WARN, 0, NULL);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error with 127.hello: (null) (in (null):(null):---)\n");
+
+
+  mock_clean_saved_logs();
+  tls->address = "127.hello";
+  tor_tls_log_one_error(tls, 0, LOG_WARN, 0, "blarg");
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error while blarg with 127.hello: (null) (in (null):(null):---)\n");
+
+  mock_clean_saved_logs();
+  tor_tls_log_one_error(tls, ERR_PACK(1, 2, 3), LOG_WARN, 0, NULL);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error with 127.hello: BN lib (in unknown library:(null):---)\n");
+
+  mock_clean_saved_logs();
+  tor_tls_log_one_error(tls, ERR_PACK(1, 2, SSL_R_HTTP_REQUEST), LOG_WARN, 0, NULL);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_int_op(mock_saved_severity_at(0), OP_EQ, LOG_INFO);
+
+  mock_clean_saved_logs();
+  tor_tls_log_one_error(tls, ERR_PACK(1, 2, SSL_R_HTTPS_PROXY_REQUEST), LOG_WARN, 0, NULL);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_int_op(mock_saved_severity_at(0), OP_EQ, LOG_INFO);
+
+  mock_clean_saved_logs();
+  tor_tls_log_one_error(tls, ERR_PACK(1, 2, SSL_R_RECORD_LENGTH_MISMATCH), LOG_WARN, 0, NULL);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_int_op(mock_saved_severity_at(0), OP_EQ, LOG_INFO);
+
+  mock_clean_saved_logs();
+  tor_tls_log_one_error(tls, ERR_PACK(1, 2, SSL_R_RECORD_TOO_LARGE), LOG_WARN, 0, NULL);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_int_op(mock_saved_severity_at(0), OP_EQ, LOG_INFO);
+
+  mock_clean_saved_logs();
+  tor_tls_log_one_error(tls, ERR_PACK(1, 2, SSL_R_UNKNOWN_PROTOCOL), LOG_WARN, 0, NULL);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_int_op(mock_saved_severity_at(0), OP_EQ, LOG_INFO);
+
+  mock_clean_saved_logs();
+  tor_tls_log_one_error(tls, ERR_PACK(1, 2, SSL_R_UNSUPPORTED_PROTOCOL), LOG_WARN, 0, NULL);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_int_op(mock_saved_severity_at(0), OP_EQ, LOG_INFO);
+
+  tls->ssl = SSL_new(ctx);
+
+  mock_clean_saved_logs();
+  tor_tls_log_one_error(tls, 0, LOG_WARN, 0, NULL);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error with 127.hello: (null) (in (null):(null):before/accept initialization)\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  SSL_free(ssl);
+  SSL_CTX_free(ctx);
+  tor_free(tls);
+}
+
+static void
+test_tortls_get_error(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+  int ret;
+  SSL_CTX *ctx;
+
+  SSL_library_init();
+  SSL_load_error_strings();
+
+  ctx = SSL_CTX_new(SSLv23_method());
+  int previous_log = setup_capture_of_logs(LOG_INFO);
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = SSL_new(ctx);
+  SSL_set_bio(tls->ssl, BIO_new(BIO_s_mem()), NULL);
+
+  ret = tor_tls_get_error(tls, 0, 0, "something", LOG_WARN, 0);
+  tt_int_op(ret, OP_EQ, TOR_TLS_ERROR_IO);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error: unexpected close while something (before/accept initialization)\n");
+
+  mock_clean_saved_logs();
+  ret = tor_tls_get_error(tls, 2, 0, "something", LOG_WARN, 0);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 0);
+
+  mock_clean_saved_logs();
+  ret = tor_tls_get_error(tls, 0, 1, "something", LOG_WARN, 0);
+  tt_int_op(ret, OP_EQ, -11);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 0);
+
+  mock_clean_saved_logs();
+  ERR_clear_error();
+  ERR_put_error(ERR_LIB_BN, 2, -1, "somewhere.c", 99);
+  ret = tor_tls_get_error(tls, 0, 0, "something", LOG_WARN, 0);
+  tt_int_op(ret, OP_EQ, TOR_TLS_ERROR_MISC);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error while something: (null) (in bignum routines:(null):before/accept initialization)\n");
+
+  mock_clean_saved_logs();
+  ERR_clear_error();
+  tls->ssl->rwstate = SSL_READING;
+  SSL_get_rbio(tls->ssl)->flags = BIO_FLAGS_READ;
+  ret = tor_tls_get_error(tls, -1, 0, "something", LOG_WARN, 0);
+  tt_int_op(ret, OP_EQ, TOR_TLS_WANTREAD);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 0);
+
+  mock_clean_saved_logs();
+  ERR_clear_error();
+  tls->ssl->rwstate = SSL_READING;
+  SSL_get_rbio(tls->ssl)->flags = BIO_FLAGS_WRITE;
+  ret = tor_tls_get_error(tls, -1, 0, "something", LOG_WARN, 0);
+  tt_int_op(ret, OP_EQ, TOR_TLS_WANTWRITE);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 0);
+
+
+  mock_clean_saved_logs();
+  ERR_clear_error();
+  tls->ssl->rwstate = 0;
+  tls->ssl->shutdown = SSL_RECEIVED_SHUTDOWN;
+  tls->ssl->s3->warn_alert =SSL_AD_CLOSE_NOTIFY;
+  ret = tor_tls_get_error(tls, 0, 0, "something", LOG_WARN, 0);
+  tt_int_op(ret, OP_EQ, TOR_TLS_CLOSE);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+
+  mock_clean_saved_logs();
+  ret = tor_tls_get_error(tls, 0, 2, "something", LOG_WARN, 0);
+  tt_int_op(ret, OP_EQ, -10);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 0);
+
+  mock_clean_saved_logs();
+  ERR_put_error(ERR_LIB_SYS, 2, -1, "somewhere.c", 99);
+  ret = tor_tls_get_error(tls, -1, 0, "something", LOG_WARN, 0);
+  tt_int_op(ret, OP_EQ, -9);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 2);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error: <syscall error while something> (errno=0: Success; state=before/accept initialization)\n");
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "TLS error while something: (null) (in system library:connect:before/accept initialization)\n");
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  tor_free(tls);
+}
+
+#define LOCAL_TEST_CASE(name, flags)                  \
+  { #name, test_tortls_##name, (flags), NULL, NULL }
 
 struct testcase_t tortls_tests[] = {
-  LOCAL_TEST_CASE(errno_to_tls_error),
-  LOCAL_TEST_CASE(err_to_string),
-  LOCAL_TEST_CASE(tor_tls_new),
-  LOCAL_TEST_CASE(tor_tls_get_error),
+  LOCAL_TEST_CASE(errno_to_tls_error, 0),
+  LOCAL_TEST_CASE(err_to_string, 0),
+  LOCAL_TEST_CASE(tor_tls_new, 0),
+  LOCAL_TEST_CASE(tor_tls_get_error, 0),
+  LOCAL_TEST_CASE(get_state_description, TT_FORK),
+  LOCAL_TEST_CASE(get_by_ssl, TT_FORK),
+  LOCAL_TEST_CASE(allocate_tor_tls_object_ex_data_index, TT_FORK),
+  LOCAL_TEST_CASE(log_one_error, TT_FORK),
+  LOCAL_TEST_CASE(get_error, TT_FORK),
   END_OF_TESTCASES
 };

@@ -69,6 +69,7 @@
 #include "compat_libevent.h"
 #endif
 
+#define TORTLS_PRIVATE
 #include "tortls.h"
 #include "util.h"
 #include "torlog.h"
@@ -118,19 +119,6 @@ struct tor_x509_cert_t {
   digests_t pkey_digests;
 };
 
-/** Holds a SSL_CTX object and related state used to configure TLS
- * connections.
- */
-typedef struct tor_tls_context_t {
-  int refcnt;
-  SSL_CTX *ctx;
-  tor_x509_cert_t *my_link_cert;
-  tor_x509_cert_t *my_id_cert;
-  tor_x509_cert_t *my_auth_cert;
-  crypto_pk_t *link_key;
-  crypto_pk_t *auth_key;
-} tor_tls_context_t;
-
 /** Return values for tor_tls_classify_client_ciphers.
  *
  * @{
@@ -151,58 +139,12 @@ typedef struct tor_tls_context_t {
 
 #define TOR_TLS_MAGIC 0x71571571
 
-typedef enum {
-    TOR_TLS_ST_HANDSHAKE, TOR_TLS_ST_OPEN, TOR_TLS_ST_GOTCLOSE,
-    TOR_TLS_ST_SENTCLOSE, TOR_TLS_ST_CLOSED, TOR_TLS_ST_RENEGOTIATE,
-    TOR_TLS_ST_BUFFEREVENT
-} tor_tls_state_t;
-#define tor_tls_state_bitfield_t ENUM_BF(tor_tls_state_t)
-
-/** Holds a SSL object and its associated data.  Members are only
- * accessed from within tortls.c.
- */
-struct tor_tls_t {
-  uint32_t magic;
-  tor_tls_context_t *context; /** A link to the context object for this tls. */
-  SSL *ssl; /**< An OpenSSL SSL object. */
-  int socket; /**< The underlying file descriptor for this TLS connection. */
-  char *address; /**< An address to log when describing this connection. */
-  tor_tls_state_bitfield_t state : 3; /**< The current SSL state,
-                                       * depending on which operations
-                                       * have completed successfully. */
-  unsigned int isServer:1; /**< True iff this is a server-side connection */
-  unsigned int wasV2Handshake:1; /**< True iff the original handshake for
-                                  * this connection used the updated version
-                                  * of the connection protocol (client sends
-                                  * different cipher list, server sends only
-                                  * one certificate). */
-  /** True iff we should call negotiated_callback when we're done reading. */
-  unsigned int got_renegotiate:1;
-  /** Return value from tor_tls_classify_client_ciphers, or 0 if we haven't
-   * called that function yet. */
-  int8_t client_cipher_list_type;
-  /** Incremented every time we start the server side of a handshake. */
-  uint8_t server_handshake_count;
-  size_t wantwrite_n; /**< 0 normally, >0 if we returned wantwrite last
-                       * time. */
-  /** Last values retrieved from BIO_number_read()/write(); see
-   * tor_tls_get_n_raw_bytes() for usage.
-   */
-  unsigned long last_write_count;
-  unsigned long last_read_count;
-  /** If set, a callback to invoke whenever the client tries to renegotiate
-   * the handshake. */
-  void (*negotiated_callback)(tor_tls_t *tls, void *arg);
-  /** Argument to pass to negotiated_callback. */
-  void *callback_arg;
-};
-
 /** The ex_data index in which we store a pointer to an SSL object's
  * corresponding tor_tls_t object. */
-static int tor_tls_object_ex_data_index = -1;
+STATIC int tor_tls_object_ex_data_index = -1;
 
 /** Helper: Allocate tor_tls_object_ex_data_index. */
-static void
+STATIC void
 tor_tls_allocate_tor_tls_object_ex_data_index(void)
 {
   if (tor_tls_object_ex_data_index == -1) {
@@ -214,7 +156,7 @@ tor_tls_allocate_tor_tls_object_ex_data_index(void)
 
 /** Helper: given a SSL* pointer, return the tor_tls_t object using that
  * pointer. */
-static INLINE tor_tls_t *
+STATIC INLINE tor_tls_t *
 tor_tls_get_by_ssl(const SSL *ssl)
 {
   tor_tls_t *result = SSL_get_ex_data(ssl, tor_tls_object_ex_data_index);
@@ -342,7 +284,7 @@ tor_tls_log_one_error(tor_tls_t *tls, unsigned long err,
 /** Log all pending tls errors at level <b>severity</b> in log domain
  * <b>domain</b>.  Use <b>doing</b> to describe our current activities.
  */
-static void
+STATIC void
 tls_log_errors(tor_tls_t *tls, int severity, int domain, const char *doing)
 {
   unsigned long err;
@@ -2829,4 +2771,3 @@ evaluate_ecgroup_for_tls(const char *ecgroup)
 
   return ret;
 }
-

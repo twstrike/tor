@@ -11,9 +11,7 @@
 
 #include "log_test_helpers.h"
 
-
 #define NS_MODULE util_process
-
 
 static
 void temp_callback(int r, void *s)
