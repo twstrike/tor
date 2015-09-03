@@ -67,7 +67,7 @@ src_test_test_SOURCES = \
 	src/test/test_data.c \
 	src/test/test_dir.c \
 	src/test/test_dir_handle_get.c \
-	src/test/test_conn_edge_ap_handshake.c \
+	src/test/test_connection_edge_ap_handshake.c \
 	src/test/test_entryconn.c \
 	src/test/test_entrynodes.c \
 	src/test/test_extorport.c \
