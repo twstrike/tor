@@ -427,8 +427,94 @@ test_tortls_x509_cert_free(void *ignored)
   cert->cert = tor_malloc_zero(sizeof(X509));
   cert->encoded = tor_malloc_zero(1);
   tor_x509_cert_free(cert);
+}
 
+static void
+test_tortls_x509_cert_get_id_digests(void *ignored)
+{
+  (void)ignored;
+  tor_x509_cert_t *cert;
+  digests_t *d;
+  const digests_t *res;
+  cert = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  d = tor_malloc_zero(sizeof(digests_t));
+  d->d[0][0] = 42;
 
+  res = tor_x509_cert_get_id_digests(cert);
+  tt_assert(!res);
+
+  cert->pkey_digests_set = 1;
+  cert->pkey_digests = *d;
+  res = tor_x509_cert_get_id_digests(cert);
+  tt_int_op(res->d[0][0], OP_EQ, 42);
+
+ done:
+  (void)0;
+}
+
+static int
+fixed_pub_cmp(const EVP_PKEY *a, const EVP_PKEY *b)
+{
+  return 1;
+}
+
+static void
+test_tortls_cert_matches_key(void *ignored)
+{
+  (void)ignored;
+  int res;
+  tor_tls_t *tls;
+  tor_x509_cert_t *cert;
+  X509 *one, *two;
+  EVP_PKEY_ASN1_METHOD *meth = EVP_PKEY_asn1_new(999, 0, NULL, NULL);
+  EVP_PKEY_asn1_set_public(meth, NULL, NULL, fixed_pub_cmp, NULL, NULL, NULL);
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  cert = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  one = tor_malloc_zero(sizeof(X509));
+  one->references = 1;
+  two = tor_malloc_zero(sizeof(X509));
+  two->references = 1;
+
+  res = tor_tls_cert_matches_key(tls, cert);
+  tt_int_op(res, OP_EQ, 0);
+
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tls->ssl->session = tor_malloc_zero(sizeof(SSL_SESSION));
+  tls->ssl->session->peer = one;
+  res = tor_tls_cert_matches_key(tls, cert);
+  tt_int_op(res, OP_EQ, 0);
+
+  cert->cert = two;
+  res = tor_tls_cert_matches_key(tls, cert);
+  tt_int_op(res, OP_EQ, 0);
+
+  one->cert_info = tor_malloc_zero(sizeof(X509_CINF));
+  one->cert_info->key = tor_malloc_zero(sizeof(X509_PUBKEY));
+  one->cert_info->key->pkey = tor_malloc_zero(sizeof(EVP_PKEY));
+  one->cert_info->key->pkey->references = 1;
+  one->cert_info->key->pkey->ameth = meth;
+  one->cert_info->key->pkey->type = 1;
+
+  two->cert_info = tor_malloc_zero(sizeof(X509_CINF));
+  two->cert_info->key = tor_malloc_zero(sizeof(X509_PUBKEY));
+  two->cert_info->key->pkey = tor_malloc_zero(sizeof(EVP_PKEY));
+  two->cert_info->key->pkey->references = 1;
+  two->cert_info->key->pkey->ameth = meth;
+  two->cert_info->key->pkey->type = 2;
+
+  res = tor_tls_cert_matches_key(tls, cert);
+  tt_int_op(res, OP_EQ, 0);
+
+  one->cert_info->key->pkey->type = 1;
+  two->cert_info->key->pkey->type = 1;
+  res = tor_tls_cert_matches_key(tls, cert);
+  tt_int_op(res, OP_EQ, 1);
+
+ done:
+  EVP_PKEY_asn1_free(meth);
+  tor_free(tls);
+  tor_free(cert);
 }
 
 #define LOCAL_TEST_CASE(name, flags)                  \
@@ -446,5 +532,7 @@ struct testcase_t tortls_tests[] = {
   LOCAL_TEST_CASE(get_error, TT_FORK),
   LOCAL_TEST_CASE(always_accept_verify_cb, 0),
   LOCAL_TEST_CASE(x509_cert_free, 0),
+  LOCAL_TEST_CASE(x509_cert_get_id_digests, 0),
+   LOCAL_TEST_CASE(cert_matches_key, 0),
   END_OF_TESTCASES
 };

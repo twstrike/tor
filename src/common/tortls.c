@@ -658,7 +658,9 @@ tor_x509_cert_free(tor_x509_cert_t *cert)
     X509_free(cert->cert);
   tor_free(cert->encoded);
   memwipe(cert, 0x03, sizeof(*cert));
+  /* LCOV_EXCL_START since cert will never be NULL here */
   tor_free(cert);
+  /* LCOV_EXCL_STOP */
 }
 
 /**
@@ -791,7 +793,9 @@ tor_tls_context_decref(tor_tls_context_t *ctx)
     tor_x509_cert_free(ctx->my_auth_cert);
     crypto_pk_free(ctx->link_key);
     crypto_pk_free(ctx->auth_key);
+    /* LCOV_EXCL_START since ctx will never be NULL here */
     tor_free(ctx);
+  /* LCOV_EXCL_STOP */
   }
 }
 
