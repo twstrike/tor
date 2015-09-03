@@ -179,8 +179,8 @@ static int check_cert_lifetime_internal(int severity, const X509 *cert,
  * to touch them.
  *
  * @{ */
-static tor_tls_context_t *server_tls_context = NULL;
-static tor_tls_context_t *client_tls_context = NULL;
+STATIC tor_tls_context_t *server_tls_context = NULL;
+STATIC tor_tls_context_t *client_tls_context = NULL;
 /**@}*/
 
 /** True iff tor_tls_init() has been called. */
@@ -1294,7 +1294,7 @@ tor_tls_get_ciphersuite_name(tor_tls_t *tls)
  * 0.2.3.17-beta. If a client is using this list, we can't believe the ciphers
  * that it claims to support.  We'll prune this list to remove the ciphers
  * *we* don't recognize. */
-static uint16_t v2_cipher_list[] = {
+STATIC uint16_t v2_cipher_list[] = {
   0xc00a, /* TLS1_TXT_ECDHE_ECDSA_WITH_AES_256_CBC_SHA */
   0xc014, /* TLS1_TXT_ECDHE_RSA_WITH_AES_256_CBC_SHA */
   0x0039, /* TLS1_TXT_DHE_RSA_WITH_AES_256_SHA */
@@ -1412,7 +1412,7 @@ prune_v2_cipher_list(const SSL *ssl)
  * client it is.  Return one of CIPHERS_ERR, CIPHERS_V1, CIPHERS_V2,
  * CIPHERS_UNRESTRICTED.
  **/
-static int
+STATIC int
 tor_tls_classify_client_ciphers(const SSL *ssl,
                                 STACK_OF(SSL_CIPHER) *peer_ciphers)
 {

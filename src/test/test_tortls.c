@@ -516,6 +516,248 @@ test_tortls_cert_matches_key(void *ignored)
   tor_free(cert);
 }
 
+static void
+test_tortls_cert_get_key(void *ignored)
+{
+  (void)ignored;
+  tor_x509_cert_t *cert;
+  crypto_pk_t *res;
+  cert = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  X509 *key;
+  key = tor_malloc_zero(sizeof(X509));
+  key->references = 1;
+
+  res = tor_tls_cert_get_key(cert);
+  tt_assert(!res);
+
+  cert->cert = key;
+  key->cert_info = tor_malloc_zero(sizeof(X509_CINF));
+  key->cert_info->key = tor_malloc_zero(sizeof(X509_PUBKEY));
+  key->cert_info->key->pkey = tor_malloc_zero(sizeof(EVP_PKEY));
+  key->cert_info->key->pkey->references = 1;
+  key->cert_info->key->pkey->type = 2;
+  res = tor_tls_cert_get_key(cert);
+  tt_assert(!res);
+
+ done:
+  (void)0;
+}
+
+extern tor_tls_context_t *server_tls_context;
+extern tor_tls_context_t *client_tls_context;
+
+static void
+test_tortls_get_my_client_auth_key(void *ignored)
+{
+  (void)ignored;
+  crypto_pk_t *ret;
+  crypto_pk_t *expected;
+  tor_tls_context_t *ctx;
+  RSA *k = tor_malloc_zero(sizeof(RSA));
+
+  ctx = tor_malloc_zero(sizeof(tor_tls_context_t));
+  expected = crypto_new_pk_from_rsa_(k);
+  ctx->auth_key = expected;
+
+  client_tls_context = NULL;
+  ret = tor_tls_get_my_client_auth_key();
+  tt_assert(!ret);
+
+  client_tls_context = ctx;
+  ret = tor_tls_get_my_client_auth_key();
+  tt_assert(ret == expected);
+
+ done:
+  tor_free(expected);
+  tor_free(k);
+  tor_free(ctx);
+}
+
+static void
+test_tortls_get_my_certs(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_context_t *ctx;
+  const tor_x509_cert_t *link_cert_out = NULL;
+  const tor_x509_cert_t *id_cert_out = NULL;
+
+  ctx = tor_malloc_zero(sizeof(tor_tls_context_t));
+
+  client_tls_context = NULL;
+  ret = tor_tls_get_my_certs(0, NULL, NULL);
+  tt_int_op(ret, OP_EQ, -1);
+
+  server_tls_context = NULL;
+  ret = tor_tls_get_my_certs(1, NULL, NULL);
+  tt_int_op(ret, OP_EQ, -1);
+
+  client_tls_context = ctx;
+  ret = tor_tls_get_my_certs(0, NULL, NULL);
+  tt_int_op(ret, OP_EQ, 0);
+
+  client_tls_context = ctx;
+  ret = tor_tls_get_my_certs(0, &link_cert_out, &id_cert_out);
+  tt_int_op(ret, OP_EQ, 0);
+
+  server_tls_context = ctx;
+  ret = tor_tls_get_my_certs(1, &link_cert_out, &id_cert_out);
+  tt_int_op(ret, OP_EQ, 0);
+
+
+ done:
+  (void)1;
+}
+
+static void
+test_tortls_get_ciphersuite_name(void *ignored)
+{
+  (void)ignored;
+  const char *ret;
+  tor_tls_t *ctx;
+  ctx = tor_malloc_zero(sizeof(tor_tls_t));
+  ctx->ssl = tor_malloc_zero(sizeof(SSL));
+
+  ret = tor_tls_get_ciphersuite_name(ctx);
+  tt_str_op(ret, OP_EQ, "(NONE)");
+
+ done:
+  (void)1;
+}
+
+static SSL_CIPHER *
+get_cipher_by_name(char *name)
+{
+  int i;
+  const SSL_METHOD *method = SSLv23_method();
+  int num = method->num_ciphers();
+  for (i = 0; i < num; ++i) {
+    const SSL_CIPHER *cipher = method->get_cipher(i);
+    const char *ciphername = SSL_CIPHER_get_name(cipher);
+    if(!strcmp(ciphername, name)) {
+      return (SSL_CIPHER *)cipher;
+    }
+  }
+
+  return NULL;
+}
+
+static SSL_CIPHER *
+get_cipher_by_id(uint16_t id)
+{
+  int i;
+  const SSL_METHOD *method = SSLv23_method();
+  int num = method->num_ciphers();
+  for (i = 0; i < num; ++i) {
+    const SSL_CIPHER *cipher = method->get_cipher(i);
+    if(id == (SSL_CIPHER_get_id(cipher) & 0xffff)) {
+      return (SSL_CIPHER *)cipher;
+    }
+  }
+
+  return NULL;
+}
+
+extern uint16_t v2_cipher_list[];
+
+static void
+test_tortls_classify_client_ciphers(void *ignored)
+{
+  (void)ignored;
+  int i;
+  int ret;
+  SSL_CTX *ctx;
+  SSL *ssl;
+  tor_tls_t *tls;
+  STACK_OF(SSL_CIPHER) *ciphers;
+  SSL_CIPHER *tmp_cipher;
+
+  SSL_library_init();
+  SSL_load_error_strings();
+  tor_tls_allocate_tor_tls_object_ex_data_index();
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->magic = TOR_TLS_MAGIC;
+
+  ctx = SSL_CTX_new(TLSv1_method());
+  ssl = SSL_new(ctx);
+  tls->ssl = ssl;
+
+  ciphers = sk_SSL_CIPHER_new_null();
+
+  ret = tor_tls_classify_client_ciphers(ssl, NULL);
+  tt_int_op(ret, OP_EQ, -1);
+
+  SSL_set_ex_data(ssl, tor_tls_object_ex_data_index, tls);
+  tls->client_cipher_list_type = 42;
+
+  ret = tor_tls_classify_client_ciphers(ssl, NULL);
+  tt_int_op(ret, OP_EQ, 42);
+
+  tls->client_cipher_list_type = 0;
+  ret = tor_tls_classify_client_ciphers(ssl, ciphers);
+  tt_int_op(ret, OP_EQ, 1);
+  tt_int_op(tls->client_cipher_list_type, OP_EQ, 1);
+
+  tls->client_cipher_list_type = 0;
+  ret = tor_tls_classify_client_ciphers(ssl, SSL_get_ciphers(ssl));
+  tt_int_op(ret, OP_EQ, 3);
+  tt_int_op(tls->client_cipher_list_type, OP_EQ, 3);
+
+  SSL_CIPHER *one = get_cipher_by_name(TLS1_TXT_DHE_RSA_WITH_AES_128_SHA),
+    *two = get_cipher_by_name(TLS1_TXT_DHE_RSA_WITH_AES_256_SHA),
+    *three = get_cipher_by_name(SSL3_TXT_EDH_RSA_DES_192_CBC3_SHA),
+    *four = NULL;
+  sk_SSL_CIPHER_push(ciphers, one);
+  sk_SSL_CIPHER_push(ciphers, two);
+  sk_SSL_CIPHER_push(ciphers, three);
+  sk_SSL_CIPHER_push(ciphers, four);
+
+  tls->client_cipher_list_type = 0;
+  ret = tor_tls_classify_client_ciphers(ssl, ciphers);
+  tt_int_op(ret, OP_EQ, 1);
+  tt_int_op(tls->client_cipher_list_type, OP_EQ, 1);
+
+  sk_SSL_CIPHER_zero(ciphers);
+
+  one = get_cipher_by_name("ECDH-RSA-AES256-GCM-SHA384");
+  one->id = 0x00ff;
+  two = get_cipher_by_name("ECDH-RSA-AES128-GCM-SHA256");
+  two->id = 0x0000;
+  sk_SSL_CIPHER_push(ciphers, one);
+  tls->client_cipher_list_type = 0;
+  ret = tor_tls_classify_client_ciphers(ssl, ciphers);
+  tt_int_op(ret, OP_EQ, 3);
+  tt_int_op(tls->client_cipher_list_type, OP_EQ, 3);
+
+  sk_SSL_CIPHER_push(ciphers, two);
+  tls->client_cipher_list_type = 0;
+  ret = tor_tls_classify_client_ciphers(ssl, ciphers);
+  tt_int_op(ret, OP_EQ, 3);
+  tt_int_op(tls->client_cipher_list_type, OP_EQ, 3);
+
+  one->id = 0xC00A;
+  tls->client_cipher_list_type = 0;
+  ret = tor_tls_classify_client_ciphers(ssl, ciphers);
+  tt_int_op(ret, OP_EQ, 3);
+  tt_int_op(tls->client_cipher_list_type, OP_EQ, 3);
+
+  sk_SSL_CIPHER_zero(ciphers);
+  for(i=0; v2_cipher_list[i]; i++) {
+    tmp_cipher = get_cipher_by_id(v2_cipher_list[i]);
+    tt_assert(tmp_cipher);
+    sk_SSL_CIPHER_push(ciphers, tmp_cipher);
+  }
+  tls->client_cipher_list_type = 0;
+  ret = tor_tls_classify_client_ciphers(ssl, ciphers);
+  tt_int_op(ret, OP_EQ, 2);
+  tt_int_op(tls->client_cipher_list_type, OP_EQ, 2);
+
+
+ done:
+  (void)1;
+}
+
 #define LOCAL_TEST_CASE(name, flags)                  \
   { #name, test_tortls_##name, (flags), NULL, NULL }
 
@@ -532,6 +774,11 @@ struct testcase_t tortls_tests[] = {
   LOCAL_TEST_CASE(always_accept_verify_cb, 0),
   LOCAL_TEST_CASE(x509_cert_free, 0),
   LOCAL_TEST_CASE(x509_cert_get_id_digests, 0),
-   LOCAL_TEST_CASE(cert_matches_key, 0),
+  LOCAL_TEST_CASE(cert_matches_key, 0),
+  LOCAL_TEST_CASE(cert_get_key, 0),
+  LOCAL_TEST_CASE(get_my_client_auth_key, TT_FORK),
+  LOCAL_TEST_CASE(get_my_certs, TT_FORK),
+  LOCAL_TEST_CASE(get_ciphersuite_name, 0),
+  LOCAL_TEST_CASE(classify_client_ciphers, 0),
   END_OF_TESTCASES
 };
