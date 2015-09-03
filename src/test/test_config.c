@@ -5405,6 +5405,46 @@ test_config_options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes(void
   tor_free(old_options);
   (void)arg;
 }
+
+static void
+test_config_options_act_does_not_recalculate_timing_if_mode_v3_do_not_changes(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->AuthoritativeDir = 1;
+  old_options->V3AuthoritativeDir = 1;
+
+  options = test_setup_option_CMD_TOR();
+  options->AuthoritativeDir = 1;
+  options->V3AuthoritativeDir = 1;
+
+  NS_MOCK(dirvote_recalculate_timing);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(dirvote_recalculate_timing), OP_EQ, 0);
+
+ done:
+  NS_UNMOCK(dirvote_recalculate_timing);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_does_not_call_dirvote_recalculate_timing(void *arg)
+{
+  or_options_t *options;
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(dirvote_recalculate_timing);
+  options_act(NULL);
+  tt_int_op(CALLED(dirvote_recalculate_timing), OP_EQ, 0);
+
+ done:
+  (void)arg;
+  NS_UNMOCK(dirvote_recalculate_timing);
+  tor_free(options);
+}
 #undef NS_MODULE
 
 #define NS_MODULE router_dir_info_changed
@@ -5752,6 +5792,8 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_pt_configure_remaining_proxies, TT_FORK),
   CONFIG_TEST(options_act_init_key_error, TT_FORK),
   CONFIG_TEST(options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes, TT_FORK),
+  CONFIG_TEST(options_act_does_not_recalculate_timing_if_mode_v3_do_not_changes, TT_FORK),
+  CONFIG_TEST(options_act_does_not_call_dirvote_recalculate_timing, TT_FORK),
   CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
   CONFIG_TEST(options_act_updates_token_buckets_if_PerConnBWRate_changes, TT_FORK),
   CONFIG_TEST(options_act_transition_affects_workers_cpu_init, TT_FORK),
