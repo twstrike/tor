@@ -10,6 +10,7 @@
 #include "config.h"
 #include "rendcache.h"
 #include "statefile.h"
+#include "rephist.h"
 
 static or_state_t *mock_state = NULL;
 static void
@@ -71,10 +72,11 @@ set_all_times_to(time_t now)
 }
 
 static void
-test_run_scheduled_events__do_nothing(void *data)
+test_run_scheduled_events__writes_cell_stats_to_disk(void *data)
 {
   time_t now = time(NULL);
   time_t after_now = now + 60;
+  time_t before_now = now - 60;
   (void) data;
 
   rend_cache_init();
@@ -86,10 +88,16 @@ test_run_scheduled_events__do_nothing(void *data)
   set_all_times_to(after_now);
   mock_state->next_write = after_now;
 
+  rep_hist_buffer_stats_init(now - WRITE_STATS_INTERVAL + 1);
+  time_to.write_stats_files = before_now;
+  mock_options->CellStatistics = 1;
+
   MOCK(get_options, get_options_mock);
   MOCK(get_or_state, get_or_state_mock);
 
   run_scheduled_events(now);
+
+  tt_int_op(time_to.write_stats_files, OP_EQ, now + 1);
 
   done:
     UNMOCK(get_options);
@@ -101,6 +109,6 @@ test_run_scheduled_events__do_nothing(void *data)
   { #name, test_run_scheduled_events__##name, (flags), NULL, NULL }
 
 struct testcase_t main_tests[] = {
-  RUN_SCHEDULED_EVENTS(do_nothing, 0),
+  RUN_SCHEDULED_EVENTS(writes_cell_stats_to_disk, 0),
   END_OF_TESTCASES
 };
