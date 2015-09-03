@@ -392,7 +392,6 @@ test_tortls_get_error(void *ignored)
   ret = tor_tls_get_error(tls, -1, 0, "something", LOG_WARN, 0);
   tt_int_op(ret, OP_EQ, -9);
   tt_int_op(mock_saved_log_number(), OP_EQ, 2);
-  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error: <syscall error while something> (errno=0: Success; state=before/accept initialization)\n");
   tt_str_op(mock_saved_log_at(1), OP_EQ, "TLS error while something: (null) (in system library:connect:before/accept initialization)\n");
 
  done:
