@@ -2477,7 +2477,7 @@ test_dir_handle_get_status_vote_current_authority(void* data)
     dirvote_free_all();
 }
 
-#define DIR_HANDLE_CMD(name,flags)                              \
+#define DIR_HANDLE_CMD(name,flags) \
   { #name, test_dir_handle_get_##name, (flags), NULL, NULL }
 
 struct testcase_t dir_handle_get_tests[] = {
