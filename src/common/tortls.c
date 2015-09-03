@@ -1494,7 +1494,7 @@ tor_tls_classify_client_ciphers(const SSL *ssl,
 /** Return true iff the cipher list suggested by the client for <b>ssl</b> is
  * a list that indicates that the client knows how to do the v2 TLS connection
  * handshake. */
-static int
+STATIC int
 tor_tls_client_is_using_v2_ciphers(const SSL *ssl)
 {
   STACK_OF(SSL_CIPHER) *ciphers;

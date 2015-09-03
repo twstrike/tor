@@ -136,6 +136,7 @@ STATIC tor_tls_t *tor_tls_get_by_ssl(const SSL *ssl);
 STATIC void tor_tls_allocate_tor_tls_object_ex_data_index(void);
 STATIC int always_accept_verify_cb(int preverify_ok, X509_STORE_CTX *x509_ctx);
 STATIC int tor_tls_classify_client_ciphers(const SSL *ssl, STACK_OF(SSL_CIPHER) *peer_ciphers);
+STATIC int tor_tls_client_is_using_v2_ciphers(const SSL *ssl);
 #endif
 
 

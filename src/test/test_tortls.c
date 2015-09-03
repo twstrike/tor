@@ -758,6 +758,46 @@ test_tortls_classify_client_ciphers(void *ignored)
   (void)1;
 }
 
+static void
+test_tortls_client_is_using_v2_ciphers(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  SSL_CTX *ctx;
+  SSL *ssl;
+  SSL_SESSION *sess;
+  STACK_OF(SSL_CIPHER) *ciphers;
+
+  SSL_library_init();
+  SSL_load_error_strings();
+
+  ctx = SSL_CTX_new(TLSv1_method());
+  ssl = SSL_new(ctx);
+  sess = SSL_SESSION_new();
+
+#ifdef HAVE_SSL_GET_CLIENT_CIPHERS
+#else
+  ret = tor_tls_client_is_using_v2_ciphers(ssl);
+  tt_int_op(ret, OP_EQ, -1);
+
+
+  ssl->session = sess;
+  ret = tor_tls_client_is_using_v2_ciphers(ssl);
+  tt_int_op(ret, OP_EQ, 0);
+
+  ciphers = sk_SSL_CIPHER_new_null();
+  SSL_CIPHER *one = get_cipher_by_name("ECDH-RSA-AES256-GCM-SHA384");
+  one->id = 0x00ff;
+  sk_SSL_CIPHER_push(ciphers, one);
+  sess->ciphers = ciphers;
+  ret = tor_tls_client_is_using_v2_ciphers(ssl);
+  tt_int_op(ret, OP_EQ, 1);
+#endif
+
+ done:
+  (void)1;
+}
+
 #define LOCAL_TEST_CASE(name, flags)                  \
   { #name, test_tortls_##name, (flags), NULL, NULL }
 
@@ -780,5 +820,6 @@ struct testcase_t tortls_tests[] = {
   LOCAL_TEST_CASE(get_my_certs, TT_FORK),
   LOCAL_TEST_CASE(get_ciphersuite_name, 0),
   LOCAL_TEST_CASE(classify_client_ciphers, 0),
+  LOCAL_TEST_CASE(client_is_using_v2_ciphers, 0),
   END_OF_TESTCASES
 };
