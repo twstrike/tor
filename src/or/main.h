@@ -76,6 +76,34 @@ int do_main_loop(void);
 int tor_init(int argc, char **argv);
 
 #ifdef MAIN_PRIVATE
+typedef struct {
+  time_t last_rotated_x509_certificate;
+  time_t check_v3_certificate;
+  time_t check_listeners;
+  time_t download_networkstatus;
+  time_t try_getting_descriptors;
+  time_t reset_descriptor_failures;
+  time_t add_entropy;
+  time_t write_bridge_status_file;
+  time_t downrate_stability;
+  time_t save_stability;
+  time_t clean_caches;
+  time_t recheck_bandwidth;
+  time_t check_for_expired_networkstatus;
+  time_t write_stats_files;
+  time_t write_bridge_stats;
+  time_t check_port_forwarding;
+  time_t launch_reachability_tests;
+  time_t retry_dns_init;
+  time_t next_heartbeat;
+  time_t check_descriptor;
+  /** When do we next launch DNS wildcarding checks? */
+  time_t check_for_correct_dns;
+  /** When do we next make sure our Ed25519 keys aren't about to expire? */
+  time_t check_ed_keys;
+
+} time_to_t;
+
 STATIC void init_connection_lists(void);
 STATIC void close_closeable_connections(void);
 #endif
