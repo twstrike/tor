@@ -3913,6 +3913,20 @@ test_setup_option_CMD_TOR()
 }
 
 static void
+test_config_options_act_with_NULL_old_options(void *arg)
+{
+  or_options_t *options, *old_options = NULL;
+  options = test_setup_option_CMD_TOR();
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  (void)arg;
+}
+
+static void
 test_config_options_act_not_DisableDebuggerAttachment(void *arg)
 {
   or_options_t *options, *old_options;
@@ -4929,6 +4943,48 @@ test_config_options_act_disable_Statistics_public_server_mode(void *arg)
   tt_int_op(CALLED(server_mode), OP_GT, 0);
   tt_int_op(CALLED(public_server_mode), OP_GT, 0);
 
+  old_options->CellStatistics = 0;
+  options->CellStatistics = 0;
+  old_options->EntryStatistics = 0;
+  options->EntryStatistics = 0;
+  old_options->ExitPortStatistics = 0;
+  options->ExitPortStatistics = 0;
+  old_options->ConnDirectionStatistics = 0;
+  options->ConnDirectionStatistics = 0;
+  old_options->HiddenServiceStatistics = 0;
+  options->HiddenServiceStatistics = 0;
+  old_options->BridgeAuthoritativeDir = 0;
+  options->BridgeAuthoritativeDir = 0;
+
+  NS_MOCK(dns_reset);
+  NS_MOCK(server_mode);
+  NS_MOCK(public_server_mode);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
+
+  old_options->CellStatistics = 1;
+  options->CellStatistics = 1;
+  old_options->EntryStatistics = 1;
+  options->EntryStatistics = 1;
+  old_options->ExitPortStatistics = 1;
+  options->ExitPortStatistics = 1;
+  old_options->ConnDirectionStatistics = 1;
+  options->ConnDirectionStatistics = 1;
+  old_options->HiddenServiceStatistics = 1;
+  options->HiddenServiceStatistics = 1;
+  old_options->BridgeAuthoritativeDir = 1;
+  options->BridgeAuthoritativeDir = 1;
+
+  NS_MOCK(dns_reset);
+  NS_MOCK(server_mode);
+  NS_MOCK(public_server_mode);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
+
  done:
   options->CellStatistics = 0;
   UNMOCK(get_options_mutable);
@@ -5030,12 +5086,17 @@ test_config_options_act_disables_statistics_calls_geoip_dirreq_stats_term(void *
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  old_options->DirReqStatistics = 1;
-  options->DirReqStatistics = 0;
   NS_MOCK(geoip_dirreq_stats_term);
 
+  old_options->DirReqStatistics = 1;
+  options->DirReqStatistics = 0;
   tt_int_op(options_act(old_options), OP_EQ, 0);
   tt_int_op(CALLED(geoip_dirreq_stats_term), OP_EQ, 1);
+
+  old_options->DirReqStatistics = 1;
+  options->DirReqStatistics = 1;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(geoip_dirreq_stats_term), OP_EQ, 2);
 
  done:
   NS_UNMOCK(geoip_dirreq_stats_term);
@@ -5750,6 +5811,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(fix_my_family, 0),
   CONFIG_TEST(parse_port_config__listenaddress, 0),
   CONFIG_TEST(parse_port_config__ports, 0),
+  CONFIG_TEST(options_act_with_NULL_old_options, TT_FORK),
   CONFIG_TEST(options_act_not_DisableDebuggerAttachment, TT_FORK),
   CONFIG_TEST(options_act_Tor2webMode_err, TT_FORK),
   CONFIG_TEST(options_act_DirAuthority_line_err, TT_FORK),
