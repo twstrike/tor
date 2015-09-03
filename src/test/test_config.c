@@ -5690,6 +5690,54 @@ test_config_options_act_transition_affects_workers_cpu_init(void *arg)
 }
 #undef NS_SUBMODULE
 
+#define NS_SUBMODULE cpu_init_ip_address_changed_dns_reset_fail
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  return -1;
+}
+
+NS_DECL(void, cpu_init, (void));
+
+void
+NS(cpu_init)(void)
+{
+  CALLED(cpu_init)++;
+}
+
+NS_DECL(void, ip_address_changed, (int at_interface));
+
+void
+NS(ip_address_changed)(int at_interface)
+{
+  CALLED(ip_address_changed)++;
+}
+
+static void
+test_config_options_act_transition_affects_workers_cpu_init_error(void *arg)
+{
+  or_options_t *old_options;
+  old_options = setup_transition_affects_workers_branch();
+
+  NS_MOCK(cpu_init);
+  NS_MOCK(ip_address_changed);
+  NS_MOCK(dns_reset);
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+  tt_int_op(CALLED(cpu_init), OP_EQ, 1);
+  tt_int_op(CALLED(ip_address_changed), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(old_options);
+  NS_UNMOCK(cpu_init);
+  NS_UNMOCK(ip_address_changed);
+  NS_UNMOCK(dns_reset);
+}
+#undef NS_SUBMODULE
+
 #define NS_SUBMODULE inform_testing_reachability
 NS_DECL(int, have_completed_a_circuit, (void));
 
@@ -5915,6 +5963,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
   CONFIG_TEST(options_act_updates_token_buckets_if_PerConnBWRate_changes, TT_FORK),
   CONFIG_TEST(options_act_transition_affects_workers_cpu_init, TT_FORK),
+  CONFIG_TEST(options_act_transition_affects_workers_cpu_init_error, TT_FORK),
   CONFIG_TEST(options_act_transition_affects_workers_inform_testing_reachability, TT_FORK),
   CONFIG_TEST(options_act_revise_automap_entries, TT_FORK),
   CONFIG_TEST(options_act_VirtualAddrNetworkIPv4, TT_FORK),
