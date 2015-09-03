@@ -5099,6 +5099,7 @@ test_config_options_act_no_geoIP_database_found_to_mesure_entry_node(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
   options->EntryStatistics = 1;
+  options->ORPort_set = 1;
   old_options->EntryStatistics = 0;
   NS_MOCK(public_server_mode);
   NS_MOCK(server_mode);
