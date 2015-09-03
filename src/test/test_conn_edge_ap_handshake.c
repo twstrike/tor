@@ -52,6 +52,17 @@ connection_ap_handshake_rewrite_mock(entry_connection_t *conn,
   result->exit_source = rewrite_mock->exit_source;
   (void) conn;
 }
+static void
+init_rewrite_mock()
+{
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+}
+static void
+destroy_rewrite_mock()
+{
+  UNMOCK(connection_ap_handshake_rewrite);
+}
 
 static int unattachment_reason_spy;
 static void
@@ -66,6 +77,16 @@ connection_mark_unattached_ap_mock(entry_connection_t *conn,
   (void) line;
   (void) file;
 }
+static void
+init_mark_unattached_ap_mock()
+{
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+}
+static void
+destroy_mark_unattached_ap_mock()
+{
+  UNMOCK(connection_mark_unattached_ap_);
+}
 
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_answer(void *data)
@@ -74,9 +95,8 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_answer(void *dat
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
-  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
-  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  init_mark_unattached_ap_mock();
+  init_rewrite_mock();
   rewrite_mock->should_close = 1;
   rewrite_mock->end_reason = END_STREAM_REASON_DONE;
 
@@ -85,8 +105,8 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_answer(void *dat
   tt_int_op(res, OP_EQ, 0);
 
   done:
-    UNMOCK(connection_ap_handshake_rewrite);
-    UNMOCK(connection_mark_unattached_ap_);
+    destroy_mark_unattached_ap_mock();
+    destroy_rewrite_mock();
     tor_free(rewrite_mock);
     tor_free(circuit); 
     tor_free(path); 
@@ -99,9 +119,8 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_error(void *data
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
-  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
-  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  init_mark_unattached_ap_mock();
+  init_rewrite_mock();
   rewrite_mock->should_close = 1;
   rewrite_mock->end_reason = END_STREAM_REASON_MISC;
 
@@ -110,12 +129,15 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_error(void *data
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    UNMOCK(connection_ap_handshake_rewrite);
-    UNMOCK(connection_mark_unattached_ap_);
+    destroy_mark_unattached_ap_mock();
+    destroy_rewrite_mock();
     tor_free(rewrite_mock);
     tor_free(circuit); 
     tor_free(path); 
 }
+
+#define SET_SOCKS_ADDRESS(socks, dest) \
+  strlcpy(socks->address, dest, sizeof(socks->address));
 
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_bogus(void *data)
@@ -124,13 +146,10 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_bogu
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
-  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
-  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  init_mark_unattached_ap_mock();
+  init_rewrite_mock();
   rewrite_mock->should_close = 0;
-  strlcpy(conn->socks_request->address,
-            "http://www.bogus.onion",
-            sizeof(conn->socks_request->address));
+  SET_SOCKS_ADDRESS(conn->socks_request, "http://www.bogus.onion");
   conn->socks_request->command = SOCKS_COMMAND_CONNECT;
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
@@ -139,8 +158,8 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_bogu
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    UNMOCK(connection_ap_handshake_rewrite);
-    UNMOCK(connection_mark_unattached_ap_);
+    destroy_mark_unattached_ap_mock();
+    destroy_rewrite_mock();
     tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
@@ -153,14 +172,11 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_unal
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
-  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
-  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  init_mark_unattached_ap_mock();
+  init_rewrite_mock();
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_AUTOMAP;
-  strlcpy(conn->socks_request->address,
-            "http://www.notgood.exit",
-            sizeof(conn->socks_request->address));
+  SET_SOCKS_ADDRESS(conn->socks_request, "http://www.notgood.exit");
   conn->socks_request->command = SOCKS_COMMAND_CONNECT;
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
@@ -169,8 +185,8 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_unal
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    UNMOCK(connection_ap_handshake_rewrite);
-    UNMOCK(connection_mark_unattached_ap_);
+    destroy_mark_unattached_ap_mock();
+    destroy_rewrite_mock();
     tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
@@ -183,14 +199,11 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_dns_
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
-  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
-  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  init_mark_unattached_ap_mock();
+  init_rewrite_mock();
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_DNS;
-  strlcpy(conn->socks_request->address,
-            "http://www.dns.exit",
-            sizeof(conn->socks_request->address));
+  SET_SOCKS_ADDRESS(conn->socks_request, "http://www.dns.exit");
   conn->socks_request->command = SOCKS_COMMAND_CONNECT;
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
@@ -199,8 +212,8 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_dns_
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    UNMOCK(connection_ap_handshake_rewrite);
-    UNMOCK(connection_mark_unattached_ap_);
+    destroy_mark_unattached_ap_mock();
+    destroy_rewrite_mock();
     tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
@@ -213,14 +226,11 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_exit
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
-  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
-  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  init_mark_unattached_ap_mock();
+  init_rewrite_mock();
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_NONE;
-  strlcpy(conn->socks_request->address,
-            "http://www.notremapped.exit",
-            sizeof(conn->socks_request->address));
+  SET_SOCKS_ADDRESS(conn->socks_request, "http://www.notremapped.exit");
   conn->socks_request->command = SOCKS_COMMAND_CONNECT;
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
@@ -229,8 +239,8 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_exit
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    UNMOCK(connection_ap_handshake_rewrite);
-    UNMOCK(connection_mark_unattached_ap_);
+    destroy_mark_unattached_ap_mock();
+    destroy_rewrite_mock();
     tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
@@ -243,6 +253,17 @@ get_options_mock(void)
   tor_assert(options_mock);
   return options_mock;
 }
+static void
+init_mock_options()
+{
+  options_mock = tor_malloc_zero(sizeof(options_mock));
+  MOCK(get_options, get_options_mock);
+}
+static void
+destroy_mock_options()
+{
+  UNMOCK(get_options);
+}
 
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed(void *data)
@@ -251,17 +272,13 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_is_allowed_
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
-  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
-  rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
+  init_mark_unattached_ap_mock();
+  init_rewrite_mock();
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_NONE;
-  strlcpy(conn->socks_request->address,
-            "http://malformed..exit",
-            sizeof(conn->socks_request->address));
+  SET_SOCKS_ADDRESS(conn->socks_request, "http://malformed..exit");
   conn->socks_request->command = SOCKS_COMMAND_CONNECT;
-  options_mock = tor_malloc_zero(sizeof(options_mock));
-  MOCK(get_options, get_options_mock);
+  init_mock_options();
   options_mock->AllowDotExit = 1;
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
@@ -270,9 +287,9 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_is_allowed_
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    UNMOCK(connection_ap_handshake_rewrite);
-    UNMOCK(connection_mark_unattached_ap_);
-    UNMOCK(get_options);
+    destroy_mark_unattached_ap_mock();
+    destroy_rewrite_mock();
+    destroy_mock_options();
     tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
