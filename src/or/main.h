@@ -78,6 +78,7 @@ int tor_init(int argc, char **argv);
 #ifdef MAIN_PRIVATE
 STATIC void init_connection_lists(void);
 STATIC void close_closeable_connections(void);
+STATIC void run_scheduled_events(time_t);
 #endif
 
 #endif

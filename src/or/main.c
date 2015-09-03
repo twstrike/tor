@@ -1295,7 +1295,7 @@ reschedule_directory_downloads(void)
 /** Perform regular maintenance tasks.  This function gets run once per
  * second by second_elapsed_callback().
  */
-static void
+STATIC void
 run_scheduled_events(time_t now)
 {
   static int should_init_bridge_stats = 1;
