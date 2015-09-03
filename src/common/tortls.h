@@ -57,6 +57,7 @@ typedef struct tor_x509_cert_t tor_x509_cert_t;
 
 
 #ifdef TORTLS_PRIVATE
+#define TOR_TLS_MAGIC 0x71571571
 
 typedef enum {
     TOR_TLS_ST_HANDSHAKE, TOR_TLS_ST_OPEN, TOR_TLS_ST_GOTCLOSE,
@@ -78,6 +79,15 @@ typedef struct tor_tls_context_t {
   crypto_pk_t *auth_key;
 } tor_tls_context_t;
 
+/** Structure that we use for a single certificate. */
+struct tor_x509_cert_t {
+  X509 *cert;
+  uint8_t *encoded;
+  size_t encoded_len;
+  unsigned pkey_digests_set : 1;
+  digests_t cert_digests;
+  digests_t pkey_digests;
+};
 
 /** Holds a SSL object and its associated data.  Members are only
  * accessed from within tortls.c.
@@ -124,6 +134,7 @@ STATIC int tor_tls_get_error(tor_tls_t *tls, int r, int extra,
                   const char *doing, int severity, int domain);
 STATIC tor_tls_t *tor_tls_get_by_ssl(const SSL *ssl);
 STATIC void tor_tls_allocate_tor_tls_object_ex_data_index(void);
+STATIC int always_accept_verify_cb(int preverify_ok, X509_STORE_CTX *x509_ctx);
 #endif
 
 

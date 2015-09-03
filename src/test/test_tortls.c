@@ -196,6 +196,7 @@ test_tortls_get_by_ssl(void *ignored)
 
   ctx = SSL_CTX_new(SSLv23_method());
   tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->magic = TOR_TLS_MAGIC;
 
   ssl = SSL_new(ctx);
 
@@ -399,6 +400,37 @@ test_tortls_get_error(void *ignored)
   tor_free(tls);
 }
 
+static void
+test_tortls_always_accept_verify_cb(void *ignored)
+{
+  (void)ignored;
+  int ret;
+
+  ret = always_accept_verify_cb(0, NULL);
+  tt_int_op(ret, OP_EQ, 1);
+
+ done:
+  (void)0;
+}
+
+
+static void
+test_tortls_x509_cert_free(void *ignored)
+{
+  (void)ignored;
+  tor_x509_cert_t *cert;
+
+  cert = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  tor_x509_cert_free(cert);
+
+  cert = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  cert->cert = tor_malloc_zero(sizeof(X509));
+  cert->encoded = tor_malloc_zero(1);
+  tor_x509_cert_free(cert);
+
+
+}
+
 #define LOCAL_TEST_CASE(name, flags)                  \
   { #name, test_tortls_##name, (flags), NULL, NULL }
 
@@ -412,5 +444,7 @@ struct testcase_t tortls_tests[] = {
   LOCAL_TEST_CASE(allocate_tor_tls_object_ex_data_index, TT_FORK),
   LOCAL_TEST_CASE(log_one_error, TT_FORK),
   LOCAL_TEST_CASE(get_error, TT_FORK),
+  LOCAL_TEST_CASE(always_accept_verify_cb, 0),
+  LOCAL_TEST_CASE(x509_cert_free, 0),
   END_OF_TESTCASES
 };

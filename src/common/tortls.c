@@ -109,15 +109,6 @@
 #define SSL3_FLAGS_ALLOW_UNSAFE_LEGACY_RENEGOTIATION 0x0010
 #endif
 
-/** Structure that we use for a single certificate. */
-struct tor_x509_cert_t {
-  X509 *cert;
-  uint8_t *encoded;
-  size_t encoded_len;
-  unsigned pkey_digests_set : 1;
-  digests_t cert_digests;
-  digests_t pkey_digests;
-};
 
 /** Return values for tor_tls_classify_client_ciphers.
  *
@@ -137,7 +128,6 @@ struct tor_x509_cert_t {
 #define CIPHERS_UNRESTRICTED 3
 /** @} */
 
-#define TOR_TLS_MAGIC 0x71571571
 
 /** The ex_data index in which we store a pointer to an SSL object's
  * corresponding tor_tls_t object. */
@@ -461,7 +451,7 @@ tor_tls_free_all(void)
  * it: We always accept peer certs and complete the handshake.  We
  * don't validate them until later.
  */
-static int
+STATIC int
 always_accept_verify_cb(int preverify_ok,
                         X509_STORE_CTX *x509_ctx)
 {
