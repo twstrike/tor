@@ -422,25 +422,25 @@ or_state_save(time_t now)
   char tbuf[ISO_TIME_LEN+1];
   char *fname;
 
-  tor_assert(global_state);
+  or_state_t *or_state = get_or_state();
 
-  if (global_state->next_write > now)
+  if (or_state->next_write > now)
     return 0;
 
   /* Call everything else that might dirty the state even more, in order
    * to avoid redundant writes. */
-  entry_guards_update_state(global_state);
-  rep_hist_update_state(global_state);
-  circuit_build_times_update_state(get_circuit_build_times(), global_state);
+  entry_guards_update_state(or_state);
+  rep_hist_update_state(or_state);
+  circuit_build_times_update_state(get_circuit_build_times(), or_state);
   if (accounting_is_enabled(get_options()))
     accounting_run_housekeeping(now);
 
-  global_state->LastWritten = now;
+  or_state->LastWritten = now;
 
-  tor_free(global_state->TorVersion);
-  tor_asprintf(&global_state->TorVersion, "Tor %s", get_version());
+  tor_free(or_state->TorVersion);
+  tor_asprintf(&or_state->TorVersion, "Tor %s", get_version());
 
-  state = config_dump(&state_format, NULL, global_state, 1, 0);
+  state = config_dump(&state_format, NULL, or_state, 1, 0);
   format_local_iso_time(tbuf, now);
   tor_asprintf(&contents,
                "# Tor state file last generated on %s local time\n"
@@ -457,7 +457,7 @@ or_state_save(time_t now)
     tor_free(contents);
     /* Try again after STATE_WRITE_RETRY_INTERVAL (or sooner, if the state
      * changes sooner). */
-    global_state->next_write = now + STATE_WRITE_RETRY_INTERVAL;
+    or_state->next_write = now + STATE_WRITE_RETRY_INTERVAL;
     return -1;
   }
 
@@ -467,9 +467,9 @@ or_state_save(time_t now)
   tor_free(contents);
 
   if (server_mode(get_options()))
-    global_state->next_write = now + STATE_RELAY_CHECKPOINT_INTERVAL;
+    or_state->next_write = now + STATE_RELAY_CHECKPOINT_INTERVAL;
   else
-    global_state->next_write = TIME_MAX;
+    or_state->next_write = TIME_MAX;
 
   return 0;
 }
