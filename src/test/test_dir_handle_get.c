@@ -1944,6 +1944,25 @@ status_vote_current_d_test(char **header, char **body, size_t *body_l)
     tor_free(conn);
 }
 
+static void
+status_vote_next_d_test(char **header, char **body, size_t *body_l)
+{
+  dir_connection_t *conn = NULL;
+
+  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
+
+  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
+  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
+    GET("/tor/status-vote/next/d/" VOTE_DIGEST), NULL, 0));
+
+  fetch_from_buf_http(TO_CONN(conn)->outbuf, header, MAX_HEADERS_SIZE,
+                      body, body_l, strlen(VOTE_BODY_V3)+1, 0);
+  tt_assert(header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(conn);
+}
 
 static void
 test_dir_handle_get_status_vote_current_d_not_found(void* data)
@@ -1960,10 +1979,24 @@ test_dir_handle_get_status_vote_current_d_not_found(void* data)
     tor_free(header);
 }
 
+static void
+test_dir_handle_get_status_vote_next_d_not_found(void* data)
+{
+  char *header = NULL;
+  (void) data;
 
+  status_vote_next_d_test(&header, NULL, NULL);
+
+  tt_assert(header);
+  tt_str_op(NOT_FOUND, OP_EQ, header);
+
+  done:
+    UNMOCK(connection_write_to_buf_impl_);
+    tor_free(header);
+}
 
 static void
-test_dir_handle_get_status_vote_current_d(void* data)
+test_dir_handle_get_status_vote_d(void* data)
 {
   char *header = NULL, *body = NULL;
   size_t body_used = 0;
@@ -1971,7 +2004,6 @@ test_dir_handle_get_status_vote_current_d(void* data)
   (void) data;
 
   clear_dir_servers();
-  //routerlist_free_all();
   dirvote_free_all();
 
   /* create a trusted ds */
@@ -2008,6 +2040,19 @@ test_dir_handle_get_status_vote_current_d(void* data)
 
   tt_str_op(VOTE_BODY_V3, OP_EQ, body);
 
+  tor_free(header);
+  tor_free(body);
+
+  status_vote_next_d_test(&header, &body, &body_used);
+
+  tt_assert(header);
+  tt_ptr_op(strstr(header, "HTTP/1.0 200 OK\r\n"), OP_EQ, header);
+  tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
+  tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
+  tt_assert(strstr(header, "Content-Length: 4135\r\n"));
+
+  tt_str_op(VOTE_BODY_V3, OP_EQ, body);
+
   done:
     tor_free(header);
     tor_free(body);
@@ -2029,30 +2074,6 @@ test_dir_handle_get_status_vote_next_not_found(void* data)
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
     GET("/tor/status-vote/next/" HEX1), NULL, 0));
-
-  fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
-                      NULL, NULL, 1, 0);
-  tt_assert(header);
-  tt_str_op(NOT_FOUND, OP_EQ, header);
-
-  done:
-    UNMOCK(connection_write_to_buf_impl_);
-    tor_free(conn);
-    tor_free(header);
-}
-
-static void
-test_dir_handle_get_status_vote_next_d_not_found(void* data)
-{
-  dir_connection_t *conn = NULL;
-  char *header = NULL;
-  (void) data;
-
-  MOCK(connection_write_to_buf_impl_, connection_write_to_buf_mock);
-
-  conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
-  tt_int_op(0, OP_EQ, directory_handle_command_get(conn,
-    GET("/tor/status-vote/next/d/" HEX1), NULL, 0));
 
   fetch_from_buf_http(TO_CONN(conn)->outbuf, &header, MAX_HEADERS_SIZE,
                       NULL, NULL, 1, 0);
@@ -2506,9 +2527,8 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(status_vote_current_consensus_ns_busy, 0),
   DIR_HANDLE_CMD(status_vote_current_consensus_ns, 0),
   DIR_HANDLE_CMD(status_vote_current_d_not_found, 0),
-  DIR_HANDLE_CMD(status_vote_current_d, 0),
   DIR_HANDLE_CMD(status_vote_next_d_not_found, 0),
-  //DIR_HANDLE_CMD(status_vote_next_d, 0),
+  DIR_HANDLE_CMD(status_vote_d, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus_not_found, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus_busy, 0),
   DIR_HANDLE_CMD(status_vote_next_consensus, 0),
