@@ -293,7 +293,38 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_is_allowed_
     tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
-    tor_free(options_mock);
+    destroy_mock_options();
+}
+
+static void
+test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_doesnt_really_exist(void *data)
+{
+  entry_connection_t *conn = data;
+  origin_circuit_t *circuit = NULL;
+  crypt_path_t *path = NULL;
+
+  init_mark_unattached_ap_mock();
+  init_rewrite_mock();
+  rewrite_mock->should_close = 0;
+  rewrite_mock->exit_source = ADDRMAPSRC_NONE;
+  SET_SOCKS_ADDRESS(conn->socks_request, "http://www.wellformed.exit");
+  conn->socks_request->command = SOCKS_COMMAND_CONNECT;
+  init_mock_options();
+  options_mock->AllowDotExit = 1;
+
+  int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
+
+  tt_int_op(unattachment_reason_spy, OP_EQ, END_STREAM_REASON_TORPROTOCOL);
+  tt_int_op(res, OP_EQ, -1);
+
+  done:
+    destroy_mark_unattached_ap_mock();
+    destroy_rewrite_mock();
+    destroy_mock_options();
+    tor_free(rewrite_mock);
+    tor_free(circuit);
+    tor_free(path);
+    destroy_mock_options();
 }
 
 #define CONN_EDGE_AP_HANDSHAKE(name,flags)                              \
@@ -308,5 +339,6 @@ struct testcase_t conn_edge_ap_handshake_tests[] =
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_dns_exit, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_exit_but_not_remapped, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_doesnt_really_exist, 0),
   END_OF_TESTCASES
 };
