@@ -4188,7 +4188,62 @@ test_config_options_act_options_transition_requires_fresh_tls_context(void *arg)
   (void)arg;
 }
 
-#define NS_SUBMODULE error
+#define NS_SUBMODULE dns_reset_fail
+
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  CALLED(dns_reset)++;
+  return -1;
+}
+
+static void
+test_config_options_act_options_transition_requires_fresh_tls_context_dns_reset_fail(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->V3AuthoritativeDir = 0;
+  old_options->V3AuthoritativeDir = 1;
+  old_options->DataDirectory = options->DataDirectory;
+  old_options->NumCPUs = options->NumCPUs;
+  old_options->ORPort_lines = options->ORPort_lines;
+  old_options->ServerDNSSearchDomains = options->ServerDNSSearchDomains;
+  old_options->SafeLogging_ = options->SafeLogging_;
+  old_options->ClientOnly = options->ClientOnly;
+  tt_int_op(public_server_mode(old_options),OP_EQ,public_server_mode(options));
+  old_options->Logs = options->Logs;
+  old_options->LogMessageDomains = options->LogMessageDomains;
+  options->TLSECGroup = "P256";
+  old_options->TLSECGroup = "P224";
+  crypto_pk_t *key = NULL;
+  key = pk_generate(2);
+  set_client_identity_key(key);
+
+  NS_MOCK(dns_reset);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(dns_reset);
+  UNMOCK(get_options_mutable);
+  options->V3AuthoritativeDir = 0;
+  old_options->V3AuthoritativeDir = 0;
+  options->TLSECGroup = NULL;
+  old_options->TLSECGroup = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+
+#define NS_SUBMODULE router_initialize_tls_context_error
 NS_DECL(int, router_initialize_tls_context, (void));
 
 int
@@ -5821,6 +5876,7 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_ServerTransportPlugin_err, TT_FORK),
   CONFIG_TEST(options_act_RunAsDaemon, TT_FORK),
   CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, TT_FORK),
+  CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context_dns_reset_fail, TT_FORK),
   CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context_error, TT_FORK),
   CONFIG_TEST(options_act_policies_parse_from_options_error, TT_FORK),
   CONFIG_TEST(options_act_init_control_cookie_authentication_error, TT_FORK),
