@@ -13,6 +13,7 @@
 #include "rephist.h"
 #include "geoip.h"
 #include "transports.h"
+#include "router.h"
 
 static or_state_t *mock_state = NULL;
 static void
@@ -411,6 +412,7 @@ test_run_scheduled_events__changes_tls_context(void *data)
 {
   time_t now = time(NULL);
   time_t after_now = now + 60;
+  crypto_pk_t *identity_pkey = pk_generate(0);
   (void) data;
 
   rend_cache_init();
@@ -423,6 +425,8 @@ test_run_scheduled_events__changes_tls_context(void *data)
 
   MOCK(get_or_state, get_or_state_mock);
 
+  set_client_identity_key(identity_pkey);
+
   time_to.last_rotated_x509_certificate = now - MAX_SSL_KEY_LIFETIME_INTERNAL - 1;
   run_scheduled_events(now);
   tt_int_op(time_to.last_rotated_x509_certificate, OP_EQ, now);
@@ -430,6 +434,7 @@ test_run_scheduled_events__changes_tls_context(void *data)
   done:
     UNMOCK(get_or_state);
     rend_cache_free_all();
+    set_client_identity_key(NULL);
 }
 
 static void
