@@ -11,6 +11,7 @@
 #include "rendcache.h"
 #include "statefile.h"
 #include "rephist.h"
+#include "geoip.h"
 
 static or_state_t *mock_state = NULL;
 static void
@@ -88,16 +89,250 @@ test_run_scheduled_events__writes_cell_stats_to_disk(void *data)
   set_all_times_to(after_now);
   mock_state->next_write = after_now;
 
-  rep_hist_buffer_stats_init(now - WRITE_STATS_INTERVAL + 1);
-  time_to.write_stats_files = before_now;
   mock_options->CellStatistics = 1;
 
   MOCK(get_options, get_options_mock);
   MOCK(get_or_state, get_or_state_mock);
 
+  time_to.write_stats_files = before_now;
+  rep_hist_buffer_stats_init(0);
   run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, before_now + 60*60);
 
+  time_to.write_stats_files = before_now;
+  rep_hist_buffer_stats_init(now - WRITE_STATS_INTERVAL + 1);
+  run_scheduled_events(now);
   tt_int_op(time_to.write_stats_files, OP_EQ, now + 1);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__writes_dir_req_stats_to_disk(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  mock_options->DirReqStatistics = 1;
+
+  MOCK(get_options, get_options_mock);
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.write_stats_files = before_now;
+  geoip_dirreq_stats_init(0);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, before_now + 60*60);
+
+  time_to.write_stats_files = before_now;
+  geoip_dirreq_stats_init(now - WRITE_STATS_INTERVAL + 1);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, now + 1);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__writes_entry_stats_to_disk(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  mock_options->EntryStatistics = 1;
+
+  MOCK(get_options, get_options_mock);
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.write_stats_files = before_now;
+  geoip_entry_stats_init(0);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, before_now + 60*60);
+
+  time_to.write_stats_files = before_now;
+  geoip_entry_stats_init(now - WRITE_STATS_INTERVAL + 1);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, now + 1);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__writes_hidden_service_stats_to_disk(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  mock_options->HiddenServiceStatistics = 1;
+
+  MOCK(get_options, get_options_mock);
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.write_stats_files = before_now;
+  rep_hist_hs_stats_init(0);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, before_now + 60*60);
+
+  time_to.write_stats_files = before_now;
+  rep_hist_hs_stats_init(now - WRITE_STATS_INTERVAL + 1);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, now + 1);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__writes_exit_port_stats_to_disk(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  mock_options->ExitPortStatistics = 1;
+
+  MOCK(get_options, get_options_mock);
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.write_stats_files = before_now;
+  rep_hist_exit_stats_init(0);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, before_now + 60*60);
+
+  time_to.write_stats_files = before_now;
+  rep_hist_exit_stats_init(now - WRITE_STATS_INTERVAL + 1);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, now + 1);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__writes_conn_direction_stats_to_disk(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  mock_options->ConnDirectionStatistics = 1;
+
+  MOCK(get_options, get_options_mock);
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.write_stats_files = before_now;
+  rep_hist_conn_stats_init(0);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, before_now + 60*60);
+
+  time_to.write_stats_files = before_now;
+  rep_hist_conn_stats_init(now - WRITE_STATS_INTERVAL + 1);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, now + 1);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__writes_bridge_authoritative_dir_stats_to_disk(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  mock_options->BridgeAuthoritativeDir = 1;
+
+  MOCK(get_options, get_options_mock);
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.write_stats_files = before_now;
+  rep_hist_desc_stats_init(0);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, before_now + 60*60);
+  rep_hist_desc_stats_term();
+
+  time_to.write_stats_files = before_now;
+  rep_hist_desc_stats_init(now - WRITE_STATS_INTERVAL + 1);
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_stats_files, OP_EQ, now + 1);
+  rep_hist_desc_stats_term();
 
   done:
     UNMOCK(get_options);
@@ -110,5 +345,11 @@ test_run_scheduled_events__writes_cell_stats_to_disk(void *data)
 
 struct testcase_t main_tests[] = {
   RUN_SCHEDULED_EVENTS(writes_cell_stats_to_disk, 0),
+  RUN_SCHEDULED_EVENTS(writes_dir_req_stats_to_disk, 0),
+  RUN_SCHEDULED_EVENTS(writes_entry_stats_to_disk, 0),
+  RUN_SCHEDULED_EVENTS(writes_hidden_service_stats_to_disk, 0),
+  RUN_SCHEDULED_EVENTS(writes_exit_port_stats_to_disk, 0),
+  RUN_SCHEDULED_EVENTS(writes_conn_direction_stats_to_disk, 0),
+  RUN_SCHEDULED_EVENTS(writes_bridge_authoritative_dir_stats_to_disk, 0),
   END_OF_TESTCASES
 };
