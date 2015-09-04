@@ -12,6 +12,7 @@
 #include "statefile.h"
 #include "rephist.h"
 #include "geoip.h"
+#include "transports.h"
 
 static or_state_t *mock_state = NULL;
 static void
@@ -340,6 +341,124 @@ test_run_scheduled_events__writes_bridge_authoritative_dir_stats_to_disk(void *d
     rend_cache_free_all();
 }
 
+NS_DECL(int, pt_proxies_configuration_pending, (void));
+
+int
+NS(pt_proxies_configuration_pending)(void)
+{
+  CALLED(pt_proxies_configuration_pending)++;
+  return 0;
+};
+
+static void
+test_run_scheduled_events__fetches_dir_descriptors(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  NS_MOCK(pt_proxies_configuration_pending);
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.try_getting_descriptors = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.try_getting_descriptors, OP_EQ, now + 10);
+
+  done:
+    UNMOCK(get_or_state);
+    NS_UNMOCK(pt_proxies_configuration_pending);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__resets_descriptor_failures(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.reset_descriptor_failures = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.reset_descriptor_failures, OP_EQ, now + 60*60);
+
+  done:
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__changes_tls_context(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.last_rotated_x509_certificate = now - MAX_SSL_KEY_LIFETIME_INTERNAL - 1;
+  run_scheduled_events(now);
+  tt_int_op(time_to.last_rotated_x509_certificate, OP_EQ, now);
+
+  done:
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__adds_entropy(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.add_entropy = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.add_entropy, OP_EQ, now + 60*60);
+
+  done:
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
 #define RUN_SCHEDULED_EVENTS(name, flags) \
   { #name, test_run_scheduled_events__##name, (flags), NULL, NULL }
 
@@ -351,5 +470,9 @@ struct testcase_t main_tests[] = {
   RUN_SCHEDULED_EVENTS(writes_exit_port_stats_to_disk, 0),
   RUN_SCHEDULED_EVENTS(writes_conn_direction_stats_to_disk, 0),
   RUN_SCHEDULED_EVENTS(writes_bridge_authoritative_dir_stats_to_disk, 0),
+  RUN_SCHEDULED_EVENTS(fetches_dir_descriptors, 0),
+  RUN_SCHEDULED_EVENTS(resets_descriptor_failures, 0),
+  RUN_SCHEDULED_EVENTS(changes_tls_context, 0),
+  RUN_SCHEDULED_EVENTS(adds_entropy, 0),
   END_OF_TESTCASES
 };
