@@ -12,6 +12,7 @@
 #include "connection_edge.h"
 #include "connection_or.h"
 #include "addressmap.h"
+#include "nodelist.h"
 #include "util.h"
 #include "test.h"
 
@@ -327,6 +328,59 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_doesnt_real
     destroy_mock_options();
 }
 
+static node_t *exit_node_mock = NULL;
+static const node_t *
+node_get_by_nickname_mock(const char *nickname, int warn)
+{
+  tor_assert(nickname);
+  tor_assert(warn);
+  return exit_node_mock;
+}
+static void
+init_exit_node_mock()
+{
+  MOCK(node_get_by_nickname, node_get_by_nickname_mock);
+  exit_node_mock = tor_malloc_zero(sizeof(node_t));
+}
+static void
+destroy_exit_node_mock()
+{
+  UNMOCK(node_get_by_nickname);
+  tor_free(exit_node_mock);
+}
+
+static void
+test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_to_port0(void *data)
+{
+  entry_connection_t *conn = data;
+  origin_circuit_t *circuit = NULL;
+  crypt_path_t *path = NULL;
+
+  init_mark_unattached_ap_mock();
+  init_rewrite_mock();
+  rewrite_mock->should_close = 0;
+  rewrite_mock->exit_source = ADDRMAPSRC_NONE;
+  SET_SOCKS_ADDRESS(conn->socks_request, "http://www.wellformed.exit");
+  conn->socks_request->command = SOCKS_COMMAND_CONNECT;
+  init_mock_options();
+  options_mock->AllowDotExit = 1;
+  init_exit_node_mock();
+
+  int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
+
+  tt_int_op(unattachment_reason_spy, OP_EQ, END_STREAM_REASON_TORPROTOCOL);
+  tt_int_op(res, OP_EQ, -1);
+
+  done:
+    destroy_mark_unattached_ap_mock();
+    destroy_rewrite_mock();
+    destroy_mock_options();
+    destroy_exit_node_mock();
+    tor_free(rewrite_mock);
+    tor_free(circuit);
+    tor_free(path);
+}
+
 #define CONN_EDGE_AP_HANDSHAKE(name,flags)                              \
   { #name, test_conn_edge_ap_handshake_##name, (flags), &test_rewrite_setup, NULL }
 
@@ -340,5 +394,6 @@ struct testcase_t conn_edge_ap_handshake_tests[] =
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_exit_but_not_remapped, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_doesnt_really_exist, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_to_port0, 0),
   END_OF_TESTCASES
 };
