@@ -945,6 +945,40 @@ test_tortls_verify(void *ignored)
   tor_free(k);
 }
 
+static void
+test_tortls_check_lifetime(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+  X509 *validCert = read_cert_from(validCertString);
+  time_t now = time(NULL);
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  ret = tor_tls_check_lifetime(LOG_WARN, tls, 0, 0);
+  tt_int_op(ret, OP_EQ, -1);
+
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tls->ssl->session = tor_malloc_zero(sizeof(SSL_SESSION));
+  tls->ssl->session->peer = validCert;
+  ret = tor_tls_check_lifetime(LOG_WARN, tls, 0, 0);
+  tt_int_op(ret, OP_EQ, 0);
+
+  validCert->cert_info->validity->notBefore = ASN1_TIME_set(NULL, now-10);
+  validCert->cert_info->validity->notAfter = ASN1_TIME_set(NULL, now+60);
+
+  ret = tor_tls_check_lifetime(LOG_WARN, tls, 0, -1000);
+  tt_int_op(ret, OP_EQ, -1);
+
+  ret = tor_tls_check_lifetime(LOG_WARN, tls, -1000, 0);
+  tt_int_op(ret, OP_EQ, -1);
+
+ done:
+  tor_free(tls->ssl->session);
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
 #define LOCAL_TEST_CASE(name, flags)                  \
   { #name, test_tortls_##name, (flags), NULL, NULL }
 
@@ -969,5 +1003,6 @@ struct testcase_t tortls_tests[] = {
   LOCAL_TEST_CASE(classify_client_ciphers, 0),
   LOCAL_TEST_CASE(client_is_using_v2_ciphers, 0),
   LOCAL_TEST_CASE(verify, 0),
+  LOCAL_TEST_CASE(check_lifetime, 0),
   END_OF_TESTCASES
 };
