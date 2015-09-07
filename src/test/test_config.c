@@ -3763,7 +3763,7 @@ test_config_parse_port_config__ports(void *data)
 
   // Test failure when asked to parse an invalid address followed by auto
   tor_free(config_port_invalid);
-  config_port_invalid = mock_config_line("DNSPort", "invalidstuff:auto");
+  config_port_invalid = mock_config_line("DNSPort", "invalidstuff!!:auto");
   ret = parse_port_config(NULL, config_port_invalid, NULL, "DNS", 0, "127.0.0.46", 0, 0);
   tt_int_op(ret, OP_EQ, -1);
 

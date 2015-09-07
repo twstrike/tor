@@ -2424,7 +2424,7 @@ tor_tls_used_v1_handshake(tor_tls_t *tls)
 
 /** Return true iff <b>name</b> is a DN of a kind that could only
  * occur in a v3-handshake-indicating certificate */
-static int
+STATIC int
 dn_indicates_v3_cert(X509_NAME *name)
 {
 #ifdef DISABLE_V3_LINKPROTO_CLIENTSIDE
@@ -2439,18 +2439,21 @@ dn_indicates_v3_cert(X509_NAME *name)
   int len, r;
 
   n_entries = X509_NAME_entry_count(name);
-  if (n_entries != 1)
+  if (n_entries != 1) {
     return 1; /* More than one entry in the DN. */
+  }
   entry = X509_NAME_get_entry(name, 0);
 
   obj = X509_NAME_ENTRY_get_object(entry);
-  if (OBJ_obj2nid(obj) != OBJ_txt2nid("commonName"))
+  if (OBJ_obj2nid(obj) != OBJ_txt2nid("commonName")) {
     return 1; /* The entry isn't a commonName. */
+  }
 
   str = X509_NAME_ENTRY_get_data(entry);
   len = ASN1_STRING_to_UTF8(&s, str);
-  if (len < 0)
+  if (len < 0){
     return 0;
+  }
   r = fast_memneq(s + len - 4, ".net", 4);
   OPENSSL_free(s);
   return r;
@@ -2555,7 +2558,7 @@ SSL_get_server_random(SSL *s, uint8_t *out, size_t len)
 #endif
 
 #ifndef HAVE_SSL_SESSION_GET_MASTER_KEY
-static size_t
+STATIC size_t
 SSL_SESSION_get_master_key(SSL_SESSION *s, uint8_t *out, size_t len)
 {
   tor_assert(s);
@@ -2578,7 +2581,6 @@ tor_tls_get_tlssecrets,(tor_tls_t *tls, uint8_t *secrets_out))
 #define TLSSECRET_MAGIC "Tor V3 handshake TLS cross-certification"
   uint8_t buf[128];
   size_t len;
-
   tor_assert(tls);
 
   SSL *const ssl = tls->ssl;
@@ -2602,12 +2604,14 @@ tor_tls_get_tlssecrets,(tor_tls_t *tls, uint8_t *secrets_out))
     size_t r = SSL_get_client_random(ssl, buf, client_random_len);
     tor_assert(r == client_random_len);
   }
+
   {
     size_t r = SSL_get_server_random(ssl,
                                      buf+client_random_len,
                                      server_random_len);
     tor_assert(r == server_random_len);
   }
+
   uint8_t *master_key = tor_malloc_zero(master_key_len);
   {
     size_t r = SSL_SESSION_get_master_key(session, master_key, master_key_len);
@@ -2627,7 +2631,7 @@ tor_tls_get_tlssecrets,(tor_tls_t *tls, uint8_t *secrets_out))
                      (char*)buf, len);
   memwipe(buf, 0, sizeof(buf));
   memwipe(master_key, 0, master_key_len);
-  tor_free(master_key);
+  tor_free(master_key); /* LCOV_EXCL_BR_LINE since master_key will never be NULL here */
 
   return 0;
 }
