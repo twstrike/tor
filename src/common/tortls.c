@@ -2189,7 +2189,6 @@ MOCK_IMPL(STATIC void, try_to_extract_certs_from_tls, (int severity, tor_tls_t *
   STACK_OF(X509) *chain = NULL;
   int num_in_chain, i;
   *cert_out = *id_cert_out = NULL;
-
   if (!(cert = SSL_get_peer_certificate(tls->ssl)))
     return;
   *cert_out = cert;
@@ -2206,7 +2205,7 @@ MOCK_IMPL(STATIC void, try_to_extract_certs_from_tls, (int severity, tor_tls_t *
            num_in_chain);
     return;
   }
-  for (i=0; i<num_in_chain; ++i) {
+  for (i=0; i<num_in_chain; ++i) { /* LCOV_EXCL_BR_LINE because we can never hit the case when we don't enter this loop, since num_in_chain<1 is checked above */
     id_cert = sk_X509_value(chain, i);
     if (X509_cmp(id_cert, cert) != 0)
       break;

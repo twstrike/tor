@@ -1367,6 +1367,66 @@ test_tortls_evaluate_ecgroup_for_tls(void *ignored)
   (void)0;
 }
 
+typedef struct cert_pkey_st_local
+{
+	X509 *x509;
+	EVP_PKEY *privatekey;
+	const EVP_MD *digest;
+} CERT_PKEY_local;
+
+typedef struct sess_cert_st_local
+{
+	STACK_OF(X509) *cert_chain;
+	int peer_cert_type;
+	CERT_PKEY_local *peer_key;
+	CERT_PKEY_local peer_pkeys[8];
+	int references;
+} SESS_CERT_local;
+
+static void
+test_tortls_try_to_extract_certs_from_tls(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+  X509 *cert = NULL, *id_cert = NULL, *c1 = NULL, *c2 = NULL;
+  SESS_CERT_local *sess = NULL;
+
+  c1 = read_cert_from(validCertString);
+  c2 = read_cert_from(caCertString);
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tls->ssl->session = tor_malloc_zero(sizeof(SSL_SESSION));
+  sess = tor_malloc_zero(sizeof(SESS_CERT_local));
+  tls->ssl->session->sess_cert = (void *)sess;
+
+  try_to_extract_certs_from_tls(LOG_WARN, tls, &cert, &id_cert);
+  tt_assert(!cert);
+  tt_assert(!id_cert);
+
+  tls->ssl->session->peer = c1;
+  try_to_extract_certs_from_tls(LOG_WARN, tls, &cert, &id_cert);
+  tt_assert(cert == c1);
+  tt_assert(!id_cert);
+
+  sess->cert_chain = sk_X509_new_null();
+  try_to_extract_certs_from_tls(LOG_WARN, tls, &cert, &id_cert);
+  tt_assert(cert == c1);
+  tt_assert(!id_cert);
+
+  sk_X509_push(sess->cert_chain, c1);
+  sk_X509_push(sess->cert_chain, c2);
+  try_to_extract_certs_from_tls(LOG_WARN, tls, &cert, &id_cert);
+  tt_assert(cert == c1);
+  tt_assert(id_cert);
+
+ done:
+  tor_free(sess);
+  tor_free(tls->ssl->session);
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
 #define LOCAL_TEST_CASE(name, flags)                  \
   { #name, test_tortls_##name, (flags), NULL, NULL }
 
@@ -1404,5 +1464,6 @@ struct testcase_t tortls_tests[] = {
   LOCAL_TEST_CASE(get_tlssecrets, 0),
   LOCAL_TEST_CASE(get_buffer_sizes, 0),
   LOCAL_TEST_CASE(evaluate_ecgroup_for_tls, 0),
+  LOCAL_TEST_CASE(try_to_extract_certs_from_tls, 0),
   END_OF_TESTCASES
 };
