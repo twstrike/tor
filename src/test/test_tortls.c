@@ -1281,6 +1281,7 @@ test_tortls_get_tlssecrets(void *ignored)
   tls = tor_malloc_zero(sizeof(tor_tls_t));
   tls->ssl = tor_malloc_zero(sizeof(SSL));
   tls->ssl->session = tor_malloc_zero(sizeof(SSL_SESSION));
+  tls->ssl->session->master_key_length = 1;
   tls->ssl->s3 = tor_malloc_zero(sizeof(SSL3_STATE));
 
   ret = tor_tls_get_tlssecrets(tls, secret_out);
