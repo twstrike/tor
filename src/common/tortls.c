@@ -1840,10 +1840,10 @@ tor_tls_read,(tor_tls_t *tls, char *cp, size_t len))
 
 /** Total number of bytes that we've used TLS to send.  Used to track TLS
  * overhead. */
-static uint64_t total_bytes_written_over_tls = 0;
+STATIC uint64_t total_bytes_written_over_tls = 0;
 /** Total number of bytes that TLS has put on the network for us. Used to
  * track TLS overhead. */
-static uint64_t total_bytes_written_by_tls = 0;
+STATIC uint64_t total_bytes_written_by_tls = 0;
 
 /** Underlying function for TLS writing.  Write up to <b>n</b>
  * characters from <b>cp</b> onto <b>tls</b>.  On success, returns the

@@ -979,6 +979,104 @@ test_tortls_check_lifetime(void *ignored)
   tor_free(tls);
 }
 
+static int fixed_ssl_pending_result = 0;
+
+static int
+fixed_ssl_pending(const SSL *ignored)
+{
+  (void)ignored;
+  return fixed_ssl_pending_result;
+}
+
+static void
+test_tortls_get_pending_bytes(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+  SSL_METHOD *method;
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  method = tor_malloc_zero(sizeof(SSL_METHOD));
+  method->ssl_pending = fixed_ssl_pending;
+  tls->ssl->method = method;
+
+  fixed_ssl_pending_result = 42;
+  ret = tor_tls_get_pending_bytes(tls);
+  tt_int_op(ret, OP_EQ, 42);
+
+ done:
+  tor_free(method);
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
+static void
+test_tortls_get_forced_write_size(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+
+  tls->wantwrite_n = 43;
+  ret = tor_tls_get_forced_write_size(tls);
+  tt_int_op(ret, OP_EQ, 43);
+
+ done:
+  tor_free(tls);
+}
+
+extern uint64_t total_bytes_written_over_tls;
+extern uint64_t total_bytes_written_by_tls;
+
+static void
+test_tortls_get_write_overhead_ratio(void *ignored)
+{
+  (void)ignored;
+  double ret;
+
+  total_bytes_written_over_tls = 0;
+  ret = tls_get_write_overhead_ratio();
+  tt_int_op(ret, OP_EQ, 1.0);
+
+  total_bytes_written_by_tls = 10;
+  total_bytes_written_over_tls = 1;
+  ret = tls_get_write_overhead_ratio();
+  tt_int_op(ret, OP_EQ, 10.0);
+
+  total_bytes_written_by_tls = 10;
+  total_bytes_written_over_tls = 2;
+  ret = tls_get_write_overhead_ratio();
+  tt_int_op(ret, OP_EQ, 5.0);
+
+ done:
+  (void)0;
+}
+
+static void
+test_tortls_used_v1_handshake(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+
+  // These tests assume both V2 handshake server and client are enabled
+  tls->wasV2Handshake = 0;
+  ret = tor_tls_used_v1_handshake(tls);
+  tt_int_op(ret, OP_EQ, 1);
+
+  tls->wasV2Handshake = 1;
+  ret = tor_tls_used_v1_handshake(tls);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  tor_free(tls);
+}
+
 #define LOCAL_TEST_CASE(name, flags)                  \
   { #name, test_tortls_##name, (flags), NULL, NULL }
 
@@ -1004,5 +1102,9 @@ struct testcase_t tortls_tests[] = {
   LOCAL_TEST_CASE(client_is_using_v2_ciphers, 0),
   LOCAL_TEST_CASE(verify, 0),
   LOCAL_TEST_CASE(check_lifetime, 0),
+  LOCAL_TEST_CASE(get_pending_bytes, 0),
+  LOCAL_TEST_CASE(get_forced_write_size, 0),
+  LOCAL_TEST_CASE(get_write_overhead_ratio, TT_FORK),
+  LOCAL_TEST_CASE(used_v1_handshake, TT_FORK),
   END_OF_TESTCASES
 };
