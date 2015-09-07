@@ -1361,7 +1361,7 @@ test_tortls_evaluate_ecgroup_for_tls(void *ignored)
   tt_int_op(ret, OP_EQ, 1);
 
   ret = evaluate_ecgroup_for_tls("P224");
-  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(ret, OP_EQ, 1);
 
  done:
   (void)0;
