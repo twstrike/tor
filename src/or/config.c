@@ -289,7 +289,7 @@ static config_var_t option_vars_[] = {
   VAR("HiddenServiceMaxStreams",LINELIST_S, RendConfigLines, NULL),
   VAR("HiddenServiceMaxStreamsCloseCircuit",LINELIST_S, RendConfigLines, NULL),
   VAR("HiddenServiceNumIntroductionPoints", LINELIST_S, RendConfigLines, NULL),
-  V(HiddenServiceStatistics,     BOOL,     "0"),
+  V(HiddenServiceStatistics,     BOOL,     "1"),
   V(HidServAuth,                 LINELIST, NULL),
   V(CloseHSClientCircuitsImmediatelyOnTimeout, BOOL, "0"),
   V(CloseHSServiceRendCircuitsImmediatelyOnTimeout, BOOL, "0"),
@@ -3173,6 +3173,21 @@ options_validate(or_options_t *old_options, or_options_t *options,
              "hidden services on this Tor instance.  Your hidden services "
              "will be very easy to locate using a well-known attack -- see "
              "http://freehaven.net/anonbib/#hs-attack06 for details.");
+  }
+
+  if (options->EntryNodes &&
+      routerset_is_list(options->EntryNodes) &&
+      (routerset_len(options->EntryNodes) == 1) &&
+      (options->RendConfigLines != NULL)) {
+    tor_asprintf(msg,
+             "You have one single EntryNodes and at least one hidden service "
+             "configured. This is bad because it's very easy to locate your "
+             "entry guard which can then lead to the deanonymization of your "
+             "hidden service -- for more details, see "
+             "https://trac.torproject.org/projects/tor/ticket/14917. "
+             "For this reason, the use of one EntryNodes with an hidden "
+             "service is prohibited until a better solution is found.");
+    return -1;
   }
 
   if (!options->LearnCircuitBuildTimeout && options->CircuitBuildTimeout &&
