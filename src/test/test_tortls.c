@@ -1427,6 +1427,327 @@ test_tortls_try_to_extract_certs_from_tls(void *ignored)
   tor_free(tls);
 }
 
+static void
+test_tortls_get_peer_cert(void *ignored)
+{
+  (void)ignored;
+  tor_x509_cert_t *ret;
+  tor_tls_t *tls;
+  X509 *cert = NULL;
+
+  cert = read_cert_from(validCertString);
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tls->ssl->session = tor_malloc_zero(sizeof(SSL_SESSION));
+
+  ret = tor_tls_get_peer_cert(tls);
+  tt_assert(!ret);
+
+  tls->ssl->session->peer = cert;
+  ret = tor_tls_get_peer_cert(tls);
+  tt_assert(ret);
+  tt_assert(ret->cert == cert);
+
+ done:
+  tor_x509_cert_free(ret);
+  tor_free(tls->ssl->session);
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
+static void
+test_tortls_peer_has_cert(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+  X509 *cert = NULL;
+
+  cert = read_cert_from(validCertString);
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tls->ssl->session = tor_malloc_zero(sizeof(SSL_SESSION));
+
+  ret = tor_tls_peer_has_cert(tls);
+  tt_assert(!ret);
+
+  tls->ssl->session->peer = cert;
+  ret = tor_tls_peer_has_cert(tls);
+  tt_assert(ret);
+
+ done:
+  tor_free(tls->ssl->session);
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
+static void
+test_tortls_is_server(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+  int ret;
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->isServer = 1;
+  ret = tor_tls_is_server(tls);
+  tt_int_op(ret, OP_EQ, 1);
+
+ done:
+  tor_free(tls);
+}
+
+static void
+test_tortls_session_secret_cb(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+  SSL_CTX *ctx;
+  STACK_OF(SSL_CIPHER) *ciphers;
+  SSL_CIPHER *one;
+
+  SSL_library_init();
+  SSL_load_error_strings();
+  tor_tls_allocate_tor_tls_object_ex_data_index();
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+
+  tls->magic = TOR_TLS_MAGIC;
+
+  ctx = SSL_CTX_new(TLSv1_method());
+  tls->ssl = SSL_new(ctx);
+  SSL_set_ex_data(tls->ssl, tor_tls_object_ex_data_index, tls);
+
+  SSL_set_session_secret_cb(tls->ssl, tor_tls_session_secret_cb, NULL);
+
+  tor_tls_session_secret_cb(tls->ssl, NULL, NULL, NULL, NULL, NULL);
+  tt_assert(!tls->ssl->tls_session_secret_cb);
+
+  one = get_cipher_by_name("ECDH-RSA-AES256-GCM-SHA384");
+  one->id = 0x00ff;
+  ciphers = sk_SSL_CIPHER_new_null();
+  sk_SSL_CIPHER_push(ciphers, one);
+
+  tls->client_cipher_list_type = 0;
+  tor_tls_session_secret_cb(tls->ssl, NULL, NULL, ciphers, NULL, NULL);
+  tt_assert(!tls->ssl->tls_session_secret_cb);
+
+ done:
+  sk_SSL_CIPHER_free(ciphers);
+  SSL_free(tls->ssl);
+  SSL_CTX_free(ctx);
+  tor_free(tls);
+}
+
+
+/* TODO: It seems block_renegotiation and unblock_renegotiation and using different blags. This might not be correct */
+static void
+test_tortls_block_renegotiation(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tls->ssl->s3 = tor_malloc_zero(sizeof(SSL3_STATE));
+  tls->ssl->s3->flags = 0x0010;
+
+  tor_tls_block_renegotiation(tls);
+
+  tt_assert(!(SSL_get_options(tls->ssl) & 0x0010));
+
+ done:
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
+static void
+test_tortls_unblock_renegotiation(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tor_tls_unblock_renegotiation(tls);
+
+  tt_assert(SSL_get_options(tls->ssl) & 0x00040000L);
+
+ done:
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
+static void
+test_tortls_assert_renegotiation_unblocked(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tor_tls_unblock_renegotiation(tls);
+  tor_tls_assert_renegotiation_unblocked(tls);
+  // No assertion here - this test will fail if tor_assert is turned on and things are bad.
+
+  tor_free(tls);
+}
+
+static void
+test_tortls_set_logged_address(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+
+  tor_tls_set_logged_address(tls, "foo bar");
+
+  tt_str_op(tls->address, OP_EQ, "foo bar");
+
+  tor_tls_set_logged_address(tls, "foo bar 2");
+  tt_str_op(tls->address, OP_EQ, "foo bar 2");
+
+ done:
+  tor_free(tls);
+}
+
+static void
+example_cb(tor_tls_t *t, void *arg)
+{
+  (void)t;
+  (void)arg;
+}
+
+
+static void
+test_tortls_set_renegotiate_callback(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+  char *arg = "hello";
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+
+  tor_tls_set_renegotiate_callback(tls, example_cb, arg);
+  tt_assert(tls->negotiated_callback == example_cb);
+  tt_assert(tls->callback_arg == arg);
+  tt_assert(!tls->got_renegotiate);
+
+  /* Assumes V2_HANDSHAKE_SERVER */
+  tt_assert(tls->ssl->info_callback == tor_tls_server_info_callback);
+
+  tor_tls_set_renegotiate_callback(tls, NULL, arg);
+  tt_assert(tls->ssl->info_callback == tor_tls_debug_state_callback);
+
+ done:
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
+static const SSL_CIPHER *
+fake_get_cipher(unsigned ncipher)
+{
+  printf("fake_get_cipher(%d)\n", ncipher);
+  SSL_CIPHER *fixed = tor_malloc_zero(sizeof(SSL_CIPHER));
+  SSL_CIPHER *fixed2 = tor_malloc_zero(sizeof(SSL_CIPHER));
+  fixed2->id = 0xC00A;
+  switch(ncipher) {
+  case 1:
+    return fixed;
+  case 2:
+    return fixed2;
+  default:
+    return NULL;
+  }
+}
+
+static int
+fake_num_ciphers(void)
+{
+  return 0;
+}
+
+static void
+test_tortls_find_cipher_by_id(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  SSL *ssl;
+  SSL_CTX *ctx;
+  const SSL_METHOD *m = TLSv1_method();
+  SSL_METHOD *empty_method = tor_malloc_zero(sizeof(SSL_METHOD));
+
+  SSL_library_init();
+  SSL_load_error_strings();
+
+  ctx = SSL_CTX_new(m);
+  ssl = SSL_new(ctx);
+
+  ret = find_cipher_by_id(ssl, NULL, 0xC00A);
+  tt_int_op(ret, OP_EQ, 1);
+
+  ret = find_cipher_by_id(ssl, m, 0xC00A);
+  tt_int_op(ret, OP_EQ, 1);
+
+  ret = find_cipher_by_id(ssl, m, 0xFFFF);
+  tt_int_op(ret, OP_EQ, 0);
+
+  ret = find_cipher_by_id(ssl, empty_method, 0xC00A);
+  tt_int_op(ret, OP_EQ, 1);
+
+  ret = find_cipher_by_id(ssl, empty_method, 0xFFFF);
+  tt_int_op(ret, OP_EQ, 1);
+
+  empty_method->get_cipher = fake_get_cipher;
+  ret = find_cipher_by_id(ssl, empty_method, 0xC00A);
+  tt_int_op(ret, OP_EQ, 1);
+
+  empty_method->get_cipher = m->get_cipher;
+  empty_method->num_ciphers = m->num_ciphers;
+  ret = find_cipher_by_id(ssl, empty_method, 0xC00A);
+  tt_int_op(ret, OP_EQ, 1);
+
+  empty_method->get_cipher = fake_get_cipher;
+  empty_method->num_ciphers = m->num_ciphers;
+  ret = find_cipher_by_id(ssl, empty_method, 0xC00A);
+  tt_int_op(ret, OP_EQ, 1);
+
+  empty_method->num_ciphers = fake_num_ciphers;
+  ret = find_cipher_by_id(ssl, empty_method, 0xC00A);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  tor_free(empty_method);
+  SSL_free(ssl);
+  SSL_CTX_free(ctx);
+}
+
+static void
+test_tortls_debug_state_callback(void *ignored)
+{
+  (void)ignored;
+  SSL *ssl;
+  char *buf = tor_malloc_zero(1000);
+  int n;
+
+  int previous_log = setup_capture_of_logs(LOG_DEBUG);
+
+  ssl = tor_malloc_zero(sizeof(SSL));
+
+  tor_tls_debug_state_callback(ssl, 32, 45);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  n = snprintf(buf, 1000, "SSL %p is now in state unknown state [type=32,val=45].\n", ssl);
+  buf[n]='\0';
+  tt_str_op(mock_saved_log_at(0), OP_EQ, buf);
+
+ done:
+  teardown_capture_of_logs(previous_log);
+}
+
 #define LOCAL_TEST_CASE(name, flags)                  \
   { #name, test_tortls_##name, (flags), NULL, NULL }
 
@@ -1465,5 +1786,23 @@ struct testcase_t tortls_tests[] = {
   LOCAL_TEST_CASE(get_buffer_sizes, 0),
   LOCAL_TEST_CASE(evaluate_ecgroup_for_tls, 0),
   LOCAL_TEST_CASE(try_to_extract_certs_from_tls, 0),
+  LOCAL_TEST_CASE(get_peer_cert, 0),
+  LOCAL_TEST_CASE(peer_has_cert, 0),
+  /* LOCAL_TEST_CASE(shutdown, 0), */
+  /* LOCAL_TEST_CASE(renegotiate, 0), */
+  /* LOCAL_TEST_CASE(finish_handshake, 0), */
+  /* LOCAL_TEST_CASE(handshake, 0), */
+  /* LOCAL_TEST_CASE(write, 0), */
+  /* LOCAL_TEST_CASE(read, 0), */
+  /* LOCAL_TEST_CASE(server_info_callback, 0), */
+  LOCAL_TEST_CASE(is_server, 0),
+  LOCAL_TEST_CASE(assert_renegotiation_unblocked, 0),
+  LOCAL_TEST_CASE(block_renegotiation, 0),
+  LOCAL_TEST_CASE(unblock_renegotiation, 0),
+  LOCAL_TEST_CASE(set_renegotiate_callback, 0),
+  LOCAL_TEST_CASE(set_logged_address, 0),
+  LOCAL_TEST_CASE(find_cipher_by_id, 0),
+  LOCAL_TEST_CASE(session_secret_cb, 0),
+  LOCAL_TEST_CASE(debug_state_callback, 0),
   END_OF_TESTCASES
 };

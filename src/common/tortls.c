@@ -1274,7 +1274,7 @@ tor_tls_context_new(crypto_pk_t *identity, unsigned int key_lifetime,
 }
 
 /** Invoked when a TLS state changes: log the change at severity 'debug' */
-static void
+STATIC void
 tor_tls_debug_state_callback(const SSL *ssl, int type, int val)
 {
   log_debug(LD_HANDSHAKE, "SSL %p is now in state %s [type=%d,val=%d].",
@@ -1330,7 +1330,7 @@ static int v2_cipher_list_pruned = 0;
 
 /** Return 0 if <b>m</b> does not support the cipher with ID <b>cipher</b>;
  * return 1 if it does support it, or if we have no way to tell. */
-static int
+STATIC int
 find_cipher_by_id(const SSL *ssl, const SSL_METHOD *m, uint16_t cipher)
 {
   const SSL_CIPHER *c;
@@ -1338,7 +1338,7 @@ find_cipher_by_id(const SSL *ssl, const SSL_METHOD *m, uint16_t cipher)
   {
     unsigned char cipherid[3];
     tor_assert(ssl);
-    set_uint16(cipherid, htons(cipher));
+    set_uint16(cipherid, htons(cipher));  /* LCOV_EXCL_BR_LINE since we won't necessarily hit both branches if htons is a macro */
     cipherid[2] = 0; /* If ssl23_get_cipher_by_char finds no cipher starting
                       * with a two-byte 'cipherid', it may look for a v2
                       * cipher with the appropriate 3 bytes. */
@@ -1350,7 +1350,7 @@ find_cipher_by_id(const SSL *ssl, const SSL_METHOD *m, uint16_t cipher)
 #elif defined(HAVE_STRUCT_SSL_METHOD_ST_GET_CIPHER_BY_CHAR)
   if (m && m->get_cipher_by_char) {
     unsigned char cipherid[3];
-    set_uint16(cipherid, htons(cipher));
+    set_uint16(cipherid, htons(cipher)); /* LCOV_EXCL_BR_LINE since we won't necessarily hit both branches if htons is a macro */
     cipherid[2] = 0; /* If ssl23_get_cipher_by_char finds no cipher starting
                       * with a two-byte 'cipherid', it may look for a v2
                       * cipher with the appropriate 3 bytes. */
@@ -1518,7 +1518,7 @@ tor_tls_client_is_using_v2_ciphers(const SSL *ssl)
  *         do not send or request extra certificates in v2 handshakes.</li>
  * <li>To detect renegotiation</li></ul>
  */
-static void
+STATIC void
 tor_tls_server_info_callback(const SSL *ssl, int type, int val)
 {
   tor_tls_t *tls;
@@ -1582,7 +1582,7 @@ tor_tls_server_info_callback(const SSL *ssl, int type, int val)
  * authentication on the fly.  But as long as we return 0, we won't actually be
  * setting up a shared secret, and all will be fine.
  */
-static int
+STATIC int
 tor_tls_session_secret_cb(SSL *ssl, void *secret, int *secret_len,
                           STACK_OF(SSL_CIPHER) *peer_ciphers,
                           SSL_CIPHER **cipher, void *arg)
@@ -1797,7 +1797,7 @@ tor_tls_free(tor_tls_t *tls)
     tor_tls_context_decref(tls->context);
   tor_free(tls->address);
   tls->magic = 0x99999999;
-  tor_free(tls);
+  tor_free(tls); /* LCOV_EXCL_BR_LINE because this line will not be reached if tls is NULL */
 }
 
 /** Underlying function for TLS reading.  Reads up to <b>len</b>
