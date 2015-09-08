@@ -5782,6 +5782,14 @@ NS(dns_reset)(void)
   return 0;
 }
 
+NS_DECL(void, cpu_init, (void));
+
+void
+NS(cpu_init)(void)
+{
+  CALLED(cpu_init)++;
+}
+
 static void
 test_config_options_act_inform_testing_reachability(void *arg)
 {
@@ -5791,6 +5799,7 @@ test_config_options_act_inform_testing_reachability(void *arg)
   NS_MOCK(have_completed_a_circuit);
   NS_MOCK(inform_testing_reachability);
   NS_MOCK(dns_reset);
+  NS_MOCK(cpu_init);
   options_act(old_options);
 
   tt_int_op(CALLED(inform_testing_reachability), OP_EQ, 1);
@@ -5801,6 +5810,7 @@ test_config_options_act_inform_testing_reachability(void *arg)
   NS_UNMOCK(have_completed_a_circuit);
   NS_UNMOCK(inform_testing_reachability);
   NS_UNMOCK(dns_reset);
+  NS_UNMOCK(cpu_init);
 }
 #undef NS_SUBMODULE
 #undef NS_MODULE
