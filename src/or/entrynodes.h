@@ -134,7 +134,7 @@ void learned_router_identity(const tor_addr_t *addr, uint16_t port,
 struct bridge_line_t;
 void bridge_add_from_config(struct bridge_line_t *bridge_line);
 void retry_bridge_descriptor_fetch_directly(const char *digest);
-void fetch_bridge_descriptors(const or_options_t *options, time_t now);
+MOCK_DECL(void, fetch_bridge_descriptors, (const or_options_t *options, time_t now));
 void learned_bridge_descriptor(routerinfo_t *ri, int from_cache);
 int any_bridge_descriptors_known(void);
 int entries_known_but_down(const or_options_t *options);

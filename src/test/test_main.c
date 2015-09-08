@@ -14,6 +14,7 @@
 #include "geoip.h"
 #include "transports.h"
 #include "router.h"
+#include "entrynodes.h"
 
 static or_state_t *mock_state = NULL;
 static void
@@ -380,6 +381,51 @@ test_run_scheduled_events__fetches_dir_descriptors(void *data)
     rend_cache_free_all();
 }
 
+
+NS_DECL(void, fetch_bridge_descriptors, (const or_options_t *options, time_t now));
+
+void
+NS(fetch_bridge_descriptors)(const or_options_t *options, time_t now)
+{
+  (void) options;
+  (void) now;
+
+  CALLED(fetch_bridge_descriptors)++;
+}
+
+static void
+test_run_scheduled_events__fetches_bridge_descriptors(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_options, get_options_mock);
+  MOCK(get_or_state, get_or_state_mock);
+  NS_MOCK(fetch_bridge_descriptors);
+
+  mock_options->UseBridges = 1;
+  mock_options->DisableNetwork = 0;
+  run_scheduled_events(now);
+
+  tt_int_op(1, OP_EQ, CALLED(fetch_bridge_descriptors));
+
+  done:
+    NS_UNMOCK(fetch_bridge_descriptors);
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
 static void
 test_run_scheduled_events__resets_descriptor_failures(void *data)
 {
@@ -476,6 +522,7 @@ struct testcase_t main_tests[] = {
   RUN_SCHEDULED_EVENTS(writes_conn_direction_stats_to_disk, 0),
   RUN_SCHEDULED_EVENTS(writes_bridge_authoritative_dir_stats_to_disk, 0),
   RUN_SCHEDULED_EVENTS(fetches_dir_descriptors, 0),
+  RUN_SCHEDULED_EVENTS(fetches_bridge_descriptors, 0),
   RUN_SCHEDULED_EVENTS(resets_descriptor_failures, 0),
   RUN_SCHEDULED_EVENTS(changes_tls_context, 0),
   RUN_SCHEDULED_EVENTS(adds_entropy, 0),
