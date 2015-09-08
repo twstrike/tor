@@ -66,7 +66,8 @@ struct rend_intro_cell_s {
 #endif
 
 int num_rend_services(void);
-MOCK_DECL(int, rend_config_services,(const or_options_t *options, int validate_only));
+MOCK_DECL(int, rend_config_services,(const or_options_t *options,
+                                     int validate_only));
 MOCK_DECL(int, rend_service_load_all_keys, (void));
 void rend_services_add_filenames_to_lists(smartlist_t *open_lst,
                                           smartlist_t *stat_lst);

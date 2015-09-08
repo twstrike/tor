@@ -17,12 +17,16 @@
 #include "confparse.h"
 #include "connection.h"
 #include "connection_edge.h"
+#include "test.h"
+#include "util.h"
+#include "address.h"
 #include "connection_or.h"
 #include "control.h"
 #include "cpuworker.h"
 #include "dirvote.h"
 #include "dns.h"
 #include "entrynodes.h"
+#include "transports.h"
 #include "ext_orport.h"
 #include "geoip.h"
 #include "hibernate.h"
@@ -3894,7 +3898,8 @@ mock_get_options_mutable(void)
 }
 
 void
-init_mock_global_options(void) {
+init_mock_global_options(void)
+{
   or_options_t *current = get_options_mutable();
   mock_global_options = tor_memdup(current,sizeof(or_options_t));
   MOCK(get_options_mutable,mock_get_options_mutable);
@@ -4056,9 +4061,11 @@ test_config_options_act_ClientTransportPlugin_err(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  config_line_t *test_clientTransportPlugin = tor_malloc_zero(sizeof(config_line_t));
+  config_line_t *test_clientTransportPlugin =
+      tor_malloc_zero(sizeof(config_line_t));
   test_clientTransportPlugin->key = tor_strdup("ClientTransportPlugin");
-  test_clientTransportPlugin->value = tor_strdup("some not correct format of ClientTransportPlugin");
+  test_clientTransportPlugin->value = tor_strdup("some not correct "
+                                    "format of ClientTransportPlugin");
   options->ClientTransportPlugin = test_clientTransportPlugin;
 
   tt_int_op(options_act(old_options), OP_EQ, -1);
@@ -4094,9 +4101,11 @@ test_config_options_act_ServerTransportPlugin_err(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  config_line_t *test_serverTransportPlugin = tor_malloc_zero(sizeof(config_line_t));
+  config_line_t *test_serverTransportPlugin =
+      tor_malloc_zero(sizeof(config_line_t));
   test_serverTransportPlugin->key = tor_strdup("ServerTransportPlugin");
-  test_serverTransportPlugin->value = tor_strdup("some not correct format of ServerTransportPlugin");
+  test_serverTransportPlugin->value = tor_strdup("some not correct format "
+                                                "of ServerTransportPlugin");
   options->ServerTransportPlugin = test_serverTransportPlugin;
   NS_MOCK(server_mode);
 
@@ -4152,7 +4161,7 @@ test_config_options_act_RunAsDaemon(void *arg)
 
 #define NS_MODULE router_initialize_tls_context
 static void
-test_config_options_act_options_transition_requires_fresh_tls_context(void *arg)
+test_config_options_act_options_transit_req_fresh_tls_cxt(void *arg)
 {
   or_options_t *options, *old_options;
   old_options = options_new();
@@ -4200,7 +4209,7 @@ NS(dns_reset)(void)
 }
 
 static void
-test_config_options_act_options_transition_requires_fresh_tls_context_dns_reset_fail(void *arg)
+test_config_options_act_options_transit_req_fresh_tls_cxt_fail(void *arg)
 {
   or_options_t *options, *old_options;
   old_options = options_new();
@@ -4254,7 +4263,7 @@ NS(router_initialize_tls_context)(void)
 };
 
 static void
-test_config_options_act_options_transition_requires_fresh_tls_context_error(void *arg)
+test_config_options_act_options_transit_req_fresh_tls_cxt_error(void *arg)
 {
   or_options_t *options, *old_options;
   old_options = options_new();
@@ -4404,7 +4413,8 @@ test_config_options_act_rend_service_load_all_keys_error(void *arg)
 
 #define NS_MODULE accounting_parse_options
 #define NS_SUBMODULE error
-NS_DECL(int, accounting_parse_options, (const or_options_t *options, int validate_only));
+NS_DECL(int, accounting_parse_options, (const or_options_t *options,
+                                        int validate_only));
 
 static int
 NS(accounting_parse_options)(const or_options_t *options, int validate_only)
@@ -4492,7 +4502,7 @@ NS(old_ewma_enabled) = 0;
 static int
 NS(cell_ewma_enabled)(void)
 {
-  if(CALLED(cell_ewma_enabled)){
+  if (CALLED(cell_ewma_enabled)) {
     CALLED(cell_ewma_enabled)++;
     return !NS(old_ewma_enabled);
   }
@@ -4529,7 +4539,7 @@ NS(old_ewma_enabled) = 1;
 static int
 NS(cell_ewma_enabled)(void)
 {
-  if(CALLED(cell_ewma_enabled)){
+  if (CALLED(cell_ewma_enabled)) {
     CALLED(cell_ewma_enabled)++;
     return !NS(old_ewma_enabled);
   }
@@ -4656,7 +4666,8 @@ test_config_options_act_parse_outbound_addresses_error(void *arg)
 #define NS_MODULE routerset_add_unknown_ccs
 #define NS_SUBMODULE error
 
-NS_DECL(int, routerset_add_unknown_ccs, (routerset_t **setp, int only_if_some_cc_set));
+NS_DECL(int, routerset_add_unknown_ccs, (routerset_t **setp,
+                                         int only_if_some_cc_set));
 
 int
 NS(routerset_add_unknown_ccs)(routerset_t **setp, int only_if_some_cc_set)
@@ -5093,7 +5104,7 @@ NS(dns_reset)(void)
 }
 
 static void
-test_config_options_act_no_geoIP_database_found_to_mesure_entry_node(void *arg)
+test_config_options_act_no_geoIP_db_found_to_mesure_entry_node(void *arg)
 {
   or_options_t *options, *old_options;
   old_options = options_new();
@@ -5136,7 +5147,7 @@ NS(geoip_dirreq_stats_term)(void)
 }
 
 static void
-test_config_options_act_disables_statistics_calls_geoip_dirreq_stats_term(void *arg)
+test_config_options_act_disable_statistics_geoip_dirreq_stats_term(void *arg)
 {
   or_options_t *options, *old_options;
   old_options = options_new();
@@ -5226,7 +5237,8 @@ test_config_options_act_DirPortFrontPage(void *arg)
 
 #define NS_MODULE rend_config_services
 #define NS_SUBMODULE error
-NS_DECL(int, rend_config_services, (const or_options_t *options, int validate_only));
+NS_DECL(int, rend_config_services, (const or_options_t *options,
+                                    int validate_only));
 
 static int
 NS(rend_config_services)(const or_options_t *options, int validate_only)
@@ -5260,10 +5272,12 @@ test_config_options_act_rend_config_services_err(void *arg)
 
 #define NS_MODULE rend_parse_service_authorization
 #define NS_SUBMODULE error
-NS_DECL(int,rend_parse_service_authorization,(const or_options_t *options, int validate_only));
+NS_DECL(int, rend_parse_service_authorization, (const or_options_t *options,
+                                                int validate_only));
 
 static int
-NS(rend_parse_service_authorization)(const or_options_t *options, int validate_only)
+NS(rend_parse_service_authorization)(const or_options_t *options,
+                                     int validate_only)
 {
   (void)options;
   (void)validate_only;
@@ -5492,7 +5506,8 @@ test_config_options_act_init_key_error(void *arg)
 #undef NS_MODULE
 
 #define NS_MODULE dirvote_recalculate_timing
-NS_DECL(void, dirvote_recalculate_timing, (const or_options_t *op, time_t now));
+NS_DECL(void, dirvote_recalculate_timing, (const or_options_t *op,
+                                           time_t now));
 
 static void
 NS(dirvote_recalculate_timing)(const or_options_t *op, time_t now)
@@ -5501,7 +5516,7 @@ NS(dirvote_recalculate_timing)(const or_options_t *op, time_t now)
 }
 
 static void
-test_config_options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes(void *arg)
+test_config_options_act_dirvote_recalc_if_mode_v3_changes(void *arg)
 {
   or_options_t *options, *old_options;
   old_options = options_new();
@@ -5524,7 +5539,7 @@ test_config_options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes(void
 }
 
 static void
-test_config_options_act_does_not_recalculate_timing_if_mode_v3_do_not_changes(void *arg)
+test_config_options_act_no_dirvote_recalc_if_mode_v3_no_changes(void *arg)
 {
   or_options_t *options, *old_options;
   old_options = options_new();
@@ -5548,7 +5563,7 @@ test_config_options_act_does_not_recalculate_timing_if_mode_v3_do_not_changes(vo
 }
 
 static void
-test_config_options_act_does_not_call_dirvote_recalculate_timing(void *arg)
+test_config_options_act_no_dirvote_recalc_if_no_old_options(void *arg)
 {
   or_options_t *options;
   options = test_setup_option_CMD_TOR();
@@ -5600,13 +5615,14 @@ NS_DECL(void, connection_or_update_token_buckets,
         (smartlist_t *conns, const or_options_t *options));
 
 static void
-NS(connection_or_update_token_buckets)(smartlist_t *conns, const or_options_t *options)
+NS(connection_or_update_token_buckets)(smartlist_t *conns,
+                                       const or_options_t *options)
 {
   CALLED(connection_or_update_token_buckets)++;
 }
 
 static void
-test_config_options_act_updates_token_buckets_if_PerConnBWRate_changes(void *arg)
+test_config_options_act_update_token_buckets_PerConnBWRate_change(void *arg)
 {
   or_options_t *options, *old_options;
   old_options = options_new();
@@ -5628,7 +5644,8 @@ test_config_options_act_updates_token_buckets_if_PerConnBWRate_changes(void *arg
 }
 #undef NS_MODULE
 
-static or_options_t * setup_transition_affects_workers_branch(void)
+static or_options_t *
+setup_transition_affects_workers_branch(void)
 {
   or_options_t *options, *old_options;
   old_options = options_new();
@@ -5766,7 +5783,7 @@ NS(dns_reset)(void)
 }
 
 static void
-test_config_options_act_transition_affects_workers_inform_testing_reachability(void *arg)
+test_config_options_act_inform_testing_reachability(void *arg)
 {
   or_options_t *old_options;
   old_options = setup_transition_affects_workers_branch();
@@ -5789,7 +5806,8 @@ test_config_options_act_transition_affects_workers_inform_testing_reachability(v
 #undef NS_MODULE
 
 #define NS_MODULE addressmap_clear_invalid_automaps
-NS_DECL(void, addressmap_clear_invalid_automaps, (const or_options_t *options));
+NS_DECL(void, addressmap_clear_invalid_automaps,
+        (const or_options_t *options));
 
 void
 NS(addressmap_clear_invalid_automaps)(const or_options_t *options)
@@ -5829,6 +5847,7 @@ test_config_options_act_VirtualAddrNetworkIPv4(void *arg)
   smartlist_t *list = NULL;
   list = smartlist_new();
   options->AutomapHostsSuffixes = list;
+  options->AutomapHostsOnResolve = 1;
   smartlist_add(list, tor_strndup("foo", 3));
   old_options->AutomapHostsSuffixes = list;
 
@@ -5856,36 +5875,12 @@ test_config_options_act_VirtualAddrNetworkIPv6(void *arg)
   smartlist_t *list = NULL;
   list = smartlist_new();
   options->AutomapHostsSuffixes = list;
+  options->AutomapHostsOnResolve = 1;
   smartlist_add(list, tor_strndup("foo", 3));
   old_options->AutomapHostsSuffixes = list;
 
   old_options->VirtualAddrNetworkIPv6 = "[FE90::]/99";
   old_options->VirtualAddrNetworkIPv4 = "127.192.0.0/10";
-
-  NS_MOCK(addressmap_clear_invalid_automaps);
-  options_act(old_options);
-
-  tt_int_op(CALLED(addressmap_clear_invalid_automaps), OP_EQ, 1);
-
- done:
-  (void)arg;
-  tor_free(options);
-  tor_free(old_options);
-  NS_UNMOCK(addressmap_clear_invalid_automaps);
-}
-
-static void
-test_config_options_act_TrackHostExits(void *arg)
-{
-  or_options_t *options, *old_options;
-  old_options = options_new();
-  options = test_setup_option_CMD_TOR();
-
-  smartlist_t *list = NULL;
-  list = smartlist_new();
-  smartlist_add(list, tor_strndup("foo", 3));
-  old_options->TrackHostExits = NULL;
-  options->TrackHostExits = list;
 
   NS_MOCK(addressmap_clear_invalid_automaps);
   options_act(old_options);
@@ -5924,9 +5919,9 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_ClientTransportPlugin_err, TT_FORK),
   CONFIG_TEST(options_act_ServerTransportPlugin_err, TT_FORK),
   CONFIG_TEST(options_act_RunAsDaemon, TT_FORK),
-  CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context, TT_FORK),
-  CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context_dns_reset_fail, TT_FORK),
-  CONFIG_TEST(options_act_options_transition_requires_fresh_tls_context_error, TT_FORK),
+  CONFIG_TEST(options_act_options_transit_req_fresh_tls_cxt, TT_FORK),
+  CONFIG_TEST(options_act_options_transit_req_fresh_tls_cxt_fail, TT_FORK),
+  CONFIG_TEST(options_act_options_transit_req_fresh_tls_cxt_error, TT_FORK),
   CONFIG_TEST(options_act_policies_parse_from_options_error, TT_FORK),
   CONFIG_TEST(options_act_init_control_cookie_authentication_error, TT_FORK),
   CONFIG_TEST(options_act_rend_service_load_all_keys_error, TT_FORK),
@@ -5946,8 +5941,8 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_Statistics_private_server_mode, TT_FORK),
   CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
   CONFIG_TEST(options_act_disable_Statistics_public_server_mode, TT_FORK),
-  CONFIG_TEST(options_act_no_geoIP_database_found_to_mesure_entry_node, TT_FORK),
-  CONFIG_TEST(options_act_disables_statistics_calls_geoip_dirreq_stats_term, TT_FORK),
+  CONFIG_TEST(options_act_no_geoIP_db_found_to_mesure_entry_node, TT_FORK),
+  CONFIG_TEST(options_act_disable_statistics_geoip_dirreq_stats_term, TT_FORK),
   CONFIG_TEST(options_act_EntryNodes, TT_FORK),
   CONFIG_TEST(options_act_ExcludeNodes, TT_FORK),
   CONFIG_TEST(options_act_DirPortFrontPage, TT_FORK),
@@ -5958,17 +5953,17 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(options_act_init_ext_or_cookie_authentication_err, TT_FORK),
   CONFIG_TEST(options_act_pt_configure_remaining_proxies, TT_FORK),
   CONFIG_TEST(options_act_init_key_error, TT_FORK),
-  CONFIG_TEST(options_act_calls_dirvote_recalculate_timing_if_mode_v3_changes, TT_FORK),
-  CONFIG_TEST(options_act_does_not_recalculate_timing_if_mode_v3_do_not_changes, TT_FORK),
-  CONFIG_TEST(options_act_does_not_call_dirvote_recalculate_timing, TT_FORK),
+  CONFIG_TEST(options_act_dirvote_recalc_if_mode_v3_changes, TT_FORK),
+  CONFIG_TEST(options_act_no_dirvote_recalc_if_mode_v3_no_changes, TT_FORK),
+  CONFIG_TEST(options_act_no_dirvote_recalc_if_no_old_options, TT_FORK),
   CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
-  CONFIG_TEST(options_act_updates_token_buckets_if_PerConnBWRate_changes, TT_FORK),
+  CONFIG_TEST(options_act_update_token_buckets_PerConnBWRate_change, TT_FORK),
   CONFIG_TEST(options_act_transition_affects_workers_cpu_init, TT_FORK),
   CONFIG_TEST(options_act_transition_affects_workers_cpu_init_error, TT_FORK),
-  CONFIG_TEST(options_act_transition_affects_workers_inform_testing_reachability, TT_FORK),
+  CONFIG_TEST(options_act_inform_testing_reachability, TT_FORK),
   CONFIG_TEST(options_act_revise_automap_entries, TT_FORK),
   CONFIG_TEST(options_act_VirtualAddrNetworkIPv4, TT_FORK),
   CONFIG_TEST(options_act_VirtualAddrNetworkIPv6, TT_FORK),
-  CONFIG_TEST(options_act_TrackHostExits, TT_FORK),
   END_OF_TESTCASES
 };
+

@@ -1386,7 +1386,7 @@ options_act(const or_options_t *old_options)
     if (options->DisableDebuggerAttachment && !disabled_debugger_attach &&
         running_tor) {
       int ok = tor_disable_debugger_attach();
-      /* LCOV_EXCL_START since the warned_debugger_attach is 0 we can't reach inside. */
+      /* LCOV_EXCL_START the warned_debugger_attach is 0 can't reach inside. */
       if (warned_debugger_attach && ok == 1) {
         log_notice(LD_CONFIG, "Disabled attaching debuggers for unprivileged "
                    "users.");
@@ -1828,8 +1828,8 @@ options_act(const or_options_t *old_options)
       print_notice = 1;
     }
     if (print_notice)
-      log_notice(LD_CONFIG, "Configured to measure statistics. Look for "
-                 "the *-stats files that will first be written to the "
+        log_notice(LD_CONFIG, "Configured to measure statistics. Look for "
+                "the *-stats files that will first be written to the "
                  "data directory in 24 hours from now.");
   }
 
