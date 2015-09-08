@@ -2139,8 +2139,8 @@ retry_bridge_descriptor_fetch_directly(const char *digest)
 /** For each bridge in our list for which we don't currently have a
  * descriptor, fetch a new copy of its descriptor -- either directly
  * from the bridge or via a bridge authority. */
-void
-fetch_bridge_descriptors(const or_options_t *options, time_t now)
+MOCK_IMPL(void,
+fetch_bridge_descriptors, (const or_options_t *options, time_t now))
 {
   int num_bridge_auths = get_n_authorities(BRIDGE_DIRINFO);
   int ask_bridge_directly;
