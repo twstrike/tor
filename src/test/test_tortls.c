@@ -1651,7 +1651,6 @@ test_tortls_set_renegotiate_callback(void *ignored)
 static const SSL_CIPHER *
 fake_get_cipher(unsigned ncipher)
 {
-  printf("fake_get_cipher(%d)\n", ncipher);
   SSL_CIPHER *fixed = tor_malloc_zero(sizeof(SSL_CIPHER));
   SSL_CIPHER *fixed2 = tor_malloc_zero(sizeof(SSL_CIPHER));
   fixed2->id = 0xC00A;
@@ -1748,6 +1747,279 @@ test_tortls_debug_state_callback(void *ignored)
   teardown_capture_of_logs(previous_log);
 }
 
+static void
+test_tortls_server_info_callback(void *ignored)
+{
+  (void)ignored;
+  tor_tls_t *tls;
+  SSL_CTX *ctx;
+  SSL *ssl;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  SSL_library_init();
+  SSL_load_error_strings();
+
+  ctx = SSL_CTX_new(TLSv1_method());
+  ssl = SSL_new(ctx);
+
+  tor_tls_allocate_tor_tls_object_ex_data_index();
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->magic = TOR_TLS_MAGIC;
+  tls->ssl = ssl;
+
+  tor_tls_server_info_callback(NULL, 0, 0);
+
+  SSL_set_state(ssl, SSL3_ST_SW_SRVR_HELLO_A);
+  mock_clean_saved_logs();
+  tor_tls_server_info_callback(ssl, SSL_CB_ACCEPT_LOOP, 0);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Couldn't look up the tls for an SSL*. How odd!\n");
+
+  SSL_set_state(ssl, SSL3_ST_SW_SRVR_HELLO_B);
+  mock_clean_saved_logs();
+  tor_tls_server_info_callback(ssl, SSL_CB_ACCEPT_LOOP, 0);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 1);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "Couldn't look up the tls for an SSL*. How odd!\n");
+
+  SSL_set_state(ssl, 99);
+  mock_clean_saved_logs();
+  tor_tls_server_info_callback(ssl, SSL_CB_ACCEPT_LOOP, 0);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 0);
+
+  SSL_set_ex_data(tls->ssl, tor_tls_object_ex_data_index, tls);
+  SSL_set_state(ssl, SSL3_ST_SW_SRVR_HELLO_B);
+  tls->negotiated_callback = 0;
+  tls->server_handshake_count = 120;
+  tor_tls_server_info_callback(ssl, SSL_CB_ACCEPT_LOOP, 0);
+  tt_int_op(tls->server_handshake_count, OP_EQ, 121);
+
+  tls->server_handshake_count = 127;
+  tls->negotiated_callback = (void *)1;
+  tor_tls_server_info_callback(ssl, SSL_CB_ACCEPT_LOOP, 0);
+  tt_int_op(tls->server_handshake_count, OP_EQ, 127);
+  tt_int_op(tls->got_renegotiate, OP_EQ, 1);
+
+  tls->ssl->session = SSL_SESSION_new();
+  tls->wasV2Handshake = 0;
+  tor_tls_server_info_callback(ssl, SSL_CB_ACCEPT_LOOP, 0);
+  tt_int_op(tls->wasV2Handshake, OP_EQ, 0);
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  tor_free(ssl);
+}
+
+static void
+test_tortls_shutdown(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+
+  ret = tor_tls_shutdown(tls);
+  tt_int_op(ret, OP_EQ, -9);
+
+  // TODO: fill up
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
+static void
+test_tortls_read(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+  char buf[100];
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tls->state = TOR_TLS_ST_OPEN;
+
+  ret = tor_tls_read(tls, buf, 10);
+  tt_int_op(ret, OP_EQ, -9);
+
+  // TODO: fill up
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
+
+static void
+test_tortls_write(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+  char buf[100];
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tls->state = TOR_TLS_ST_OPEN;
+
+  ret = tor_tls_write(tls, buf, 0);
+  tt_int_op(ret, OP_EQ, 0);
+
+  ret = tor_tls_write(tls, buf, 10);
+  tt_int_op(ret, OP_EQ, -9);
+
+  // TODO: fill up
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  tor_free(tls->ssl);
+  tor_free(tls);
+}
+
+static void
+test_tortls_renegotiate(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+  SSL_CTX *ctx;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  SSL_library_init();
+  SSL_load_error_strings();
+
+  ctx = SSL_CTX_new(TLSv1_method());
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = SSL_new(ctx);
+  tls->state = TOR_TLS_ST_OPEN;
+
+  ret = tor_tls_renegotiate(tls);
+  tt_int_op(ret, OP_EQ, -9);
+
+  // TODO: fill up
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  SSL_free(tls->ssl);
+  SSL_CTX_free(ctx);
+  tor_free(tls);
+}
+
+
+static void
+test_tortls_handshake(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+  SSL_CTX *ctx;
+  int previous_log = setup_capture_of_logs(LOG_WARN);
+
+  SSL_library_init();
+  SSL_load_error_strings();
+
+  ctx = SSL_CTX_new(TLSv1_method());
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = SSL_new(ctx);
+  tls->state = TOR_TLS_ST_OPEN;
+
+  ret = tor_tls_handshake(tls);
+  tt_int_op(ret, OP_EQ, -9);
+
+  // TODO: fill up
+
+ done:
+  teardown_capture_of_logs(previous_log);
+  SSL_free(tls->ssl);
+  SSL_CTX_free(ctx);
+  tor_free(tls);
+}
+
+static void
+test_tortls_finish_handshake(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_t *tls;
+  SSL_CTX *ctx;
+  SSL_METHOD *method = tor_malloc_zero(sizeof(SSL_METHOD));
+  SSL_library_init();
+  SSL_load_error_strings();
+
+  X509 *c1 = read_cert_from(validCertString);
+  X509 *c2 = read_cert_from(caCertString);
+
+  memcpy(method, TLSv1_method(), sizeof(SSL_METHOD));
+
+  ctx = SSL_CTX_new(method);
+
+  tls = tor_malloc_zero(sizeof(tor_tls_t));
+  tls->ssl = SSL_new(ctx);
+  tls->state = TOR_TLS_ST_OPEN;
+
+  ret = tor_tls_finish_handshake(tls);
+  tt_int_op(ret, OP_EQ, 0);
+
+  tls->isServer = 1;
+  tls->wasV2Handshake = 0;
+  ret = tor_tls_finish_handshake(tls);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tls->wasV2Handshake, OP_EQ, 1);
+
+  tls->wasV2Handshake = 1;
+  ret = tor_tls_finish_handshake(tls);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tls->wasV2Handshake, OP_EQ, 1);
+
+  tls->wasV2Handshake = 1;
+  tls->ssl->session = SSL_SESSION_new();
+  ret = tor_tls_finish_handshake(tls);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tls->wasV2Handshake, OP_EQ, 0);
+
+  tls->isServer = 0;
+
+  SESS_CERT_local *sess = tor_malloc_zero(sizeof(SESS_CERT_local));
+  tls->ssl->session->sess_cert = (void *)sess;
+  sess->cert_chain = sk_X509_new_null();
+  sk_X509_push(sess->cert_chain, c1);
+  tls->ssl->session->peer = c1;
+  tls->wasV2Handshake = 0;
+  ret = tor_tls_finish_handshake(tls);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tls->wasV2Handshake, OP_EQ, 1);
+
+  tls->ssl->session->peer = c2;
+  tls->wasV2Handshake = 1;
+  ret = tor_tls_finish_handshake(tls);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tls->wasV2Handshake, OP_EQ, 0);
+
+  sk_X509_push(sess->cert_chain, c2);
+  tls->wasV2Handshake = 1;
+  ret = tor_tls_finish_handshake(tls);
+  tt_int_op(ret, OP_EQ, 0);
+  tt_int_op(tls->wasV2Handshake, OP_EQ, 0);
+
+  method->num_ciphers = fake_num_ciphers;
+  ret = tor_tls_finish_handshake(tls);
+  tt_int_op(ret, OP_EQ, -9);
+
+ done:
+  SSL_CTX_free(ctx);
+  tor_free(tls);
+}
+
 #define LOCAL_TEST_CASE(name, flags)                  \
   { #name, test_tortls_##name, (flags), NULL, NULL }
 
@@ -1788,13 +2060,13 @@ struct testcase_t tortls_tests[] = {
   LOCAL_TEST_CASE(try_to_extract_certs_from_tls, 0),
   LOCAL_TEST_CASE(get_peer_cert, 0),
   LOCAL_TEST_CASE(peer_has_cert, 0),
-  /* LOCAL_TEST_CASE(shutdown, 0), */
-  /* LOCAL_TEST_CASE(renegotiate, 0), */
-  /* LOCAL_TEST_CASE(finish_handshake, 0), */
-  /* LOCAL_TEST_CASE(handshake, 0), */
-  /* LOCAL_TEST_CASE(write, 0), */
-  /* LOCAL_TEST_CASE(read, 0), */
-  /* LOCAL_TEST_CASE(server_info_callback, 0), */
+  LOCAL_TEST_CASE(shutdown, 0),
+  LOCAL_TEST_CASE(renegotiate, 0),
+  LOCAL_TEST_CASE(finish_handshake, 0),
+  LOCAL_TEST_CASE(handshake, 0),
+  LOCAL_TEST_CASE(write, 0),
+  LOCAL_TEST_CASE(read, 0),
+  LOCAL_TEST_CASE(server_info_callback, 0),
   LOCAL_TEST_CASE(is_server, 0),
   LOCAL_TEST_CASE(assert_renegotiation_unblocked, 0),
   LOCAL_TEST_CASE(block_renegotiation, 0),

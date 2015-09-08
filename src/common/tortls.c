@@ -1277,7 +1277,7 @@ tor_tls_context_new(crypto_pk_t *identity, unsigned int key_lifetime,
 STATIC void
 tor_tls_debug_state_callback(const SSL *ssl, int type, int val)
 {
-  log_debug(LD_HANDSHAKE, "SSL %p is now in state %s [type=%d,val=%d].",
+  log_debug(LD_HANDSHAKE, "SSL %p is now in state %s [type=%d,val=%d].", /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
             ssl, SSL_state_string_long(ssl), type, val);
 }
 
@@ -1441,7 +1441,7 @@ tor_tls_classify_client_ciphers(const SSL *ssl,
         strcmp(ciphername, TLS1_TXT_DHE_RSA_WITH_AES_256_SHA) &&
         strcmp(ciphername, SSL3_TXT_EDH_RSA_DES_192_CBC3_SHA) &&
         strcmp(ciphername, "(NONE)")) {
-      log_debug(LD_NET, "Got a non-version-1 cipher called '%s'", ciphername);
+      log_debug(LD_NET, "Got a non-version-1 cipher called '%s'", ciphername); /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
       // return 1;
       goto v2_or_higher;
     }
@@ -1479,7 +1479,7 @@ tor_tls_classify_client_ciphers(const SSL *ssl,
       smartlist_add(elts, (char*)ciphername);
     }
     s = smartlist_join_strings(elts, ":", 0, NULL);
-    log_debug(LD_NET, "Got a %s V2/V3 cipher list from %s.  It is: '%s'",
+    log_debug(LD_NET, "Got a %s V2/V3 cipher list from %s.  It is: '%s'", /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
               (res == CIPHERS_V2) ? "fictitious" : "real", ADDR(tor_tls), s);
     tor_free(s);
     smartlist_free(elts);
@@ -1534,7 +1534,6 @@ tor_tls_server_info_callback(const SSL *ssl, int type, int val)
   if ((ssl_state != SSL3_ST_SW_SRVR_HELLO_A) &&
       (ssl_state != SSL3_ST_SW_SRVR_HELLO_B))
     return;
-
   tls = tor_tls_get_by_ssl(ssl);
   if (tls) {
     /* Check whether we're watching for renegotiates.  If so, this is one! */
@@ -1561,10 +1560,10 @@ tor_tls_server_info_callback(const SSL *ssl, int type, int val)
     /* Don't send a hello request. */
     SSL_set_verify((SSL*) ssl, SSL_VERIFY_NONE, NULL);
 
-    if (tls) {
+    if (tls) { /* LCOV_EXCL_BR_LINE impossible to have tls be NULL here, it's checked earlier */
       tls->wasV2Handshake = 1;
     } else {
-      log_warn(LD_BUG, "Couldn't look up the tls for an SSL*. How odd!");
+      log_warn(LD_BUG, "Couldn't look up the tls for an SSL*. How odd!"); /* LCOV_EXCL_LINE this line is not reachable */
     }
   }
 }
@@ -1828,12 +1827,12 @@ tor_tls_read,(tor_tls_t *tls, char *cp, size_t len))
   }
   err = tor_tls_get_error(tls, r, CATCH_ZERO, "reading", LOG_DEBUG, LD_NET);
   if (err == TOR_TLS_ZERORETURN_ || err == TOR_TLS_CLOSE) {
-    log_debug(LD_NET,"read returned r=%d; TLS is closed",r);
+    log_debug(LD_NET,"read returned r=%d; TLS is closed",r); /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
     tls->state = TOR_TLS_ST_CLOSED;
     return TOR_TLS_CLOSE;
   } else {
     tor_assert(err != TOR_TLS_DONE);
-    log_debug(LD_NET,"read returned r=%d, err=%d",r,err);
+    log_debug(LD_NET,"read returned r=%d, err=%d",r,err); /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
     return err;
   }
 }
@@ -1863,7 +1862,7 @@ tor_tls_write(tor_tls_t *tls, const char *cp, size_t n)
   if (tls->wantwrite_n) {
     /* if WANTWRITE last time, we must use the _same_ n as before */
     tor_assert(n >= tls->wantwrite_n);
-    log_debug(LD_NET,"resuming pending-write, (%d to flush, reusing %d)",
+    log_debug(LD_NET,"resuming pending-write, (%d to flush, reusing %d)", /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
               (int)n, (int)tls->wantwrite_n);
     n = tls->wantwrite_n;
     tls->wantwrite_n = 0;
@@ -1895,16 +1894,16 @@ tor_tls_handshake(tor_tls_t *tls)
   check_no_tls_errors();
   oldstate = SSL_state(tls->ssl);
   if (tls->isServer) {
-    log_debug(LD_HANDSHAKE, "About to call SSL_accept on %p (%s)", tls,
+    log_debug(LD_HANDSHAKE, "About to call SSL_accept on %p (%s)", tls, /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
               SSL_state_string_long(tls->ssl));
     r = SSL_accept(tls->ssl);
   } else {
-    log_debug(LD_HANDSHAKE, "About to call SSL_connect on %p (%s)", tls,
+    log_debug(LD_HANDSHAKE, "About to call SSL_connect on %p (%s)", tls, /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
               SSL_state_string_long(tls->ssl));
     r = SSL_connect(tls->ssl);
   }
   if (oldstate != SSL_state(tls->ssl))
-    log_debug(LD_HANDSHAKE, "After call, %p was in state %s",
+    log_debug(LD_HANDSHAKE, "After call, %p was in state %s",  /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
               tls, SSL_state_string_long(tls->ssl));
   /* We need to call this here and not earlier, since OpenSSL has a penchant
    * for clearing its flags when you say accept or connect. */
@@ -1949,7 +1948,7 @@ tor_tls_finish_handshake(tor_tls_t *tls)
                  " get set. Fixing that.");
       }
       tls->wasV2Handshake = 1;
-      log_debug(LD_HANDSHAKE, "Completed V2 TLS handshake with client; waiting"
+      log_debug(LD_HANDSHAKE, "Completed V2 TLS handshake with client; waiting" /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
                 " for renegotiation.");
     } else {
       tls->wasV2Handshake = 0;
@@ -1962,11 +1961,11 @@ tor_tls_finish_handshake(tor_tls_t *tls)
     STACK_OF(X509) *chain = SSL_get_peer_cert_chain(tls->ssl);
     int n_certs = sk_X509_num(chain);
     if (n_certs > 1 || (n_certs == 1 && cert != sk_X509_value(chain, 0))) {
-      log_debug(LD_HANDSHAKE, "Server sent back multiple certificates; it "
+      log_debug(LD_HANDSHAKE, "Server sent back multiple certificates; it " /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
                 "looks like a v1 handshake on %p", tls);
       tls->wasV2Handshake = 0;
     } else {
-      log_debug(LD_HANDSHAKE,
+      log_debug(LD_HANDSHAKE, /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
                 "Server sent back a single certificate; looks like "
                 "a v2 handshake on %p.", tls);
       tls->wasV2Handshake = 1;
