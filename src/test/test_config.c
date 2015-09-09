@@ -7,20 +7,44 @@
 
 #define CONFIG_PRIVATE
 #define PT_PRIVATE
+#define ROUTERSET_PRIVATE
 #include "or.h"
+#include "address.h"
 #include "addressmap.h"
+#include "circuitmux_ewma.h"
+#include "circuitbuild.h"
 #include "config.h"
 #include "confparse.h"
+#include "connection.h"
 #include "connection_edge.h"
 #include "test.h"
 #include "util.h"
 #include "address.h"
+#include "connection_or.h"
+#include "control.h"
+#include "cpuworker.h"
+#include "dirserv.h"
+#include "dirvote.h"
+#include "dns.h"
 #include "entrynodes.h"
 #include "transports.h"
-#include "routerlist.h"
+#include "ext_orport.h"
+#include "geoip.h"
+#include "hibernate.h"
+#include "main.h"
 #include "networkstatus.h"
+#include "nodelist.h"
+#include "policies.h"
+#include "rendclient.h"
+#include "rendservice.h"
 #include "router.h"
-#include "dirserv.h"
+#include "routerlist.h"
+#include "router.h"
+#include "routerset.h"
+#include "statefile.h"
+#include "test.h"
+#include "transports.h"
+#include "util.h"
 
 static void
 test_config_addressmap(void *arg)
@@ -3686,6 +3710,2023 @@ test_config_default_fallback_dirs(void *arg)
   done:
   clear_dir_servers();
 }
+//Mock get_options_mutable
+static or_options_t * mock_global_options = NULL;
+
+or_options_t *
+mock_get_options_mutable(void)
+{
+  tor_assert(mock_global_options);
+  return mock_global_options;
+}
+
+void
+init_mock_global_options(void)
+{
+  or_options_t *current = get_options_mutable();
+  mock_global_options = tor_memdup(current,sizeof(or_options_t));
+  MOCK(get_options_mutable,mock_get_options_mutable);
+}
+
+static or_options_t *
+test_setup_option_CMD_TOR()
+{
+  or_options_t *options;
+
+  init_mock_global_options();
+  options = get_options_mutable();
+  options->command = CMD_RUN_TOR;
+
+  return options;
+}
+
+static void
+test_config_options_act_with_NULL_old_options(void *arg)
+{
+  or_options_t *options, *old_options = NULL;
+  options = test_setup_option_CMD_TOR();
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_not_DisableDebuggerAttachment(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  int currentDisableDebuggerAttachment = options->DisableDebuggerAttachment;
+  options->DisableDebuggerAttachment = 0;
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  options->DisableDebuggerAttachment = currentDisableDebuggerAttachment;
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_Tor2webMode_err(void *arg)
+{
+  mark_logs_temp();
+  close_temp_logs();
+
+  or_options_t *options, *old_options;
+  old_options = options_new();
+
+  options = test_setup_option_CMD_TOR();
+
+  //Options should not have Tor2webMode without compiled as ENABLE_TOR2WEB_MODE
+  options->Tor2webMode = 1;
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+ done:
+  UNMOCK(get_options_mutable);
+  options->Tor2webMode = 0;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_DirAuthority_line_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  config_line_t *test_dir_authority = tor_malloc_zero(sizeof(config_line_t));
+  test_dir_authority->key = tor_strdup("DirAuthority");
+  test_dir_authority->value = tor_strdup("D0");
+  options->DirAuthorities = test_dir_authority;
+  options->DisableDebuggerAttachment = 0;
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(test_dir_authority->key);
+  tor_free(test_dir_authority->value);
+  tor_free(test_dir_authority);
+
+  options->DirAuthorities = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_Bridge(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  config_line_t *test_bridges = tor_malloc_zero(sizeof(config_line_t));
+  test_bridges->key = tor_strdup("Bridges");
+  test_bridges->value = tor_strdup("192.0.2.1:4123");
+  test_bridges->next = NULL;
+  options->Bridges = test_bridges;
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(test_bridges->key);
+  tor_free(test_bridges->value);
+  tor_free(test_bridges);
+  options->Bridges = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_Bridge_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  config_line_t *test_bridges = tor_malloc_zero(sizeof(config_line_t));
+  test_bridges->key = tor_strdup("NotBridges");
+  test_bridges->value = tor_strdup("some not correct format of Bridge");
+  test_bridges->next = NULL;
+  options->Bridges = test_bridges;
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(test_bridges->key);
+  tor_free(test_bridges->value);
+  tor_free(test_bridges);
+  options->Bridges = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_ClientTransportPlugin_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  config_line_t *test_clientTransportPlugin =
+      tor_malloc_zero(sizeof(config_line_t));
+  test_clientTransportPlugin->key = tor_strdup("ClientTransportPlugin");
+  test_clientTransportPlugin->value = tor_strdup("some not correct "
+                                    "format of ClientTransportPlugin");
+  options->ClientTransportPlugin = test_clientTransportPlugin;
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(test_clientTransportPlugin->key);
+  tor_free(test_clientTransportPlugin->value);
+  tor_free(test_clientTransportPlugin);
+  options->ClientTransportPlugin = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#define NS_MODULE server_mode
+#define NS_SUBMODULE ServerTransportPlugin_err
+NS_DECL(int, server_mode, (const or_options_t *options));
+
+static int
+NS(server_mode)(const or_options_t *options)
+{
+  (void)options;
+  CALLED(server_mode)++;
+
+  return 1;
+}
+
+static void
+test_config_options_act_ServerTransportPlugin_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  config_line_t *test_serverTransportPlugin =
+      tor_malloc_zero(sizeof(config_line_t));
+  test_serverTransportPlugin->key = tor_strdup("ServerTransportPlugin");
+  test_serverTransportPlugin->value = tor_strdup("some not correct format "
+                                                "of ServerTransportPlugin");
+  options->ServerTransportPlugin = test_serverTransportPlugin;
+  NS_MOCK(server_mode);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(server_mode);
+  UNMOCK(get_options_mutable);
+  tor_free(test_serverTransportPlugin->key);
+  tor_free(test_serverTransportPlugin->value);
+  tor_free(test_serverTransportPlugin);
+  options->ServerTransportPlugin = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE util
+#define NS_SUBMODULE finish_daemon
+NS_DECL(void, finish_daemon, (const char *desired_cwd));
+void
+NS(finish_daemon)(const char *desired_cwd)
+{
+  (void) desired_cwd;
+  CALLED(finish_daemon)++;
+}
+
+static void
+test_config_options_act_RunAsDaemon(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(finish_daemon);
+  options->RunAsDaemon = 1;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(finish_daemon), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(finish_daemon);
+  UNMOCK(get_options_mutable);
+  options->RunAsDaemon = 0;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE router_initialize_tls_context
+static void
+test_config_options_act_options_transit_req_fresh_tls_cxt(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->V3AuthoritativeDir = 0;
+  old_options->V3AuthoritativeDir = 1;
+  old_options->DataDirectory = options->DataDirectory;
+  old_options->NumCPUs = options->NumCPUs;
+  old_options->ORPort_lines = options->ORPort_lines;
+  old_options->ServerDNSSearchDomains = options->ServerDNSSearchDomains;
+  old_options->SafeLogging_ = options->SafeLogging_;
+  old_options->ClientOnly = options->ClientOnly;
+  tt_int_op(public_server_mode(old_options),OP_EQ,public_server_mode(options));
+  old_options->Logs = options->Logs;
+  old_options->LogMessageDomains = options->LogMessageDomains;
+  options->TLSECGroup = "P256";
+  old_options->TLSECGroup = "P224";
+  crypto_pk_t *key = NULL;
+  key = pk_generate(2);
+  set_client_identity_key(key);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  options->V3AuthoritativeDir = 0;
+  old_options->V3AuthoritativeDir = 0;
+  options->TLSECGroup = NULL;
+  old_options->TLSECGroup = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#define NS_SUBMODULE dns_reset_fail
+
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  CALLED(dns_reset)++;
+  return -1;
+}
+
+static void
+test_config_options_act_options_transit_req_fresh_tls_cxt_fail(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->V3AuthoritativeDir = 0;
+  old_options->V3AuthoritativeDir = 1;
+  old_options->DataDirectory = options->DataDirectory;
+  old_options->NumCPUs = options->NumCPUs;
+  old_options->ORPort_lines = options->ORPort_lines;
+  old_options->ServerDNSSearchDomains = options->ServerDNSSearchDomains;
+  old_options->SafeLogging_ = options->SafeLogging_;
+  old_options->ClientOnly = options->ClientOnly;
+  tt_int_op(public_server_mode(old_options),OP_EQ,public_server_mode(options));
+  old_options->Logs = options->Logs;
+  old_options->LogMessageDomains = options->LogMessageDomains;
+  options->TLSECGroup = "P256";
+  old_options->TLSECGroup = "P224";
+  crypto_pk_t *key = NULL;
+  key = pk_generate(2);
+  set_client_identity_key(key);
+
+  NS_MOCK(dns_reset);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(dns_reset);
+  UNMOCK(get_options_mutable);
+  options->V3AuthoritativeDir = 0;
+  old_options->V3AuthoritativeDir = 0;
+  options->TLSECGroup = NULL;
+  old_options->TLSECGroup = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+
+#define NS_SUBMODULE router_initialize_tls_context_error
+NS_DECL(int, router_initialize_tls_context, (void));
+
+int
+NS(router_initialize_tls_context)(void)
+{
+  CALLED(router_initialize_tls_context)++;
+  return -1;
+};
+
+static void
+test_config_options_act_options_transit_req_fresh_tls_cxt_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->V3AuthoritativeDir = 0;
+  old_options->V3AuthoritativeDir = 1;
+  old_options->DataDirectory = options->DataDirectory;
+  old_options->NumCPUs = options->NumCPUs;
+  old_options->ORPort_lines = options->ORPort_lines;
+  old_options->ServerDNSSearchDomains = options->ServerDNSSearchDomains;
+  old_options->SafeLogging_ = options->SafeLogging_;
+  old_options->ClientOnly = options->ClientOnly;
+  tt_int_op(public_server_mode(old_options),OP_EQ,public_server_mode(options));
+  old_options->Logs = options->Logs;
+  old_options->LogMessageDomains = options->LogMessageDomains;
+  options->TLSECGroup = "P256";
+  old_options->TLSECGroup = "P224";
+  crypto_pk_t *key = NULL;
+  key = pk_generate(2);
+  set_client_identity_key(key);
+  NS_MOCK(router_initialize_tls_context);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(router_initialize_tls_context), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(router_initialize_tls_context);
+  UNMOCK(get_options_mutable);
+  options->V3AuthoritativeDir = 0;
+  old_options->V3AuthoritativeDir = 0;
+  options->TLSECGroup = NULL;
+  old_options->TLSECGroup = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE policies_parse_from_options
+#define NS_SUBMODULE error
+NS_DECL(int, policies_parse_from_options, (const or_options_t *options));
+
+static int
+NS(policies_parse_from_options)(const or_options_t *options)
+{
+  (void) options;
+
+  CALLED(policies_parse_from_options)++;
+  return -1;
+}
+
+static void
+test_config_options_act_policies_parse_from_options_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(policies_parse_from_options);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(policies_parse_from_options), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(policies_parse_from_options);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE init_control_cookie_authentication
+#define NS_SUBMODULE error
+NS_DECL(int, init_control_cookie_authentication, (int enabled));
+
+static int
+NS(init_control_cookie_authentication)(int enabled)
+{
+  (void) enabled;
+
+  CALLED(init_control_cookie_authentication)++;
+  return -1;
+}
+
+static void
+test_config_options_act_init_control_cookie_authentication_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(init_control_cookie_authentication);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(init_control_cookie_authentication), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(init_control_cookie_authentication);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE rend_service_load_all_keys
+#define NS_SUBMODULE error
+NS_DECL(int, rend_service_load_all_keys, (void));
+
+static int
+NS(rend_service_load_all_keys)(void)
+{
+  CALLED(rend_service_load_all_keys)++;
+  return -1;
+}
+
+static void
+test_config_options_act_rend_service_load_all_keys_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(rend_service_load_all_keys);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(rend_service_load_all_keys), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(rend_service_load_all_keys);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE accounting_parse_options
+#define NS_SUBMODULE error
+NS_DECL(int, accounting_parse_options, (const or_options_t *options,
+                                        int validate_only));
+
+static int
+NS(accounting_parse_options)(const or_options_t *options, int validate_only)
+{
+  CALLED(accounting_parse_options)++;
+  return -1;
+}
+
+static void
+test_config_options_act_accounting_parse_options_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(accounting_parse_options);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(accounting_parse_options), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(accounting_parse_options);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE accounting_is_enabled
+#define NS_SUBMODULE error
+NS_DECL(int, accounting_is_enabled, (const or_options_t *options));
+NS_DECL(void, configure_accounting, (time_t now));
+
+static int
+NS(accounting_is_enabled)(const or_options_t *options)
+{
+  (void) options;
+  CALLED(accounting_is_enabled)++;
+  return 1;
+}
+
+void
+NS(configure_accounting)(time_t now)
+{
+  (void) now;
+  CALLED(configure_accounting)++;
+}
+
+static void
+test_config_options_act_accounting_is_enabled(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(accounting_is_enabled);
+  NS_MOCK(configure_accounting);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(accounting_is_enabled), OP_GT, 0);
+  tt_int_op(CALLED(configure_accounting), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(accounting_is_enabled);
+  NS_UNMOCK(configure_accounting);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE cell_ewma_enabled
+#define NS_SUBMODULE enabled
+NS_DECL(int, cell_ewma_enabled, (void));
+
+static int
+NS(old_ewma_enabled) = 0;
+
+static int
+NS(cell_ewma_enabled)(void)
+{
+  if (CALLED(cell_ewma_enabled)) {
+    CALLED(cell_ewma_enabled)++;
+    return !NS(old_ewma_enabled);
+  }
+  CALLED(cell_ewma_enabled)++;
+  return NS(old_ewma_enabled);
+}
+
+static void
+test_config_options_act_cell_ewma_enabled(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(cell_ewma_enabled);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(cell_ewma_enabled), OP_EQ, 2);
+
+ done:
+  NS_UNMOCK(cell_ewma_enabled);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#define NS_SUBMODULE disabled
+NS_DECL(int, cell_ewma_enabled, (void));
+
+static int
+NS(old_ewma_enabled) = 1;
+
+static int
+NS(cell_ewma_enabled)(void)
+{
+  if (CALLED(cell_ewma_enabled)) {
+    CALLED(cell_ewma_enabled)++;
+    return !NS(old_ewma_enabled);
+  }
+  CALLED(cell_ewma_enabled)++;
+  return NS(old_ewma_enabled);
+}
+
+static void
+test_config_options_act_cell_ewma_disabled(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(cell_ewma_enabled);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(cell_ewma_enabled), OP_EQ, 3);
+
+ done:
+  NS_UNMOCK(cell_ewma_enabled);
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+static void
+test_config_options_act_write_pidfile(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->PidFile = "tmp/tor_test_PidFile";
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  options->PidFile = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#define NS_MODULE alloc_http_authenticator
+static void
+test_config_options_act_BridgePassword(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->BridgePassword = "some password";
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  options->BridgePassword = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#define NS_SUBMODULE null
+NS_DECL(char *, alloc_http_authenticator, (const char *authenticator));
+char *
+NS(alloc_http_authenticator)(const char *authenticator)
+{
+    (void)authenticator;
+    CALLED(alloc_http_authenticator)++;
+    return NULL;
+}
+
+static void
+test_config_options_act_BridgePassword_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+  options->BridgePassword = "some password";
+
+  NS_MOCK(alloc_http_authenticator);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(alloc_http_authenticator), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(alloc_http_authenticator);
+  UNMOCK(get_options_mutable);
+  options->BridgePassword = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+static void
+test_config_options_act_parse_outbound_addresses_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+  options->BridgePassword = "some password";
+
+  options->OutboundBindAddress = tor_malloc_zero(sizeof(config_line_t));
+  options->OutboundBindAddress->key = tor_strdup("OutboundBindAddress");
+  options->OutboundBindAddress->value = tor_strdup("some invalid address");
+  options->OutboundBindAddress->next = NULL;
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+ done:
+  UNMOCK(get_options_mutable);
+  options->OutboundBindAddress = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#define NS_MODULE routerset_add_unknown_ccs
+#define NS_SUBMODULE error
+
+NS_DECL(int, routerset_add_unknown_ccs, (routerset_t **setp,
+                                         int only_if_some_cc_set));
+
+int
+NS(routerset_add_unknown_ccs)(routerset_t **setp, int only_if_some_cc_set)
+{
+    (void)setp;
+    (void)only_if_some_cc_set;
+    CALLED(routerset_add_unknown_ccs)++;
+    return 1;
+}
+
+static void
+test_config_options_act_routerset_add_unknown_ccs_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(routerset_add_unknown_ccs);
+
+  options->BridgePassword = "some password";
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  NS_UNMOCK(routerset_add_unknown_ccs);
+  UNMOCK(get_options_mutable);
+  options->BridgePassword = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+static void
+test_config_options_act_circuit_change_by_UseBridges(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->UseEntryGuards = 0;
+  old_options->UseEntryGuards = 1;
+  options->UseBridges = 1;
+  old_options->UseBridges = 0;
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_circuit_change_by_Bridges_line_update(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->UseEntryGuards = 0;
+  old_options->UseEntryGuards = 1;
+  options->UseBridges = 1;
+  old_options->UseBridges = 1;
+
+  options->Bridges = tor_malloc_zero(sizeof(config_line_t));
+  options->Bridges->key = tor_strdup("Bridges");
+  options->Bridges->value = tor_strdup("192.0.2.1:4123");
+  options->Bridges->next = NULL;
+
+  old_options->Bridges = tor_malloc_zero(sizeof(config_line_t));
+  old_options->Bridges->key = tor_strdup("Bridges");
+  old_options->Bridges->value = tor_strdup("192.0.2.1:4124");
+  old_options->Bridges->next = NULL;
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_circuit_change_by_Nodes_update(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->UseEntryGuards = 0;
+  old_options->UseEntryGuards = 1;
+  options->UseBridges = 1;
+  old_options->UseBridges = 1;
+
+  //Bridge not change
+  options->Bridges = tor_malloc_zero(sizeof(config_line_t));
+  options->Bridges->key = tor_strdup("Bridges");
+  options->Bridges->value = tor_strdup("192.0.2.1:4123");
+  options->Bridges->next = NULL;
+  old_options->Bridges = options->Bridges;
+
+  //ExcludeNodes change
+  options->ExcludeNodes = routerset_new();
+  smartlist_add(options->ExcludeNodes->list, tor_strndup("foo", 3));
+  old_options->ExcludeNodes = NULL;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //ExcludeNodes not change
+  options->ExcludeNodes = routerset_new();
+  smartlist_add(options->ExcludeNodes->list, tor_strndup("foo", 3));
+  old_options->ExcludeNodes = options->ExcludeNodes;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //ExcludeExitNodes change
+  options->ExcludeExitNodes = routerset_new();
+  smartlist_add(options->ExcludeExitNodes->list, tor_strndup("foo", 3));
+  old_options->ExcludeExitNodes = NULL;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //ExcludeExitNodes not change
+  options->ExcludeExitNodes = routerset_new();
+  smartlist_add(options->ExcludeExitNodes->list, tor_strndup("foo", 3));
+  old_options->ExcludeExitNodes = options->ExcludeExitNodes;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //EntryNodes change
+  options->EntryNodes = routerset_new();
+  smartlist_add(options->EntryNodes->list, tor_strndup("foo", 3));
+  old_options->EntryNodes = NULL;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //EntryNodes not change
+  options->EntryNodes = routerset_new();
+  smartlist_add(options->EntryNodes->list, tor_strndup("foo", 3));
+  old_options->EntryNodes = options->EntryNodes;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //ExitNodes change
+  options->ExitNodes = routerset_new();
+  smartlist_add(options->ExitNodes->list, tor_strndup("foo", 3));
+  old_options->ExitNodes = NULL;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //ExitNodes not change
+  options->ExitNodes = routerset_new();
+  smartlist_add(options->ExitNodes->list, tor_strndup("foo", 3));
+  old_options->ExitNodes = options->ExitNodes;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //Tor2webRendezvousPoints change
+  options->Tor2webRendezvousPoints = routerset_new();
+  smartlist_add(options->Tor2webRendezvousPoints->list, tor_strndup("foo", 3));
+  old_options->Tor2webRendezvousPoints = NULL;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //Tor2webRendezvousPoints not change
+  options->Tor2webRendezvousPoints = routerset_new();
+  smartlist_add(options->Tor2webRendezvousPoints->list, tor_strndup("foo", 3));
+  old_options->Tor2webRendezvousPoints = options->Tor2webRendezvousPoints;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //StrictNodes change
+  options->StrictNodes = 1;
+  old_options->StrictNodes = 0;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+ done:
+  UNMOCK(get_options_mutable);
+  tor_free(options->EntryNodes);
+  tor_free(options->ExitNodes);
+  tor_free(options->ExcludeNodes);
+  tor_free(options->ExcludeExitNodes);
+  tor_free(options->Tor2webRendezvousPoints);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_BridgeRelay(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  int tempIsBridgeRelay = options->BridgeRelay;
+  //New option is BridgeRelay
+  options->BridgeRelay = 1;
+  old_options->BridgeRelay = !options->BridgeRelay;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  //New option is BridgeRelay
+  options->BridgeRelay = 0;
+  old_options->BridgeRelay = !options->BridgeRelay;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  options->BridgeRelay = tempIsBridgeRelay;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#define NS_MODULE server_mode
+#define NS_SUBMODULE Statistics_private_server_mode
+NS_DECL(int, public_server_mode, (const or_options_t *options));
+
+static int
+NS(public_server_mode)(const or_options_t *options)
+{
+  (void) options;
+
+  CALLED(public_server_mode)++;
+  return 0;
+}
+
+static void
+test_config_options_act_Statistics_private_server_mode(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->CellStatistics = 1;
+  NS_MOCK(public_server_mode);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(public_server_mode);
+  UNMOCK(get_options_mutable);
+  options->CellStatistics = 0;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+
+#define NS_SUBMODULE Statistics_public_server_mode
+NS_DECL(int, public_server_mode, (const or_options_t *options));
+
+static int
+NS(public_server_mode)(const or_options_t *options)
+{
+  (void)options;
+
+  CALLED(public_server_mode)++;
+  return 1;
+}
+
+NS_DECL(int, server_mode, (const or_options_t *options));
+
+static int
+NS(server_mode)(const or_options_t *options)
+{
+  (void)options;
+
+  CALLED(server_mode)++;
+  return 1;
+}
+
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  CALLED(dns_reset)++;
+  return 0;
+}
+
+static void
+test_config_options_act_enable_Statistics_public_server_mode(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+  options->CellStatistics = 1;
+  old_options->CellStatistics = 0;
+  options->EntryStatistics = 1;
+  old_options->EntryStatistics = 0;
+  options->ExitPortStatistics = 1;
+  old_options->ExitPortStatistics = 0;
+  options->ConnDirectionStatistics = 1;
+  old_options->ConnDirectionStatistics = 0;
+  options->HiddenServiceStatistics = 1;
+  old_options->HiddenServiceStatistics = 0;
+  options->BridgeAuthoritativeDir = 1;
+  old_options->BridgeAuthoritativeDir = 0;
+
+  NS_MOCK(dns_reset);
+  NS_MOCK(server_mode);
+  NS_MOCK(public_server_mode);
+  tt_int_op(options_act(old_options),OP_EQ,0);
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
+
+ done:
+  UNMOCK(get_options_mutable);
+  NS_UNMOCK(dns_reset);
+  NS_UNMOCK(server_mode);
+  NS_UNMOCK(public_server_mode);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_disable_Statistics_public_server_mode(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  old_options->CellStatistics = 1;
+  options->CellStatistics = 0;
+  old_options->EntryStatistics = 1;
+  options->EntryStatistics = 0;
+  old_options->ExitPortStatistics = 1;
+  options->ExitPortStatistics = 0;
+  old_options->ConnDirectionStatistics = 1;
+  options->ConnDirectionStatistics = 0;
+  old_options->HiddenServiceStatistics = 1;
+  options->HiddenServiceStatistics = 0;
+  old_options->BridgeAuthoritativeDir = 1;
+  options->BridgeAuthoritativeDir = 0;
+
+  NS_MOCK(dns_reset);
+  NS_MOCK(server_mode);
+  NS_MOCK(public_server_mode);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
+
+  old_options->CellStatistics = 0;
+  options->CellStatistics = 0;
+  old_options->EntryStatistics = 0;
+  options->EntryStatistics = 0;
+  old_options->ExitPortStatistics = 0;
+  options->ExitPortStatistics = 0;
+  old_options->ConnDirectionStatistics = 0;
+  options->ConnDirectionStatistics = 0;
+  old_options->HiddenServiceStatistics = 0;
+  options->HiddenServiceStatistics = 0;
+  old_options->BridgeAuthoritativeDir = 0;
+  options->BridgeAuthoritativeDir = 0;
+
+  NS_MOCK(dns_reset);
+  NS_MOCK(server_mode);
+  NS_MOCK(public_server_mode);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
+
+  old_options->CellStatistics = 1;
+  options->CellStatistics = 1;
+  old_options->EntryStatistics = 1;
+  options->EntryStatistics = 1;
+  old_options->ExitPortStatistics = 1;
+  options->ExitPortStatistics = 1;
+  old_options->ConnDirectionStatistics = 1;
+  options->ConnDirectionStatistics = 1;
+  old_options->HiddenServiceStatistics = 1;
+  options->HiddenServiceStatistics = 1;
+  old_options->BridgeAuthoritativeDir = 1;
+  options->BridgeAuthoritativeDir = 1;
+
+  NS_MOCK(dns_reset);
+  NS_MOCK(server_mode);
+  NS_MOCK(public_server_mode);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
+
+ done:
+  options->CellStatistics = 0;
+  UNMOCK(get_options_mutable);
+  NS_UNMOCK(dns_reset);
+  NS_UNMOCK(server_mode);
+  NS_UNMOCK(public_server_mode);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+
+#define NS_SUBMODULE EntryStatistics_public_server_mode
+NS_DECL(int, public_server_mode, (const or_options_t *options));
+
+static int
+NS(public_server_mode)(const or_options_t *options)
+{
+  (void)options;
+  CALLED(public_server_mode)++;
+  return 1;
+}
+
+NS_DECL(int, server_mode, (const or_options_t *options));
+
+static int
+NS(server_mode)(const or_options_t *options)
+{
+  (void)options;
+  CALLED(server_mode)++;
+  return 1;
+}
+
+NS_DECL(int, geoip_is_loaded, (sa_family_t family));
+
+static int
+NS(geoip_is_loaded)(sa_family_t family)
+{
+  (void)family;
+  CALLED(geoip_is_loaded)++;
+  return 0;
+}
+
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  CALLED(dns_reset)++;
+  return 0;
+}
+
+static void
+test_config_options_act_no_geoIP_db_found_to_mesure_entry_node(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+  options->EntryStatistics = 1;
+  options->ORPort_set = 1;
+  old_options->EntryStatistics = 0;
+  NS_MOCK(public_server_mode);
+  NS_MOCK(server_mode);
+  NS_MOCK(geoip_is_loaded);
+  NS_MOCK(dns_reset);
+
+  options_act(old_options);
+
+  tt_int_op(options->EntryStatistics, OP_EQ, 0);
+  tt_int_op(CALLED(geoip_is_loaded), OP_GT, 0);
+  tt_int_op(CALLED(public_server_mode), OP_GT, 0);
+  tt_int_op(CALLED(server_mode), OP_GT, 0);
+  tt_int_op(CALLED(dns_reset), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(public_server_mode);
+  NS_UNMOCK(server_mode);
+  NS_UNMOCK(geoip_is_loaded);
+  NS_UNMOCK(dns_reset);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE geoip_dirreq_stats_term
+NS_DECL(void, geoip_dirreq_stats_term, (void));
+
+static void
+NS(geoip_dirreq_stats_term)(void)
+{
+  CALLED(geoip_dirreq_stats_term)++;
+}
+
+static void
+test_config_options_act_disable_statistics_geoip_dirreq_stats_term(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(geoip_dirreq_stats_term);
+
+  old_options->DirReqStatistics = 1;
+  options->DirReqStatistics = 0;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(geoip_dirreq_stats_term), OP_EQ, 1);
+
+  old_options->DirReqStatistics = 1;
+  options->DirReqStatistics = 1;
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(geoip_dirreq_stats_term), OP_EQ, 2);
+
+ done:
+  NS_UNMOCK(geoip_dirreq_stats_term);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_MODULE
+
+static void
+test_config_options_act_EntryNodes(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->EntryNodes = routerset_new();
+  smartlist_add(options->EntryNodes->list, tor_strndup("foo", 3));
+  old_options->EntryNodes = NULL;
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  options->EntryNodes->list = NULL;
+  options->EntryNodes = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_ExcludeNodes(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->EntryNodes = routerset_new();
+  options->ExcludeNodes = routerset_new();
+  smartlist_add(options->ExcludeNodes->list, tor_strndup("foo", 3));
+  old_options->ExcludeNodes = NULL;
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  options->EntryNodes = NULL;
+  options->ExcludeNodes->list = NULL;
+  options->ExcludeNodes = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_DirPortFrontPage(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  options->DirPortFrontPage = "";
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+
+ done:
+  options->DirPortFrontPage = NULL;
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+#define NS_MODULE rend_config_services
+#define NS_SUBMODULE error
+NS_DECL(int, rend_config_services, (const or_options_t *options,
+                                    int validate_only));
+
+static int
+NS(rend_config_services)(const or_options_t *options, int validate_only)
+{
+  (void)options;
+  (void)validate_only;
+  CALLED(rend_config_services)++;
+  return -1;
+};
+
+static void
+test_config_options_act_rend_config_services_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(rend_config_services);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(rend_config_services), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(rend_config_services);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE rend_parse_service_authorization
+#define NS_SUBMODULE error
+NS_DECL(int, rend_parse_service_authorization, (const or_options_t *options,
+                                                int validate_only));
+
+static int
+NS(rend_parse_service_authorization)(const or_options_t *options,
+                                     int validate_only)
+{
+  (void)options;
+  (void)validate_only;
+  CALLED(rend_parse_service_authorization)++;
+  return -1;
+};
+
+static void
+test_config_options_act_rend_parse_service_authorization_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(rend_parse_service_authorization);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(rend_parse_service_authorization), OP_GT, 0);
+
+ done:
+  tor_free(options);
+  tor_free(old_options);
+  NS_UNMOCK(rend_parse_service_authorization);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE try_locking
+#define NS_SUBMODULE error
+NS_DECL(int, have_lockfile, (void));
+NS_DECL(int, try_locking, (const or_options_t *options, int err_if_locked));
+
+int
+NS(have_lockfile)(void)
+{
+  CALLED(have_lockfile)++;
+  return 0;
+};
+
+int
+NS(try_locking)(const or_options_t *options, int err_if_locked)
+{
+  (void)options;
+  (void)err_if_locked;
+  CALLED(try_locking)++;
+  return -1;
+};
+
+static void
+test_config_options_act_try_locking_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(have_lockfile);
+  NS_MOCK(try_locking);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(have_lockfile), OP_GT, 0);
+  tt_int_op(CALLED(try_locking), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(have_lockfile);
+  NS_UNMOCK(try_locking);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE or_state_load
+#define NS_SUBMODULE error
+NS_DECL(int,or_state_load,(void));
+
+int
+NS(or_state_load)(void)
+{
+  CALLED(or_state_load)++;
+  return -1;
+};
+
+static void
+test_config_options_act_or_state_load_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(or_state_load);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(or_state_load), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(or_state_load);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE init_ext_or_cookie_authentication
+#define NS_SUBMODULE error
+NS_DECL(int,init_ext_or_cookie_authentication,(int is_enabled));
+
+int
+NS(init_ext_or_cookie_authentication)(int is_enabled)
+{
+  (void)is_enabled;
+  CALLED(init_ext_or_cookie_authentication)++;
+  return -1;
+};
+
+static void
+test_config_options_act_init_ext_or_cookie_authentication_err(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(init_ext_or_cookie_authentication);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(init_ext_or_cookie_authentication), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(init_ext_or_cookie_authentication);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE pt_configure_remaining_proxies
+#define NS_SUBMODULE error
+NS_DECL(int, pt_proxies_configuration_pending, (void));
+
+int
+NS(pt_proxies_configuration_pending)(void)
+{
+  CALLED(pt_proxies_configuration_pending)++;
+  return -1;
+};
+
+NS_DECL(int, net_is_disabled, (void));
+
+int
+NS(net_is_disabled)(void)
+{
+  CALLED(net_is_disabled)++;
+  return 0;
+};
+
+NS_DECL(void, pt_configure_remaining_proxies, (void));
+
+void
+NS(pt_configure_remaining_proxies)(void)
+{
+  CALLED(pt_configure_remaining_proxies)++;
+};
+
+static void
+test_config_options_act_pt_configure_remaining_proxies(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(pt_proxies_configuration_pending);
+  NS_MOCK(net_is_disabled);
+  NS_MOCK(pt_configure_remaining_proxies);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(pt_proxies_configuration_pending), OP_GT, 0);
+  tt_int_op(CALLED(net_is_disabled), OP_GT, 0);
+  tt_int_op(CALLED(pt_configure_remaining_proxies), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(pt_proxies_configuration_pending);
+  NS_UNMOCK(net_is_disabled);
+  NS_UNMOCK(pt_configure_remaining_proxies);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE init_keys
+#define NS_SUBMODULE error
+NS_DECL(int, init_keys, (void));
+
+int
+NS(init_keys)(void)
+{
+  CALLED(init_keys)++;
+  return -1;
+};
+
+static void
+test_config_options_act_init_key_error(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(init_keys);
+
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+  tt_int_op(CALLED(init_keys), OP_GT, 0);
+
+ done:
+  NS_UNMOCK(init_keys);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE dirvote_recalculate_timing
+NS_DECL(void, dirvote_recalculate_timing, (const or_options_t *op,
+                                           time_t now));
+
+static void
+NS(dirvote_recalculate_timing)(const or_options_t *op, time_t now)
+{
+  CALLED(dirvote_recalculate_timing)++;
+}
+
+static void
+test_config_options_act_dirvote_recalc_if_mode_v3_changes(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->AuthoritativeDir = 0;
+
+  options = test_setup_option_CMD_TOR();
+  options->AuthoritativeDir = 1;
+  options->V3AuthoritativeDir = 1;
+
+  NS_MOCK(dirvote_recalculate_timing);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(dirvote_recalculate_timing), OP_EQ, 1);
+
+ done:
+  NS_UNMOCK(dirvote_recalculate_timing);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_no_dirvote_recalc_if_mode_v3_no_changes(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->AuthoritativeDir = 1;
+  old_options->V3AuthoritativeDir = 1;
+
+  options = test_setup_option_CMD_TOR();
+  options->AuthoritativeDir = 1;
+  options->V3AuthoritativeDir = 1;
+
+  NS_MOCK(dirvote_recalculate_timing);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(dirvote_recalculate_timing), OP_EQ, 0);
+
+ done:
+  NS_UNMOCK(dirvote_recalculate_timing);
+  tor_free(options);
+  tor_free(old_options);
+  (void)arg;
+}
+
+static void
+test_config_options_act_no_dirvote_recalc_if_no_old_options(void *arg)
+{
+  or_options_t *options;
+  options = test_setup_option_CMD_TOR();
+
+  NS_MOCK(dirvote_recalculate_timing);
+  options_act(NULL);
+  tt_int_op(CALLED(dirvote_recalculate_timing), OP_EQ, 0);
+
+ done:
+  (void)arg;
+  NS_UNMOCK(dirvote_recalculate_timing);
+  tor_free(options);
+}
+#undef NS_MODULE
+
+#define NS_MODULE router_dir_info_changed
+NS_DECL(void, router_dir_info_changed, (void));
+
+static void
+NS(router_dir_info_changed)(void)
+{
+  CALLED(router_dir_info_changed)++;
+}
+
+static void
+test_config_options_act_calls_update_router_when_changes_status(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->BridgeRelay = 1;
+
+  options = test_setup_option_CMD_TOR();
+  options->FetchDirInfoEarly = 1;
+
+  NS_MOCK(router_dir_info_changed);
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(router_dir_info_changed), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  NS_UNMOCK(router_dir_info_changed);
+  tor_free(options);
+  tor_free(old_options);
+}
+#undef NS_MODULE
+
+#define NS_MODULE connection_or_update_token_buckets
+NS_DECL(void, connection_or_update_token_buckets,
+        (smartlist_t *conns, const or_options_t *options));
+
+static void
+NS(connection_or_update_token_buckets)(smartlist_t *conns,
+                                       const or_options_t *options)
+{
+  CALLED(connection_or_update_token_buckets)++;
+}
+
+static void
+test_config_options_act_update_token_buckets_PerConnBWRate_change(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->PerConnBWRate = 0;
+
+  options = test_setup_option_CMD_TOR();
+  options->PerConnBWRate = 1;
+
+  NS_MOCK(connection_or_update_token_buckets);
+
+  tt_int_op(options_act(old_options), OP_EQ, 0);
+  tt_int_op(CALLED(connection_or_update_token_buckets), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  NS_UNMOCK(connection_or_update_token_buckets);
+  tor_free(options);
+  tor_free(old_options);
+}
+#undef NS_MODULE
+
+static or_options_t *
+setup_transition_affects_workers_branch(void)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->NumCPUs = 0;
+  old_options->ClientOnly = 1;
+
+  options = test_setup_option_CMD_TOR();
+  options->NumCPUs = 1;
+  options->ORPort_set = 1;
+
+  return old_options;
+}
+
+#define NS_MODULE transition_affects_workers
+#define NS_SUBMODULE cpu_init_ip_address_changed
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  return 0;
+}
+
+NS_DECL(void, cpu_init, (void));
+
+void
+NS(cpu_init)(void)
+{
+  CALLED(cpu_init)++;
+}
+
+NS_DECL(void, ip_address_changed, (int at_interface));
+
+void
+NS(ip_address_changed)(int at_interface)
+{
+  CALLED(ip_address_changed)++;
+}
+
+static void
+test_config_options_act_transition_affects_workers_cpu_init(void *arg)
+{
+  or_options_t *old_options;
+  old_options = setup_transition_affects_workers_branch();
+
+  NS_MOCK(cpu_init);
+  NS_MOCK(ip_address_changed);
+  NS_MOCK(dns_reset);
+  options_act(old_options);
+
+  tt_int_op(CALLED(cpu_init), OP_EQ, 1);
+  tt_int_op(CALLED(ip_address_changed), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(old_options);
+  NS_UNMOCK(cpu_init);
+  NS_UNMOCK(ip_address_changed);
+  NS_UNMOCK(dns_reset);
+}
+#undef NS_SUBMODULE
+
+#define NS_SUBMODULE cpu_init_ip_address_changed_dns_reset_fail
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  return -1;
+}
+
+NS_DECL(void, cpu_init, (void));
+
+void
+NS(cpu_init)(void)
+{
+  CALLED(cpu_init)++;
+}
+
+NS_DECL(void, ip_address_changed, (int at_interface));
+
+void
+NS(ip_address_changed)(int at_interface)
+{
+  CALLED(ip_address_changed)++;
+}
+
+static void
+test_config_options_act_transition_affects_workers_cpu_init_error(void *arg)
+{
+  or_options_t *old_options;
+  old_options = setup_transition_affects_workers_branch();
+
+  NS_MOCK(cpu_init);
+  NS_MOCK(ip_address_changed);
+  NS_MOCK(dns_reset);
+  tt_int_op(options_act(old_options), OP_EQ, -1);
+
+  tt_int_op(CALLED(cpu_init), OP_EQ, 1);
+  tt_int_op(CALLED(ip_address_changed), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(old_options);
+  NS_UNMOCK(cpu_init);
+  NS_UNMOCK(ip_address_changed);
+  NS_UNMOCK(dns_reset);
+}
+#undef NS_SUBMODULE
+
+#define NS_SUBMODULE inform_testing_reachability
+NS_DECL(int, have_completed_a_circuit, (void));
+
+int
+NS(have_completed_a_circuit)(void)
+{
+  return 1;
+}
+
+NS_DECL(int, inform_testing_reachability, (void));
+
+int
+NS(inform_testing_reachability)(void)
+{
+  CALLED(inform_testing_reachability)++;
+  return 1;
+}
+
+NS_DECL(int, dns_reset, (void));
+
+int
+NS(dns_reset)(void)
+{
+  return 0;
+}
+
+NS_DECL(void, cpu_init, (void));
+
+void
+NS(cpu_init)(void)
+{
+  CALLED(cpu_init)++;
+}
+
+static void
+test_config_options_act_inform_testing_reachability(void *arg)
+{
+  or_options_t *old_options;
+  old_options = setup_transition_affects_workers_branch();
+
+  NS_MOCK(have_completed_a_circuit);
+  NS_MOCK(inform_testing_reachability);
+  NS_MOCK(dns_reset);
+  NS_MOCK(cpu_init);
+  options_act(old_options);
+
+  tt_int_op(CALLED(inform_testing_reachability), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(old_options);
+  NS_UNMOCK(have_completed_a_circuit);
+  NS_UNMOCK(inform_testing_reachability);
+  NS_UNMOCK(dns_reset);
+  NS_UNMOCK(cpu_init);
+}
+#undef NS_SUBMODULE
+#undef NS_MODULE
+
+#define NS_MODULE addressmap_clear_invalid_automaps
+NS_DECL(void, addressmap_clear_invalid_automaps,
+        (const or_options_t *options));
+
+void
+NS(addressmap_clear_invalid_automaps)(const or_options_t *options)
+{
+  CALLED(addressmap_clear_invalid_automaps)++;
+}
+
+static void
+test_config_options_act_revise_automap_entries(void *arg)
+{
+  or_options_t *options, *old_options;
+  old_options = options_new();
+  old_options->AutomapHostsOnResolve = 1;
+
+  options = test_setup_option_CMD_TOR();
+  options->AutomapHostsOnResolve = 0;
+
+  NS_MOCK(addressmap_clear_invalid_automaps);
+  options_act(old_options);
+
+  tt_int_op(CALLED(addressmap_clear_invalid_automaps), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(options);
+  tor_free(old_options);
+  NS_UNMOCK(addressmap_clear_invalid_automaps);
+}
+
+static void
+test_config_options_act_VirtualAddrNetworkIPv4(void *arg)
+{
+  or_options_t *options, *old_options;
+  options = test_setup_option_CMD_TOR();
+  old_options = options_new();
+
+  smartlist_t *list = NULL;
+  list = smartlist_new();
+  options->AutomapHostsSuffixes = list;
+  options->AutomapHostsOnResolve = 1;
+  smartlist_add(list, tor_strndup("foo", 3));
+  old_options->AutomapHostsSuffixes = list;
+
+  old_options->VirtualAddrNetworkIPv4 = "127.192.9.9/99";
+
+  NS_MOCK(addressmap_clear_invalid_automaps);
+  options_act(old_options);
+
+  tt_int_op(CALLED(addressmap_clear_invalid_automaps), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(options);
+  tor_free(old_options);
+  NS_UNMOCK(addressmap_clear_invalid_automaps);
+}
+
+static void
+test_config_options_act_VirtualAddrNetworkIPv6(void *arg)
+{
+  or_options_t *options, *old_options;
+  options = test_setup_option_CMD_TOR();
+  old_options = options_new();
+
+  smartlist_t *list = NULL;
+  list = smartlist_new();
+  options->AutomapHostsSuffixes = list;
+  options->AutomapHostsOnResolve = 1;
+  smartlist_add(list, tor_strndup("foo", 3));
+  old_options->AutomapHostsSuffixes = list;
+
+  old_options->VirtualAddrNetworkIPv6 = "[FE90::]/99";
+  old_options->VirtualAddrNetworkIPv4 = "127.192.0.0/10";
+
+  NS_MOCK(addressmap_clear_invalid_automaps);
+  options_act(old_options);
+
+  tt_int_op(CALLED(addressmap_clear_invalid_automaps), OP_EQ, 1);
+
+ done:
+  (void)arg;
+  tor_free(options);
+  tor_free(old_options);
+  NS_UNMOCK(addressmap_clear_invalid_automaps);
+}
+#undef NS_MODULE
 
 #define CONFIG_TEST(name, flags)                          \
   { #name, test_config_ ## name, flags, NULL, NULL }
@@ -3708,6 +5749,60 @@ struct testcase_t config_tests[] = {
   CONFIG_TEST(write_to_data_subdir, TT_FORK),
   CONFIG_TEST(fix_my_family, 0),
   CONFIG_TEST(directory_fetch, 0),
+  CONFIG_TEST(options_act_with_NULL_old_options, TT_FORK),
+  CONFIG_TEST(options_act_not_DisableDebuggerAttachment, TT_FORK),
+  CONFIG_TEST(options_act_Tor2webMode_err, TT_FORK),
+  CONFIG_TEST(options_act_DirAuthority_line_err, TT_FORK),
+  CONFIG_TEST(options_act_Bridge, TT_FORK),
+  CONFIG_TEST(options_act_Bridge_err, TT_FORK),
+  CONFIG_TEST(options_act_ClientTransportPlugin_err, TT_FORK),
+  CONFIG_TEST(options_act_ServerTransportPlugin_err, TT_FORK),
+  CONFIG_TEST(options_act_RunAsDaemon, TT_FORK),
+  CONFIG_TEST(options_act_options_transit_req_fresh_tls_cxt, TT_FORK),
+  CONFIG_TEST(options_act_options_transit_req_fresh_tls_cxt_fail, TT_FORK),
+  CONFIG_TEST(options_act_options_transit_req_fresh_tls_cxt_error, TT_FORK),
+  CONFIG_TEST(options_act_policies_parse_from_options_error, TT_FORK),
+  CONFIG_TEST(options_act_init_control_cookie_authentication_error, TT_FORK),
+  CONFIG_TEST(options_act_rend_service_load_all_keys_error, TT_FORK),
+  CONFIG_TEST(options_act_accounting_parse_options_error, TT_FORK),
+  CONFIG_TEST(options_act_accounting_is_enabled, TT_FORK),
+  CONFIG_TEST(options_act_cell_ewma_enabled, TT_FORK),
+  CONFIG_TEST(options_act_cell_ewma_disabled, TT_FORK),
+  CONFIG_TEST(options_act_write_pidfile, TT_FORK),
+  CONFIG_TEST(options_act_BridgePassword, TT_FORK),
+  CONFIG_TEST(options_act_BridgePassword_error, TT_FORK),
+  CONFIG_TEST(options_act_parse_outbound_addresses_error, TT_FORK),
+  CONFIG_TEST(options_act_routerset_add_unknown_ccs_error, TT_FORK),
+  CONFIG_TEST(options_act_circuit_change_by_UseBridges, TT_FORK),
+  CONFIG_TEST(options_act_circuit_change_by_Bridges_line_update, TT_FORK),
+  CONFIG_TEST(options_act_circuit_change_by_Nodes_update, TT_FORK),
+  CONFIG_TEST(options_act_BridgeRelay, TT_FORK),
+  CONFIG_TEST(options_act_Statistics_private_server_mode, TT_FORK),
+  CONFIG_TEST(options_act_enable_Statistics_public_server_mode, TT_FORK),
+  CONFIG_TEST(options_act_disable_Statistics_public_server_mode, TT_FORK),
+  CONFIG_TEST(options_act_no_geoIP_db_found_to_mesure_entry_node, TT_FORK),
+  CONFIG_TEST(options_act_disable_statistics_geoip_dirreq_stats_term, TT_FORK),
+  CONFIG_TEST(options_act_EntryNodes, TT_FORK),
+  CONFIG_TEST(options_act_ExcludeNodes, TT_FORK),
+  CONFIG_TEST(options_act_DirPortFrontPage, TT_FORK),
+  CONFIG_TEST(options_act_rend_config_services_err, TT_FORK),
+  CONFIG_TEST(options_act_rend_parse_service_authorization_err, TT_FORK),
+  CONFIG_TEST(options_act_try_locking_err, TT_FORK),
+  CONFIG_TEST(options_act_or_state_load_err, TT_FORK),
+  CONFIG_TEST(options_act_init_ext_or_cookie_authentication_err, TT_FORK),
+  CONFIG_TEST(options_act_pt_configure_remaining_proxies, TT_FORK),
+  CONFIG_TEST(options_act_init_key_error, TT_FORK),
+  CONFIG_TEST(options_act_dirvote_recalc_if_mode_v3_changes, TT_FORK),
+  CONFIG_TEST(options_act_no_dirvote_recalc_if_mode_v3_no_changes, TT_FORK),
+  CONFIG_TEST(options_act_no_dirvote_recalc_if_no_old_options, TT_FORK),
+  CONFIG_TEST(options_act_calls_update_router_when_changes_status, TT_FORK),
+  CONFIG_TEST(options_act_update_token_buckets_PerConnBWRate_change, TT_FORK),
+  CONFIG_TEST(options_act_transition_affects_workers_cpu_init, TT_FORK),
+  CONFIG_TEST(options_act_transition_affects_workers_cpu_init_error, TT_FORK),
+  CONFIG_TEST(options_act_inform_testing_reachability, TT_FORK),
+  CONFIG_TEST(options_act_revise_automap_entries, TT_FORK),
+  CONFIG_TEST(options_act_VirtualAddrNetworkIPv4, TT_FORK),
+  CONFIG_TEST(options_act_VirtualAddrNetworkIPv6, TT_FORK),
   END_OF_TESTCASES
 };
 
