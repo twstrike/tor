@@ -12,7 +12,7 @@
 #ifndef TOR_MAIN_H
 #define TOR_MAIN_H
 
-int have_completed_a_circuit(void);
+MOCK_DECL(int, have_completed_a_circuit, (void));
 void note_that_we_completed_a_circuit(void);
 void note_that_we_maybe_cant_complete_circuits(void);
 
@@ -26,8 +26,8 @@ void add_connection_to_closeable_list(connection_t *conn);
 int connection_is_on_closeable_list(connection_t *conn);
 
 smartlist_t *get_connection_array(void);
-MOCK_DECL(uint64_t,get_bytes_read,(void));
-MOCK_DECL(uint64_t,get_bytes_written,(void));
+MOCK_DECL(uint64_t, get_bytes_read, (void));
+MOCK_DECL(uint64_t, get_bytes_written, (void));
 
 /** Bitmask for events that we can turn on and off with
  * connection_watch_events. */
@@ -38,33 +38,33 @@ typedef enum watchable_events {
 } watchable_events_t;
 void connection_watch_events(connection_t *conn, watchable_events_t events);
 int connection_is_reading(connection_t *conn);
-MOCK_DECL(void,connection_stop_reading,(connection_t *conn));
-MOCK_DECL(void,connection_start_reading,(connection_t *conn));
+MOCK_DECL(void, connection_stop_reading, (connection_t *conn));
+MOCK_DECL(void, connection_start_reading, (connection_t *conn));
 
 int connection_is_writing(connection_t *conn);
-MOCK_DECL(void,connection_stop_writing,(connection_t *conn));
-MOCK_DECL(void,connection_start_writing,(connection_t *conn));
+MOCK_DECL(void, connection_stop_writing, (connection_t *conn));
+MOCK_DECL(void, connection_start_writing, (connection_t *conn));
 
 void connection_stop_reading_from_linked_conn(connection_t *conn);
 
 void directory_all_unreachable(time_t now);
 void directory_info_has_arrived(time_t now, int from_cache);
 
-void ip_address_changed(int at_interface);
+MOCK_DECL(void, ip_address_changed, (int at_interface));
 void dns_servers_relaunch_checks(void);
 void reset_all_main_loop_timers(void);
 void reschedule_descriptor_update_check(void);
 void reschedule_directory_downloads(void);
 
-MOCK_DECL(long,get_uptime,(void));
+MOCK_DECL(long, get_uptime, (void));
 
 unsigned get_signewnym_epoch(void);
 
 void handle_signals(int is_parent);
 void activate_signal(int signal_num);
 
-int try_locking(const or_options_t *options, int err_if_locked);
-int have_lockfile(void);
+MOCK_DECL(int, try_locking, (const or_options_t *options, int err_if_locked));
+MOCK_DECL(int, have_lockfile, (void));
 void release_lockfile(void);
 
 void tor_cleanup(void);

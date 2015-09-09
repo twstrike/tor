@@ -670,8 +670,8 @@ v3_authority_check_key_expiry(void)
 
 /** Set up Tor's TLS contexts, based on our configuration and keys. Return 0
  * on success, and -1 on failure. */
-int
-router_initialize_tls_context(void)
+MOCK_IMPL(int,
+router_initialize_tls_context, (void))
 {
   unsigned int flags = 0;
   const or_options_t *options = get_options();
@@ -811,8 +811,8 @@ init_keys_client(void)
  * On OPs, this only initializes the tls context. Return 0 on success,
  * or -1 if Tor should die.
  */
-int
-init_keys(void)
+MOCK_IMPL(int,
+init_keys, (void))
 {
   char *keydir;
   const char *mydesc;
@@ -1391,8 +1391,8 @@ router_perform_bandwidth_test(int num_circs, time_t now)
 /** Return true iff our network is in some sense disabled: either we're
  * hibernating, entering hibernation, or the network is turned off with
  * DisableNetwork. */
-int
-net_is_disabled(void)
+MOCK_IMPL(int,
+net_is_disabled, (void))
 {
   return get_options()->DisableNetwork || we_are_hibernating();
 }

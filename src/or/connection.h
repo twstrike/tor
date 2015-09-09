@@ -34,8 +34,9 @@ void connection_about_to_close_connection(connection_t *conn);
 void connection_close_immediate(connection_t *conn);
 void connection_mark_for_close_(connection_t *conn,
                                 int line, const char *file);
-void connection_mark_for_close_internal_(connection_t *conn,
-                                         int line, const char *file);
+MOCK_DECL(void, connection_mark_for_close_internal_, (connection_t *conn,
+                                                      int line,
+                                                      const char *file));
 
 #define connection_mark_for_close(c) \
   connection_mark_for_close_((c), __LINE__, SHORT_FILE__)
@@ -253,7 +254,7 @@ int connection_is_listener(connection_t *conn);
 int connection_state_is_open(connection_t *conn);
 int connection_state_is_connecting(connection_t *conn);
 
-char *alloc_http_authenticator(const char *authenticator);
+MOCK_DECL(char *, alloc_http_authenticator, (const char *authenticator));
 
 void assert_connection_ok(connection_t *conn, time_t now);
 int connection_or_nonopen_was_started_here(or_connection_t *conn);

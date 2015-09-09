@@ -42,7 +42,8 @@ int smartlist_pos(const smartlist_t *sl, const void *element);
 int smartlist_string_pos(const smartlist_t *, const char *elt);
 int smartlist_contains_string_case(const smartlist_t *sl, const char *element);
 int smartlist_contains_int_as_string(const smartlist_t *sl, int num);
-int smartlist_strings_eq(const smartlist_t *sl1, const smartlist_t *sl2);
+MOCK_DECL(int, smartlist_strings_eq, (const smartlist_t *sl1,
+                                      const smartlist_t *sl2));
 int smartlist_contains_digest(const smartlist_t *sl, const char *element);
 int smartlist_ints_eq(const smartlist_t *sl1, const smartlist_t *sl2);
 int smartlist_overlap(const smartlist_t *sl1, const smartlist_t *sl2);

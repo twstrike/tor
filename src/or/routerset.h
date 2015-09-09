@@ -31,7 +31,8 @@ int routerset_contains_node(const routerset_t *set, const node_t *node);
 void routerset_get_all_nodes(smartlist_t *out, const routerset_t *routerset,
                              const routerset_t *excludeset,
                              int running_only);
-int routerset_add_unknown_ccs(routerset_t **setp, int only_if_some_cc_set);
+MOCK_DECL(int, routerset_add_unknown_ccs, (routerset_t **setp,
+                                           int only_if_some_cc_set));
 void routerset_subtract_nodes(smartlist_t *out,
                                 const routerset_t *routerset);
 

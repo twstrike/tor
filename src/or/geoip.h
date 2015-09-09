@@ -53,7 +53,7 @@ void geoip_dirreq_stats_init(time_t now);
 void geoip_reset_dirreq_stats(time_t now);
 char *geoip_format_dirreq_stats(time_t now);
 time_t geoip_dirreq_stats_write(time_t now);
-void geoip_dirreq_stats_term(void);
+MOCK_DECL(void, geoip_dirreq_stats_term, (void));
 void geoip_entry_stats_init(time_t now);
 time_t geoip_entry_stats_write(time_t now);
 void geoip_entry_stats_term(void);

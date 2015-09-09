@@ -129,8 +129,8 @@ get_ext_or_auth_cookie_file_name(void)
 /* Initialize the cookie-based authentication system of the
  * Extended ORPort. If <b>is_enabled</b> is 0, then disable the cookie
  * authentication system. */
-int
-init_ext_or_cookie_authentication(int is_enabled)
+MOCK_IMPL(int,
+init_ext_or_cookie_authentication,(int is_enabled))
 {
   char *fname = NULL;
   int retval;

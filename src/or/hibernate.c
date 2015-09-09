@@ -124,8 +124,8 @@ static void accounting_set_wakeup_time(void);
 /** Configure accounting start/end time settings based on
  * options->AccountingStart.  Return 0 on success, -1 on failure. If
  * <b>validate_only</b> is true, do not change the current settings. */
-int
-accounting_parse_options(const or_options_t *options, int validate_only)
+MOCK_IMPL(int,
+accounting_parse_options, (const or_options_t *options, int validate_only))
 {
   time_unit_t unit;
   int ok, idx;
@@ -364,8 +364,8 @@ length_of_accounting_period_containing(time_t now)
 }
 
 /** Initialize the accounting subsystem. */
-void
-configure_accounting(time_t now)
+MOCK_IMPL(void,
+configure_accounting, (time_t now))
 {
   time_t s_now;
   /* Try to remember our recorded usage. */

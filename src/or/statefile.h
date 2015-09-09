@@ -14,7 +14,7 @@ int or_state_save(time_t now);
 void save_transport_to_state(const char *transport_name,
                              const tor_addr_t *addr, uint16_t port);
 char *get_stored_bindaddr_for_server_transport(const char *transport);
-int or_state_load(void);
+MOCK_DECL(int,or_state_load,(void));
 int or_state_loaded(void);
 void or_state_free_all(void);
 

@@ -124,7 +124,8 @@ void dirvote_get_preferred_voting_intervals(vote_timing_t *timing_out);
 time_t dirvote_get_start_of_next_interval(time_t now,
                                           int interval,
                                           int offset);
-void dirvote_recalculate_timing(const or_options_t *options, time_t now);
+MOCK_DECL(void, dirvote_recalculate_timing, (const or_options_t *options,
+                                             time_t now));
 void dirvote_act(const or_options_t *options, time_t now);
 
 /* invoked on timers and by outside triggers. */

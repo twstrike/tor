@@ -821,9 +821,9 @@ connection_or_update_token_buckets_helper(or_connection_t *conn, int reset,
 /** Either our set of relays or our per-conn rate limits have changed.
  * Go through all the OR connections and update their token buckets to make
  * sure they don't exceed their maximum values. */
-void
-connection_or_update_token_buckets(smartlist_t *conns,
-                                   const or_options_t *options)
+MOCK_IMPL(void,
+connection_or_update_token_buckets, (smartlist_t *conns,
+                                     const or_options_t *options))
 {
   SMARTLIST_FOREACH(conns, connection_t *, conn,
   {

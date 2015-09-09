@@ -2504,8 +2504,8 @@ static struct {
 
 /** Set voting_schedule to hold the timing for the next vote we should be
  * doing. */
-void
-dirvote_recalculate_timing(const or_options_t *options, time_t now)
+MOCK_IMPL(void,
+dirvote_recalculate_timing, (const or_options_t *options, time_t now))
 {
   int interval, vote_delay, dist_delay;
   time_t start;

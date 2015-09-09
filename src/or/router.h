@@ -35,8 +35,8 @@ void v3_authority_check_key_expiry(void);
 di_digest256_map_t *construct_ntor_key_map(void);
 void ntor_key_map_free(di_digest256_map_t *map);
 
-int router_initialize_tls_context(void);
-int init_keys(void);
+MOCK_DECL(int, router_initialize_tls_context, (void));
+MOCK_DECL(int, init_keys, (void));
 int init_keys_client(void);
 
 int check_whether_orport_reachable(void);
@@ -47,7 +47,7 @@ void router_orport_found_reachable(void);
 void router_dirport_found_reachable(void);
 void router_perform_bandwidth_test(int num_circs, time_t now);
 
-int net_is_disabled(void);
+MOCK_DECL(int, net_is_disabled, (void));
 
 int authdir_mode(const or_options_t *options);
 int authdir_mode_v3(const or_options_t *options);

@@ -221,8 +221,8 @@ routerset_contains(const routerset_t *set, const tor_addr_t *addr,
  * <b>only_some_cc_set</b> is 0, add the ?? and A1 country codes to
  * *<b>setp</b>, creating it as needed.  Return true iff *<b>setp</b> changed.
  */
-int
-routerset_add_unknown_ccs(routerset_t **setp, int only_if_some_cc_set)
+MOCK_IMPL(int,
+routerset_add_unknown_ccs, (routerset_t **setp, int only_if_some_cc_set))
 {
   routerset_t *set;
   int add_unknown, add_a1;

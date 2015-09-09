@@ -796,9 +796,9 @@ connection_mark_for_close_(connection_t *conn, int line, const char *file)
  * For all other cases, use connection_mark_and_flush() instead, which
  * checks for or_connection_t properly, instead.  See below.
  */
-void
-connection_mark_for_close_internal_(connection_t *conn,
-                                    int line, const char *file)
+MOCK_IMPL(void, connection_mark_for_close_internal_,
+          (connection_t *conn,
+           int line, const char *file))
 {
   assert_connection_ok(conn,0);
   tor_assert(line);
@@ -4511,8 +4511,8 @@ connection_state_is_connecting(connection_t *conn)
 /** Allocates a base64'ed authenticator for use in http or https
  * auth, based on the input string <b>authenticator</b>. Returns it
  * if success, else returns NULL. */
-char *
-alloc_http_authenticator(const char *authenticator)
+MOCK_IMPL(char *,
+alloc_http_authenticator, (const char *authenticator))
 {
   /* an authenticator in Basic authentication
    * is just the string "username:password" */

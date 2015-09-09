@@ -672,8 +672,8 @@ get_dirportfrontpage, (void))
 }
 
 /** Return the currently configured options. */
-or_options_t *
-get_options_mutable(void)
+MOCK_IMPL(or_options_t *,
+get_options_mutable, (void))
 {
   tor_assert(global_options);
   return global_options;

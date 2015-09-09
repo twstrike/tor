@@ -242,8 +242,8 @@ set_buffer_lengths_to_zero(tor_socket_t s)
 /** Return 1 if we have successfully built a circuit, and nothing has changed
  * to make us think that maybe we can't.
  */
-int
-have_completed_a_circuit(void)
+MOCK_IMPL(int,
+have_completed_a_circuit, (void))
 {
   return can_complete_circuits;
 }
@@ -2190,8 +2190,8 @@ got_libevent_error(void)
 /** Called when our IP address seems to have changed. <b>at_interface</b>
  * should be true if we detected a change in our interface, and false if we
  * detected a change in our published address. */
-void
-ip_address_changed(int at_interface)
+MOCK_IMPL(void,
+ip_address_changed, (int at_interface))
 {
   int server = server_mode(get_options());
 
@@ -3030,8 +3030,8 @@ static tor_lockfile_t *lockfile = NULL;
  * holding the lock, and exit if we can't get it after waiting.  Otherwise,
  * return -1 if we can't get the lockfile.  Return 0 on success.
  */
-int
-try_locking(const or_options_t *options, int err_if_locked)
+MOCK_IMPL(int,
+try_locking,(const or_options_t *options, int err_if_locked))
 {
   if (lockfile)
     return 0;
@@ -3066,8 +3066,8 @@ try_locking(const or_options_t *options, int err_if_locked)
 }
 
 /** Return true iff we've successfully acquired the lock file. */
-int
-have_lockfile(void)
+MOCK_IMPL(int,
+have_lockfile,(void))
 {
   return lockfile != NULL;
 }

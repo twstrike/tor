@@ -24,16 +24,17 @@ origin_circuit_t *circuit_establish_circuit(uint8_t purpose,
 int circuit_handle_first_hop(origin_circuit_t *circ);
 void circuit_n_chan_done(channel_t *chan, int status,
                          int close_origin_circuits);
-int inform_testing_reachability(void);
+MOCK_DECL(int, inform_testing_reachability, (void));
 int circuit_timeout_want_to_count_circ(origin_circuit_t *circ);
-int circuit_send_next_onion_skin(origin_circuit_t *circ);
+MOCK_DECL(int, circuit_send_next_onion_skin,
+          (origin_circuit_t *circ));
 void circuit_note_clock_jumped(int seconds_elapsed);
 int circuit_extend(cell_t *cell, circuit_t *circ);
 int circuit_init_cpath_crypto(crypt_path_t *cpath, const char *key_data,
                               int reverse);
 struct created_cell_t;
-int circuit_finish_handshake(origin_circuit_t *circ,
-                             const struct created_cell_t *created_cell);
+MOCK_DECL(int, circuit_finish_handshake, (origin_circuit_t *circ,
+                                          const struct created_cell_t *reply));
 int circuit_truncated(origin_circuit_t *circ, crypt_path_t *layer,
                       int reason);
 int onionskin_answer(or_circuit_t *circ,
