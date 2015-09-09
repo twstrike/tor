@@ -590,7 +590,7 @@ static const config_var_t testing_tor_network_defaults[] = {
 static char *get_windows_conf_root(void);
 #endif
 static int options_act_reversible(const or_options_t *old_options, char **msg);
-static int options_act(const or_options_t *old_options);
+STATIC int options_act(const or_options_t *old_options);
 static int options_transition_allowed(const or_options_t *old,
                                       const or_options_t *new,
                                       char **msg);
@@ -1446,7 +1446,7 @@ options_transition_requires_fresh_tls_context(const or_options_t *old_options,
  * Note: We haven't moved all the "act on new configuration" logic
  * here yet.  Some is still in do_hup() and other places.
  */
-static int
+STATIC int
 options_act(const or_options_t *old_options)
 {
   config_line_t *cl;
@@ -6168,7 +6168,7 @@ config_parse_unix_port(const char *addrport, char **path_out)
  * <b>out</b> for every port that the client should listen on.  Return 0
  * on success, -1 on failure.
  */
-static int
+STATIC int
 parse_port_config(smartlist_t *out,
                   const config_line_t *ports,
                   const config_line_t *listenaddrs,

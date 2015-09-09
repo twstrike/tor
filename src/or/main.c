@@ -149,7 +149,7 @@ static unsigned newnym_epoch = 0;
 static smartlist_t *connection_array = NULL;
 /** List of connections that have been marked for close and need to be freed
  * and removed from connection_array. */
-static smartlist_t *closeable_connection_lst = NULL;
+STATIC smartlist_t *closeable_connection_lst = NULL;
 /** List of linked connections that are currently reading data into their
  * inbuf from their partner's outbuf. */
 static smartlist_t *active_linked_connection_lst = NULL;
@@ -1428,7 +1428,7 @@ safe_timer_diff(time_t now, time_t next)
 /** Perform regular maintenance tasks.  This function gets run once per
  * second by second_elapsed_callback().
  */
-static void
+STATIC void
 run_scheduled_events(time_t now)
 {
   const or_options_t *options = get_options();

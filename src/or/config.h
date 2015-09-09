@@ -138,6 +138,7 @@ smartlist_t *get_options_for_server_transport(const char *transport);
 #ifdef CONFIG_PRIVATE
 #ifdef TOR_UNIT_TESTS
 extern struct config_format_t options_format;
+STATIC int options_act(const or_options_t *old_options);
 #endif
 
 STATIC port_cfg_t *port_cfg_new(size_t namelen);
@@ -160,6 +161,15 @@ STATIC int parse_dir_authority_line(const char *line,
 STATIC int parse_dir_fallback_line(const char *line, int validate_only);
 STATIC int have_enough_mem_for_dircache(const or_options_t *options,
                                         size_t total_mem, char **msg);
+STATIC int
+parse_port_config(smartlist_t *out,
+                  const config_line_t *ports,
+                  const config_line_t *listenaddrs,
+                  const char *portname,
+                  int listener_type,
+                  const char *defaultaddr,
+                  int defaultport,
+                  const unsigned flags);
 #endif
 
 #endif
