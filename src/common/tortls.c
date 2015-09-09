@@ -1884,6 +1884,7 @@ tor_tls_handshake(tor_tls_t *tls)
   tor_assert(tls);
   tor_assert(tls->ssl);
   tor_assert(tls->state == TOR_TLS_ST_HANDSHAKE);
+
   check_no_tls_errors();
   oldstate = SSL_state(tls->ssl);
   if (tls->isServer) {
