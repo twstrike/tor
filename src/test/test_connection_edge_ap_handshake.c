@@ -5,6 +5,8 @@
 
 #define CONNECTION_PRIVATE
 #define CONNECTION_EDGE_PRIVATE
+#define ROUTERSET_PRIVATE
+#define LOG_PRIVATE
 
 #include "or.h"
 #include "config.h"
@@ -13,8 +15,11 @@
 #include "connection_or.h"
 #include "addressmap.h"
 #include "nodelist.h"
+#include "routerset.h"
 #include "util.h"
+#include "torlog.h"
 #include "test.h"
+#include "log_test_helpers.h"
 
 #define NS_MODULE conn_edge_ap_handshake
 
@@ -325,7 +330,6 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_doesnt_real
     tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
-    destroy_mock_options();
 }
 
 static node_t *exit_node_mock = NULL;
@@ -341,12 +345,62 @@ init_exit_node_mock()
 {
   MOCK(node_get_by_nickname, node_get_by_nickname_mock);
   exit_node_mock = tor_malloc_zero(sizeof(node_t));
+  exit_node_mock->rs = tor_malloc_zero(sizeof(routerstatus_t));
 }
 static void
 destroy_exit_node_mock()
 {
   UNMOCK(node_get_by_nickname);
+  tor_free(exit_node_mock->rs);
   tor_free(exit_node_mock);
+}
+
+static routerset_t *excluded_nodes = NULL;
+
+static void
+test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_for_excluded_exit(void *data)
+{
+  entry_connection_t *conn = data;
+  origin_circuit_t *circuit = NULL;
+  crypt_path_t *path = NULL;
+  int prev_log = setup_capture_of_logs(LOG_INFO);
+
+  init_mark_unattached_ap_mock();
+  init_rewrite_mock();
+  init_exit_node_mock();
+  init_mock_options();
+
+  rewrite_mock->should_close = 0;
+  rewrite_mock->exit_source = ADDRMAPSRC_NONE;
+  SET_SOCKS_ADDRESS(conn->socks_request, "http://www.wellformed.exit");
+  conn->socks_request->command = SOCKS_COMMAND_CONNECT;
+  strlcpy(exit_node_mock->rs->nickname, "wellformed", 10);
+
+  options_mock->AllowDotExit = 1;
+  options_mock->StrictNodes = 0;
+  options_mock->SafeLogging_ = SAFELOG_SCRUB_NONE;
+
+  excluded_nodes = routerset_new();
+  smartlist_add(excluded_nodes->list, "wellformed");
+  strmap_set(excluded_nodes->names, "wellformed", exit_node_mock);
+  options_mock->ExcludeExitNodes = excluded_nodes;
+
+  int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
+
+  tt_int_op(unattachment_reason_spy, OP_EQ, END_STREAM_REASON_TORPROTOCOL);
+  tt_int_op(res, OP_EQ, -1);
+  tt_str_op(mock_saved_log_at(-1), OP_EQ, "Excluded relay in exit address 'http://www.exit'. Refusing.\n");
+
+  done:
+    destroy_mark_unattached_ap_mock();
+    destroy_rewrite_mock();
+    destroy_mock_options();
+    destroy_exit_node_mock();
+    tor_free(rewrite_mock);
+    tor_free(excluded_nodes);
+    tor_free(circuit);
+    tor_free(path);
+    teardown_capture_of_logs(prev_log);
 }
 
 static void
@@ -394,6 +448,7 @@ struct testcase_t conn_edge_ap_handshake_tests[] =
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_exit_but_not_remapped, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_doesnt_really_exist, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_for_excluded_exit, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_to_port0, 0),
   END_OF_TESTCASES
 };
