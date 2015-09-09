@@ -157,21 +157,7 @@ tor_tls_get_by_ssl(const SSL *ssl)
 
 static void tor_tls_context_decref(tor_tls_context_t *ctx);
 static void tor_tls_context_incref(tor_tls_context_t *ctx);
-static X509* tor_tls_create_certificate(crypto_pk_t *rsa,
-                                        crypto_pk_t *rsa_sign,
-                                        const char *cname,
-                                        const char *cname_sign,
-                                        unsigned int cert_lifetime);
 
-static int tor_tls_context_init_one(tor_tls_context_t **ppcontext,
-                                    crypto_pk_t *identity,
-                                    unsigned int key_lifetime,
-                                    unsigned int flags,
-                                    int is_client);
-static tor_tls_context_t *tor_tls_context_new(crypto_pk_t *identity,
-                                              unsigned int key_lifetime,
-                                              unsigned int flags,
-                                              int is_client);
 static int check_cert_lifetime_internal(int severity, const X509 *cert,
                                    int past_tolerance, int future_tolerance);
 
@@ -395,6 +381,7 @@ tor_tls_init(void)
      OPENSSL_VERSION_NUMBER >= OPENSSL_V_SERIES(1,0,1))
     long version = SSLeay();
 
+    /* LCOV_EXCL_START because we can't reasonably test these lines on the same machine */
     if (version >= OPENSSL_V_SERIES(1,0,1)) {
       /* Warn if we could *almost* be running with much faster ECDH.
          If we're built for a 64-bit target, using OpenSSL 1.0.1, but we
@@ -421,6 +408,7 @@ tor_tls_init(void)
                    "support (using the enable-ec_nistp_64_gcc_128 option "
                    "when configuring it) would make ECDH much faster.");
     }
+    /* LCOV_EXCL_STOP */
 #endif
 
     tor_tls_allocate_tor_tls_object_ex_data_index();
@@ -466,16 +454,20 @@ tor_x509_name_new(const char *cname)
 {
   int nid;
   X509_NAME *name;
+  /* LCOV_EXCL_BR_START because these branches will only fail on out of memory errors */
   if (!(name = X509_NAME_new()))
     return NULL;
   if ((nid = OBJ_txt2nid("commonName")) == NID_undef) goto error;
   if (!(X509_NAME_add_entry_by_NID(name, nid, MBSTRING_ASC,
                                    (unsigned char*)cname, -1, -1, 0)))
     goto error;
+  /* LCOV_EXCL_BR_STOP */
   return name;
  error:
+  /* LCOV_EXCL_START because these lines will only execute on out of memory errors*/
   X509_NAME_free(name);
   return NULL;
+  /* LCOV_EXCL_STOP */
 }
 
 /** Generate and sign an X509 certificate with the public key <b>rsa</b>,
@@ -486,12 +478,12 @@ tor_x509_name_new(const char *cname)
  *
  * Return a certificate on success, NULL on failure.
  */
-static X509 *
-tor_tls_create_certificate(crypto_pk_t *rsa,
-                           crypto_pk_t *rsa_sign,
-                           const char *cname,
-                           const char *cname_sign,
-                           unsigned int cert_lifetime)
+MOCK_IMPL(STATIC X509 *,
+          tor_tls_create_certificate,(crypto_pk_t *rsa,
+                                      crypto_pk_t *rsa_sign,
+                                      const char *cname,
+                                      const char *cname_sign,
+                                      unsigned int cert_lifetime))
 {
   /* OpenSSL generates self-signed certificates with random 64-bit serial
    * numbers, so let's do that too. */
@@ -522,17 +514,17 @@ tor_tls_create_certificate(crypto_pk_t *rsa,
     goto error;
   if (!(pkey = crypto_pk_get_evp_pkey_(rsa,0)))
     goto error;
-  if (!(x509 = X509_new()))
+  if (!(x509 = X509_new())) /* LCOV_EXCL_BR_LINE because this can only fail when memory failures occur */
     goto error;
-  if (!(X509_set_version(x509, 2)))
+  if (!(X509_set_version(x509, 2))) /* LCOV_EXCL_BR_LINE because this can only fail when something catastrophic happens in openssl  */
     goto error;
 
   { /* our serial number is 8 random bytes. */
     if (crypto_rand((char *)serial_tmp, sizeof(serial_tmp)) < 0)
       goto error;
-    if (!(serial_number = BN_bin2bn(serial_tmp, sizeof(serial_tmp), NULL)))
+    if (!(serial_number = BN_bin2bn(serial_tmp, sizeof(serial_tmp), NULL))) /* LCOV_EXCL_BR_LINE because this can only fail when memory failures occur */
       goto error;
-    if (!(BN_to_ASN1_INTEGER(serial_number, X509_get_serialNumber(x509))))
+    if (!(BN_to_ASN1_INTEGER(serial_number, X509_get_serialNumber(x509)))) /* LCOV_EXCL_BR_LINE because this can only fail when memory failures occur */
       goto error;
   }
 
@@ -668,8 +660,8 @@ tor_x509_cert_free(tor_x509_cert_t *cert)
  *
  * Steals a reference to x509_cert.
  */
-static tor_x509_cert_t *
-tor_x509_cert_new(X509 *x509_cert)
+MOCK_IMPL(STATIC tor_x509_cert_t *,
+          tor_x509_cert_new,(X509 *x509_cert))
 {
   tor_x509_cert_t *cert;
   EVP_PKEY *pkey;
@@ -682,11 +674,13 @@ tor_x509_cert_new(X509 *x509_cert)
 
   length = i2d_X509(x509_cert, &buf);
   cert = tor_malloc_zero(sizeof(tor_x509_cert_t));
-  if (length <= 0 || buf == NULL) {
+  if (length <= 0 || buf == NULL) { /* LCOV_EXCL_BR_LINE because these conditions can't be provoked without memory failures */
+    /* LCOV_EXCL_START for the same reason as the exclusion above */
     tor_free(cert);
     log_err(LD_CRYPTO, "Couldn't get length of encoded x509 certificate");
     X509_free(x509_cert);
     return NULL;
+    /* LCOV_EXCL_STOP */
   }
   cert->encoded_len = (size_t) length;
   cert->encoded = tor_malloc(length);
@@ -891,7 +885,6 @@ tor_tls_cert_is_valid(int severity,
                       int check_rsa_1024)
 {
   check_no_tls_errors();
-
   EVP_PKEY *cert_key;
   EVP_PKEY *signing_key = X509_get_pubkey(signing_cert->cert);
   int r, key_ok = 0;
@@ -1016,7 +1009,7 @@ tor_tls_context_init(unsigned flags,
  * it generates new certificates; all new connections will use
  * the new SSL context.
  */
-static int
+STATIC int
 tor_tls_context_init_one(tor_tls_context_t **ppcontext,
                          crypto_pk_t *identity,
                          unsigned int key_lifetime,
@@ -1050,7 +1043,7 @@ tor_tls_context_init_one(tor_tls_context_t **ppcontext,
  * <b>identity</b> should be set to the identity key used to sign the
  * certificate.
  */
-static tor_tls_context_t *
+STATIC tor_tls_context_t *
 tor_tls_context_new(crypto_pk_t *identity, unsigned int key_lifetime,
                     unsigned flags, int is_client)
 {
@@ -1197,7 +1190,7 @@ tor_tls_context_new(crypto_pk_t *identity, unsigned int key_lifetime,
       goto error;
     X509_free(cert); /* We just added a reference to cert. */
     cert=NULL;
-    if (idcert) {
+    if (idcert) { /* LCOV_EXCL_BR_LINE because we can't actually get here without a valid idcert */
       X509_STORE *s = SSL_CTX_get_cert_store(result->ctx);
       tor_assert(s);
       X509_STORE_add_cert(s, idcert);
@@ -1481,7 +1474,7 @@ tor_tls_classify_client_ciphers(const SSL *ssl,
     s = smartlist_join_strings(elts, ":", 0, NULL);
     log_debug(LD_NET, "Got a %s V2/V3 cipher list from %s.  It is: '%s'", /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
               (res == CIPHERS_V2) ? "fictitious" : "real", ADDR(tor_tls), s);
-    tor_free(s);
+    tor_free(s); /* LCOV_EXCL_BR_LINE since s will always be non-null here */
     smartlist_free(elts);
   }
  done:
@@ -1623,7 +1616,7 @@ tor_tls_new(int sock, int isServer)
   tor_assert(context); /* make sure somebody made it first */
   if (!(result->ssl = SSL_new(context->ctx))) {
     tls_log_errors(NULL, LOG_WARN, LD_NET, "creating SSL object");
-    tor_free(result);
+    tor_free(result); /* LCOV_EXCL_BR_LINE because result can't be null here */
     goto err;
   }
 
@@ -1632,7 +1625,7 @@ tor_tls_new(int sock, int isServer)
   if (!isServer) {
     char *fake_hostname = crypto_random_hostname(4,25, "www.",".com");
     SSL_set_tlsext_host_name(result->ssl, fake_hostname);
-    tor_free(fake_hostname);
+    tor_free(fake_hostname); /* LCOV_EXCL_BR_LINE because fake_hostname can't be null here */
   }
 #endif
 
@@ -1643,7 +1636,7 @@ tor_tls_new(int sock, int isServer)
     SSL_set_tlsext_host_name(result->ssl, NULL);
 #endif
     SSL_free(result->ssl);
-    tor_free(result);
+    tor_free(result); /* LCOV_EXCL_BR_LINE because this can't be null here */
     goto err;
   }
   result->socket = sock;
@@ -1817,7 +1810,7 @@ tor_tls_read,(tor_tls_t *tls, char *cp, size_t len))
 #ifdef V2_HANDSHAKE_SERVER
     if (tls->got_renegotiate) {
       /* Renegotiation happened! */
-      log_info(LD_NET, "Got a TLS renegotiation from %s", ADDR(tls));
+      log_info(LD_NET, "Got a TLS renegotiation from %s", ADDR(tls)); /* LCOV_EXCL_BR_LINE because testing the branches of ADDR feels not so useful here */
       if (tls->negotiated_callback)
         tls->negotiated_callback(tls, tls->callback_arg);
       tls->got_renegotiate = 0;
@@ -1826,7 +1819,7 @@ tor_tls_read,(tor_tls_t *tls, char *cp, size_t len))
     return r;
   }
   err = tor_tls_get_error(tls, r, CATCH_ZERO, "reading", LOG_DEBUG, LD_NET);
-  if (err == TOR_TLS_ZERORETURN_ || err == TOR_TLS_CLOSE) {
+  if (err == TOR_TLS_ZERORETURN_ || err == TOR_TLS_CLOSE) { /* LCOV_EXCL_BR_LINE err can never be TOR_TLS_CLOSE here because tor_tls_get_error will never return it with those parameters */
     log_debug(LD_NET,"read returned r=%d; TLS is closed",r); /* LCOV_EXCL_BR_LINE since this depends on whether debug is captured or not */
     tls->state = TOR_TLS_ST_CLOSED;
     return TOR_TLS_CLOSE;

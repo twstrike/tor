@@ -144,6 +144,18 @@ STATIC void tor_tls_debug_state_callback(const SSL *ssl, int type, int val);
 STATIC void tor_tls_server_info_callback(const SSL *ssl, int type, int val);
 STATIC int tor_tls_session_secret_cb(SSL *ssl, void *secret, int *secret_len, STACK_OF(SSL_CIPHER) *peer_ciphers, SSL_CIPHER **cipher, void *arg);
 STATIC int find_cipher_by_id(const SSL *ssl, const SSL_METHOD *m, uint16_t cipher);
+MOCK_DECL(STATIC X509*, tor_tls_create_certificate,(crypto_pk_t *rsa,
+                                                    crypto_pk_t *rsa_sign,
+                                                    const char *cname,
+                                                    const char *cname_sign,
+                                                    unsigned int cert_lifetime));
+STATIC tor_tls_context_t *tor_tls_context_new(crypto_pk_t *identity, unsigned int key_lifetime, unsigned flags, int is_client);
+MOCK_DECL(STATIC tor_x509_cert_t *, tor_x509_cert_new,(X509 *x509_cert));
+STATIC int tor_tls_context_init_one(tor_tls_context_t **ppcontext,
+                                    crypto_pk_t *identity,
+                                    unsigned int key_lifetime,
+                                    unsigned int flags,
+                                    int is_client);
 #endif
 
 

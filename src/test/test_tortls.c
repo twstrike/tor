@@ -16,8 +16,26 @@
 #include <openssl/ssl.h>
 #include <openssl/ssl3.h>
 #include <openssl/err.h>
+#include <openssl/asn1t.h>
 
 #define NS_MODULE tortls
+
+extern tor_tls_context_t *server_tls_context;
+extern tor_tls_context_t *client_tls_context;
+
+static SSL_METHOD *
+give_me_a_test_method(void)
+{
+  SSL_METHOD *method = tor_malloc_zero(sizeof(SSL_METHOD));
+  memcpy(method, TLSv1_method(), sizeof(SSL_METHOD));
+  return method;
+}
+
+static int
+fake_num_ciphers(void)
+{
+  return 0;
+}
 
 static void
 test_tortls_errno_to_tls_error(void *data)
@@ -70,7 +88,20 @@ test_tortls_tor_tls_new(void *data)
     tt_int_op(tor_tls_context_init(TOR_TLS_CTX_IS_PUBLIC_SERVER,
                 key1, key2, 86400), OP_EQ, 0);
     tls = tor_tls_new(-1, 0);
-    tt_want(tls)
+    tt_want(tls);
+
+
+    client_tls_context->ctx = NULL;
+    tls = tor_tls_new(-1, 0);
+    tt_assert(!tls);
+
+    SSL_METHOD *method = give_me_a_test_method();
+    SSL_CTX *ctx = SSL_CTX_new(method);
+    method->num_ciphers = fake_num_ciphers;
+    client_tls_context->ctx = ctx;
+    tls = tor_tls_new(-1, 0);
+    tt_assert(!tls);
+
  done:
   UNMOCK(tor_tls_cert_matches_key);
   crypto_pk_free(key1);
@@ -544,9 +575,6 @@ test_tortls_cert_get_key(void *ignored)
  done:
   (void)0;
 }
-
-extern tor_tls_context_t *server_tls_context;
-extern tor_tls_context_t *client_tls_context;
 
 static void
 test_tortls_get_my_client_auth_key(void *ignored)
@@ -1664,12 +1692,6 @@ fake_get_cipher(unsigned ncipher)
   }
 }
 
-static int
-fake_num_ciphers(void)
-{
-  return 0;
-}
-
 static void
 test_tortls_find_cipher_by_id(void *ignored)
 {
@@ -1810,26 +1832,149 @@ test_tortls_server_info_callback(void *ignored)
   tor_free(ssl);
 }
 
+
+static int fixed_ssl_read_result_index;
+static int fixed_ssl_read_result[5];
+static int fixed_ssl_shutdown_result;
+
+static int
+fixed_ssl_read(SSL *s, void *buf, int len)
+{
+  return fixed_ssl_read_result[fixed_ssl_read_result_index++];
+}
+
+static int
+fixed_ssl_shutdown(SSL *s)
+{
+  return fixed_ssl_shutdown_result;
+}
+
+static int fixed_ssl_state_to_set;
+static tor_tls_t *fixed_tls;
+
+static int
+setting_version_ssl_shutdown(SSL *s)
+{
+  s->version = SSL2_VERSION;
+  return fixed_ssl_shutdown_result;
+}
+
+static int
+setting_version_and_state_ssl_shutdown(SSL *s)
+{
+  fixed_tls->state = fixed_ssl_state_to_set;
+  s->version = SSL2_VERSION;
+  return fixed_ssl_shutdown_result;
+}
+
+static int
+dummy_handshake_func(SSL *s)
+{
+  return 1;
+}
+
 static void
 test_tortls_shutdown(void *ignored)
 {
   (void)ignored;
   int ret;
   tor_tls_t *tls;
+  SSL_METHOD *method = give_me_a_test_method();
   int previous_log = setup_capture_of_logs(LOG_WARN);
 
   tls = tor_malloc_zero(sizeof(tor_tls_t));
   tls->ssl = tor_malloc_zero(sizeof(SSL));
+  tls->ssl->method = method;
+  method->ssl_read = fixed_ssl_read;
+  method->ssl_shutdown = fixed_ssl_shutdown;
 
   ret = tor_tls_shutdown(tls);
   tt_int_op(ret, OP_EQ, -9);
 
-  // TODO: fill up
+  tls->state = TOR_TLS_ST_SENTCLOSE;
+  fixed_ssl_read_result_index = 0;
+  fixed_ssl_read_result[0] = 10;
+  fixed_ssl_read_result[1] = -1;
+  ret = tor_tls_shutdown(tls);
+  tt_int_op(ret, OP_EQ, -9);
+
+  tls->ssl->handshake_func = dummy_handshake_func;
+
+  fixed_ssl_read_result_index = 0;
+  fixed_ssl_read_result[0] = 10;
+  fixed_ssl_read_result[1] = 42;
+  fixed_ssl_read_result[2] = 0;
+  fixed_ssl_shutdown_result = 1;
+  ERR_clear_error();
+  tls->ssl->version = SSL2_VERSION;
+  ret = tor_tls_shutdown(tls);
+  tt_int_op(ret, OP_EQ, TOR_TLS_DONE);
+  tt_int_op(tls->state, OP_EQ, TOR_TLS_ST_CLOSED);
+
+  fixed_ssl_read_result_index = 0;
+  fixed_ssl_read_result[0] = 10;
+  fixed_ssl_read_result[1] = 42;
+  fixed_ssl_read_result[2] = 0;
+  fixed_ssl_shutdown_result = 0;
+  ERR_clear_error();
+  tls->ssl->version = 0;
+  ret = tor_tls_shutdown(tls);
+  tt_int_op(ret, OP_EQ, TOR_TLS_DONE);
+  tt_int_op(tls->state, OP_EQ, TOR_TLS_ST_CLOSED);
+
+  fixed_ssl_read_result_index = 0;
+  fixed_ssl_read_result[0] = 10;
+  fixed_ssl_read_result[1] = 42;
+  fixed_ssl_read_result[2] = 0;
+  fixed_ssl_shutdown_result = 0;
+  ERR_clear_error();
+  tls->ssl->version = 0;
+  method->ssl_shutdown = setting_version_ssl_shutdown;
+  ret = tor_tls_shutdown(tls);
+  tt_int_op(ret, OP_EQ, TOR_TLS_ERROR_MISC);
+
+  fixed_ssl_read_result_index = 0;
+  fixed_ssl_read_result[0] = 10;
+  fixed_ssl_read_result[1] = 42;
+  fixed_ssl_read_result[2] = 0;
+  fixed_ssl_shutdown_result = 0;
+  fixed_tls = tls;
+  fixed_ssl_state_to_set = TOR_TLS_ST_GOTCLOSE;
+  ERR_clear_error();
+  tls->ssl->version = 0;
+  method->ssl_shutdown = setting_version_and_state_ssl_shutdown;
+  ret = tor_tls_shutdown(tls);
+  tt_int_op(ret, OP_EQ, TOR_TLS_ERROR_MISC);
+
+  fixed_ssl_read_result_index = 0;
+  fixed_ssl_read_result[0] = 10;
+  fixed_ssl_read_result[1] = 42;
+  fixed_ssl_read_result[2] = 0;
+  fixed_ssl_read_result[3] = -1;
+  fixed_ssl_shutdown_result = 0;
+  fixed_tls = tls;
+  fixed_ssl_state_to_set = 0;
+  ERR_clear_error();
+  tls->ssl->version = 0;
+  method->ssl_shutdown = setting_version_and_state_ssl_shutdown;
+  ret = tor_tls_shutdown(tls);
+  tt_int_op(ret, OP_EQ, TOR_TLS_ERROR_MISC);
 
  done:
   teardown_capture_of_logs(previous_log);
+  tor_free(method);
   tor_free(tls->ssl);
   tor_free(tls);
+}
+
+static int negotiated_callback_called;
+
+static void
+negotiated_callback_setter(tor_tls_t *t, void *arg)
+{
+  (void)t;
+  (void)arg;
+  negotiated_callback_called++;
 }
 
 static void
@@ -1839,6 +1984,7 @@ test_tortls_read(void *ignored)
   int ret;
   tor_tls_t *tls;
   char buf[100];
+  SSL_METHOD *method = give_me_a_test_method();
   int previous_log = setup_capture_of_logs(LOG_WARN);
 
   tls = tor_malloc_zero(sizeof(tor_tls_t));
@@ -1848,12 +1994,55 @@ test_tortls_read(void *ignored)
   ret = tor_tls_read(tls, buf, 10);
   tt_int_op(ret, OP_EQ, -9);
 
+  /* These tests assume that V2_HANDSHAKE_SERVER is set */
+  tls->ssl->handshake_func = dummy_handshake_func;
+  tls->ssl->method = method;
+  method->ssl_read = fixed_ssl_read;
+  fixed_ssl_read_result_index = 0;
+  fixed_ssl_read_result[0] = 42;
+  tls->state = TOR_TLS_ST_OPEN;
+  ERR_clear_error();
+  ret = tor_tls_read(tls, buf, 10);
+  tt_int_op(ret, OP_EQ, 42);
+
+  tls->state = TOR_TLS_ST_OPEN;
+  tls->got_renegotiate = 1;
+  fixed_ssl_read_result_index = 0;
+  ERR_clear_error();
+  ret = tor_tls_read(tls, buf, 10);
+  tt_int_op(tls->got_renegotiate, OP_EQ, 0);
+
+  tls->state = TOR_TLS_ST_OPEN;
+  tls->got_renegotiate = 1;
+  negotiated_callback_called = 0;
+  tls->negotiated_callback = negotiated_callback_setter;
+  fixed_ssl_read_result_index = 0;
+  ERR_clear_error();
+  ret = tor_tls_read(tls, buf, 10);
+  tt_int_op(negotiated_callback_called, OP_EQ, 1);
+
+  fixed_ssl_read_result_index = 0;
+  fixed_ssl_read_result[0] = 0;
+  tls->ssl->version = SSL2_VERSION;
+  ERR_clear_error();
+  ret = tor_tls_read(tls, buf, 10);
+  tt_int_op(ret, OP_EQ, TOR_TLS_CLOSE);
+  tt_int_op(tls->state, OP_EQ, TOR_TLS_ST_CLOSED);
+
   // TODO: fill up
 
  done:
   teardown_capture_of_logs(previous_log);
   tor_free(tls->ssl);
   tor_free(tls);
+}
+
+static int fixed_ssl_write_result;
+
+static int
+fixed_ssl_write(SSL *s, const void *buf, int len)
+{
+  return fixed_ssl_write_result;
 }
 
 
@@ -1863,6 +2052,7 @@ test_tortls_write(void *ignored)
   (void)ignored;
   int ret;
   tor_tls_t *tls;
+  SSL_METHOD *method = give_me_a_test_method();
   char buf[100];
   int previous_log = setup_capture_of_logs(LOG_WARN);
 
@@ -1876,12 +2066,45 @@ test_tortls_write(void *ignored)
   ret = tor_tls_write(tls, buf, 10);
   tt_int_op(ret, OP_EQ, -9);
 
-  // TODO: fill up
+  tls->ssl->method = method;
+  tls->wantwrite_n = 1;
+  ret = tor_tls_write(tls, buf, 10);
+  tt_int_op(tls->wantwrite_n, OP_EQ, 0);
+
+  method->ssl_write = fixed_ssl_write;
+  tls->ssl->handshake_func = dummy_handshake_func;
+  fixed_ssl_write_result = 1;
+  ERR_clear_error();
+  ret = tor_tls_write(tls, buf, 10);
+  tt_int_op(ret, OP_EQ, 1);
+
+  fixed_ssl_write_result = -1;
+  ERR_clear_error();
+  tls->ssl->rwstate = SSL_READING;
+  SSL_set_bio(tls->ssl, BIO_new(BIO_s_mem()), NULL);
+  SSL_get_rbio(tls->ssl)->flags = BIO_FLAGS_READ;
+  ret = tor_tls_write(tls, buf, 10);
+  tt_int_op(ret, OP_EQ, TOR_TLS_WANTREAD);
+
+  ERR_clear_error();
+  tls->ssl->rwstate = SSL_READING;
+  SSL_set_bio(tls->ssl, BIO_new(BIO_s_mem()), NULL);
+  SSL_get_rbio(tls->ssl)->flags = BIO_FLAGS_WRITE;
+  ret = tor_tls_write(tls, buf, 10);
+  tt_int_op(ret, OP_EQ, TOR_TLS_WANTWRITE);
 
  done:
   teardown_capture_of_logs(previous_log);
   tor_free(tls->ssl);
   tor_free(tls);
+}
+
+static int fixed_ssl_renegotiate_result;
+
+static int
+fixed_ssl_renegotiate(SSL *s)
+{
+  return fixed_ssl_renegotiate_result;
 }
 
 static void
@@ -1891,6 +2114,7 @@ test_tortls_renegotiate(void *ignored)
   int ret;
   tor_tls_t *tls;
   SSL_CTX *ctx;
+  SSL_METHOD *method = give_me_a_test_method();
   int previous_log = setup_capture_of_logs(LOG_WARN);
 
   SSL_library_init();
@@ -1905,7 +2129,24 @@ test_tortls_renegotiate(void *ignored)
   ret = tor_tls_renegotiate(tls);
   tt_int_op(ret, OP_EQ, -9);
 
-  // TODO: fill up
+  tls->ssl->method = method;
+  method->ssl_renegotiate = fixed_ssl_renegotiate;
+  fixed_ssl_renegotiate_result = 0;
+  ERR_clear_error();
+  ret = tor_tls_renegotiate(tls);
+  tt_int_op(ret, OP_EQ, -9);
+
+  ERR_clear_error();
+  tls->ssl->handshake_func = dummy_handshake_func;
+  tls->state = TOR_TLS_ST_RENEGOTIATE;
+  ret = tor_tls_renegotiate(tls);
+  tt_int_op(ret, OP_EQ, TOR_TLS_DONE);
+
+  ERR_clear_error();
+  tls->state = TOR_TLS_ST_OPEN;
+  fixed_ssl_renegotiate_result = -1;
+  ret = tor_tls_renegotiate(tls);
+  tt_int_op(ret, OP_EQ, -9);
 
  done:
   teardown_capture_of_logs(previous_log);
@@ -1914,6 +2155,30 @@ test_tortls_renegotiate(void *ignored)
   tor_free(tls);
 }
 
+static int fixed_ssl_accept_result;
+static int fixed_ssl_connect_result;
+
+static int
+setting_error_ssl_accept(SSL *ssl)
+{
+  ERR_put_error(ERR_LIB_BN, 2, -1, "somewhere.c", 99);
+  ERR_put_error(ERR_LIB_SYS, 2, -1, "somewhere.c", 99);
+  return fixed_ssl_accept_result;
+}
+
+static int
+setting_error_ssl_connect(SSL *ssl)
+{
+  ERR_put_error(ERR_LIB_BN, 2, -1, "somewhere.c", 99);
+  ERR_put_error(ERR_LIB_SYS, 2, -1, "somewhere.c", 99);
+  return fixed_ssl_connect_result;
+}
+
+static int
+fixed_ssl_accept(SSL *ssl)
+{
+  return fixed_ssl_accept_result;
+}
 
 static void
 test_tortls_handshake(void *ignored)
@@ -1922,7 +2187,8 @@ test_tortls_handshake(void *ignored)
   int ret;
   tor_tls_t *tls;
   SSL_CTX *ctx;
-  int previous_log = setup_capture_of_logs(LOG_WARN);
+  SSL_METHOD *method = give_me_a_test_method();
+  int previous_log = setup_capture_of_logs(LOG_INFO);
 
   SSL_library_init();
   SSL_load_error_strings();
@@ -1931,12 +2197,47 @@ test_tortls_handshake(void *ignored)
 
   tls = tor_malloc_zero(sizeof(tor_tls_t));
   tls->ssl = SSL_new(ctx);
-  tls->state = TOR_TLS_ST_OPEN;
+  tls->state = TOR_TLS_ST_HANDSHAKE;
 
   ret = tor_tls_handshake(tls);
   tt_int_op(ret, OP_EQ, -9);
 
-  // TODO: fill up
+  tls->isServer = 1;
+  ret = tor_tls_handshake(tls);
+  tt_int_op(ret, OP_EQ, -9);
+
+
+  tls->ssl->method = method;
+  method->ssl_accept = fixed_ssl_accept;
+  fixed_ssl_accept_result = 2;
+  ERR_clear_error();
+  ret = tor_tls_handshake(tls);
+  tt_int_op(tls->state, OP_EQ, TOR_TLS_ST_OPEN);
+
+  method->ssl_accept = setting_error_ssl_accept;
+  fixed_ssl_accept_result = 1;
+  ERR_clear_error();
+  mock_clean_saved_logs();
+  ret = tor_tls_handshake(tls);
+  tt_int_op(ret, OP_EQ, TOR_TLS_ERROR_MISC);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 2);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error while handshaking: (null) (in bignum routines:(null):SSLv3 write client hello B)\n");
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "TLS error while handshaking: (null) (in system library:connect:SSLv3 write client hello B)\n");
+  tt_int_op(mock_saved_severity_at(0), OP_EQ, LOG_INFO);
+  tt_int_op(mock_saved_severity_at(1), OP_EQ, LOG_INFO);
+
+  tls->isServer = 0;
+  method->ssl_connect = setting_error_ssl_connect;
+  fixed_ssl_connect_result = 1;
+  ERR_clear_error();
+  mock_clean_saved_logs();
+  ret = tor_tls_handshake(tls);
+  tt_int_op(ret, OP_EQ, TOR_TLS_ERROR_MISC);
+  tt_int_op(mock_saved_log_number(), OP_EQ, 2);
+  tt_str_op(mock_saved_log_at(0), OP_EQ, "TLS error while handshaking: (null) (in bignum routines:(null):SSLv3 write client hello B)\n");
+  tt_str_op(mock_saved_log_at(1), OP_EQ, "TLS error while handshaking: (null) (in system library:connect:SSLv3 write client hello B)\n");
+  tt_int_op(mock_saved_severity_at(0), OP_EQ, LOG_WARN);
+  tt_int_op(mock_saved_severity_at(1), OP_EQ, LOG_WARN);
 
  done:
   teardown_capture_of_logs(previous_log);
@@ -1952,14 +2253,12 @@ test_tortls_finish_handshake(void *ignored)
   int ret;
   tor_tls_t *tls;
   SSL_CTX *ctx;
-  SSL_METHOD *method = tor_malloc_zero(sizeof(SSL_METHOD));
+  SSL_METHOD *method = give_me_a_test_method();
   SSL_library_init();
   SSL_load_error_strings();
 
   X509 *c1 = read_cert_from(validCertString);
   X509 *c2 = read_cert_from(caCertString);
-
-  memcpy(method, TLSv1_method(), sizeof(SSL_METHOD));
 
   ctx = SSL_CTX_new(method);
 
@@ -2020,6 +2319,372 @@ test_tortls_finish_handshake(void *ignored)
   tor_free(tls);
 }
 
+static int fixed_crypto_pk_new_result_index;
+static crypto_pk_t *fixed_crypto_pk_new_result[5];
+static int fixed_crypto_pk_generate_key_with_bits_result_index;
+static int fixed_crypto_pk_generate_key_with_bits_result[5];
+static int fixed_tor_tls_create_certificate_result_index;
+static X509 *fixed_tor_tls_create_certificate_result[5];
+static int fixed_tor_x509_cert_new_result_index;
+static tor_x509_cert_t *fixed_tor_x509_cert_new_result[5];
+
+static crypto_pk_t *
+fixed_crypto_pk_new(void)
+{
+  return fixed_crypto_pk_new_result[fixed_crypto_pk_new_result_index++];
+}
+
+static int
+fixed_crypto_pk_generate_key_with_bits(crypto_pk_t *env, int bits)
+{
+  return fixed_crypto_pk_generate_key_with_bits_result[fixed_crypto_pk_generate_key_with_bits_result_index++];
+}
+
+static X509 *
+fixed_tor_tls_create_certificate(crypto_pk_t *rsa,
+                                 crypto_pk_t *rsa_sign,
+                                 const char *cname,
+                                 const char *cname_sign,
+                                 unsigned int cert_lifetime)
+{
+  return fixed_tor_tls_create_certificate_result[fixed_tor_tls_create_certificate_result_index++];
+}
+
+static tor_x509_cert_t *
+fixed_tor_x509_cert_new(X509 *x509_cert)
+{
+  return fixed_tor_x509_cert_new_result[fixed_tor_x509_cert_new_result_index++];
+}
+
+static void
+test_tortls_context_new(void *ignored)
+{
+  (void)ignored;
+  tor_tls_context_t *ret;
+  crypto_pk_t *pk1, *pk2, *pk3, *pk4, *pk5, *pk6, *pk7, *pk8, *pk9, *pk10, *pk11, *pk12, *pk13, *pk14, *pk15, *pk16, *pk17, *pk18;
+
+  pk1 = crypto_pk_new();
+  pk2 = crypto_pk_new();
+  pk3 = crypto_pk_new();
+  pk4 = crypto_pk_new();
+  pk5 = crypto_pk_new();
+  pk6 = crypto_pk_new();
+  pk7 = crypto_pk_new();
+  pk8 = crypto_pk_new();
+  pk9 = crypto_pk_new();
+  pk10 = crypto_pk_new();
+  pk11 = crypto_pk_new();
+  pk12 = crypto_pk_new();
+  pk13 = crypto_pk_new();
+  pk14 = crypto_pk_new();
+  pk15 = crypto_pk_new();
+  pk16 = crypto_pk_new();
+  pk17 = crypto_pk_new();
+  pk18 = crypto_pk_new();
+
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = NULL;
+  MOCK(crypto_pk_new, fixed_crypto_pk_new);
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+  MOCK(crypto_pk_generate_key_with_bits, fixed_crypto_pk_generate_key_with_bits);
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = pk1;
+  fixed_crypto_pk_new_result[1] = NULL;
+  fixed_crypto_pk_generate_key_with_bits_result[0] = -1;
+  fixed_crypto_pk_generate_key_with_bits_result_index = 0;
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = pk2;
+  fixed_crypto_pk_new_result[1] = NULL;
+  fixed_crypto_pk_generate_key_with_bits_result[0] = 0;
+  fixed_crypto_pk_generate_key_with_bits_result_index = 0;
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = pk3;
+  fixed_crypto_pk_new_result[1] = pk4;
+  fixed_crypto_pk_new_result[2] = NULL;
+  fixed_crypto_pk_generate_key_with_bits_result[0] = 0;
+  fixed_crypto_pk_generate_key_with_bits_result[1] = -1;
+  fixed_crypto_pk_generate_key_with_bits_result_index = 0;
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+  MOCK(tor_tls_create_certificate, fixed_tor_tls_create_certificate);
+
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = pk5;
+  fixed_crypto_pk_new_result[1] = pk6;
+  fixed_crypto_pk_new_result[2] = NULL;
+  fixed_crypto_pk_generate_key_with_bits_result_index = 0;
+  fixed_crypto_pk_generate_key_with_bits_result[1] = 0;
+  fixed_tor_tls_create_certificate_result_index = 0;
+  fixed_tor_tls_create_certificate_result[0] = NULL;
+  fixed_tor_tls_create_certificate_result[1] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[2] = tor_malloc_zero(sizeof(X509));
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = pk7;
+  fixed_crypto_pk_new_result[1] = pk8;
+  fixed_crypto_pk_new_result[2] = NULL;
+  fixed_crypto_pk_generate_key_with_bits_result_index = 0;
+  fixed_tor_tls_create_certificate_result_index = 0;
+  fixed_tor_tls_create_certificate_result[0] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[1] = NULL;
+  fixed_tor_tls_create_certificate_result[2] = tor_malloc_zero(sizeof(X509));
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = pk9;
+  fixed_crypto_pk_new_result[1] = pk10;
+  fixed_crypto_pk_new_result[2] = NULL;
+  fixed_crypto_pk_generate_key_with_bits_result_index = 0;
+  fixed_tor_tls_create_certificate_result_index = 0;
+  fixed_tor_tls_create_certificate_result[0] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[1] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[2] = NULL;
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+  MOCK(tor_x509_cert_new, fixed_tor_x509_cert_new);
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = pk11;
+  fixed_crypto_pk_new_result[1] = pk12;
+  fixed_crypto_pk_new_result[2] = NULL;
+  fixed_crypto_pk_generate_key_with_bits_result_index = 0;
+  fixed_tor_tls_create_certificate_result_index = 0;
+  fixed_tor_tls_create_certificate_result[0] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[1] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[2] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_x509_cert_new_result_index = 0;
+  fixed_tor_x509_cert_new_result[0] = NULL;
+  fixed_tor_x509_cert_new_result[1] = NULL;
+  fixed_tor_x509_cert_new_result[2] = NULL;
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = pk13;
+  fixed_crypto_pk_new_result[1] = pk14;
+  fixed_crypto_pk_new_result[2] = NULL;
+  fixed_crypto_pk_generate_key_with_bits_result_index = 0;
+  fixed_tor_tls_create_certificate_result_index = 0;
+  fixed_tor_tls_create_certificate_result[0] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[1] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[2] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_x509_cert_new_result_index = 0;
+  fixed_tor_x509_cert_new_result[0] = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  fixed_tor_x509_cert_new_result[1] = NULL;
+  fixed_tor_x509_cert_new_result[2] = NULL;
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = pk15;
+  fixed_crypto_pk_new_result[1] = pk16;
+  fixed_crypto_pk_new_result[2] = NULL;
+  fixed_crypto_pk_generate_key_with_bits_result_index = 0;
+  fixed_tor_tls_create_certificate_result_index = 0;
+  fixed_tor_tls_create_certificate_result[0] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[1] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[2] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_x509_cert_new_result_index = 0;
+  fixed_tor_x509_cert_new_result[0] = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  fixed_tor_x509_cert_new_result[1] = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  fixed_tor_x509_cert_new_result[2] = NULL;
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = pk17;
+  fixed_crypto_pk_new_result[1] = pk18;
+  fixed_crypto_pk_new_result[2] = NULL;
+  fixed_crypto_pk_generate_key_with_bits_result_index = 0;
+  fixed_tor_tls_create_certificate_result_index = 0;
+  fixed_tor_tls_create_certificate_result[0] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[1] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_tls_create_certificate_result[2] = tor_malloc_zero(sizeof(X509));
+  fixed_tor_x509_cert_new_result_index = 0;
+  fixed_tor_x509_cert_new_result[0] = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  fixed_tor_x509_cert_new_result[1] = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  fixed_tor_x509_cert_new_result[2] = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  ret = tor_tls_context_new(NULL, 0, 0, 0);
+  tt_assert(!ret);
+
+ done:
+  UNMOCK(tor_x509_cert_new);
+  UNMOCK(tor_tls_create_certificate);
+  UNMOCK(crypto_pk_generate_key_with_bits);
+  UNMOCK(crypto_pk_new);
+}
+
+static int fixed_crypto_pk_get_evp_pkey_result_index = 0;
+static EVP_PKEY *fixed_crypto_pk_get_evp_pkey_result[5];
+static int fixed_crypto_rand_result;
+
+static EVP_PKEY *
+fixed_crypto_pk_get_evp_pkey_(crypto_pk_t *env, int private)
+{
+  return fixed_crypto_pk_get_evp_pkey_result[fixed_crypto_pk_get_evp_pkey_result_index++];
+}
+
+static int
+fixed_crypto_rand(char *to, size_t n)
+{
+  return fixed_crypto_rand_result;
+}
+
+static void
+test_tortls_create_certificate(void *ignored)
+{
+  (void)ignored;
+  X509 *ret;
+  crypto_pk_t *pk1, *pk2;
+
+  pk1 = crypto_pk_new();
+  pk2 = crypto_pk_new();
+
+  MOCK(crypto_pk_get_evp_pkey_, fixed_crypto_pk_get_evp_pkey_);
+  fixed_crypto_pk_get_evp_pkey_result_index = 0;
+  fixed_crypto_pk_get_evp_pkey_result[0] = NULL;
+  ret = tor_tls_create_certificate(pk1, pk2, "hello", "hello2", 1);
+  tt_assert(!ret);
+
+  fixed_crypto_pk_get_evp_pkey_result_index = 0;
+  fixed_crypto_pk_get_evp_pkey_result[0] = tor_malloc_zero(sizeof(EVP_PKEY));;
+  fixed_crypto_pk_get_evp_pkey_result[1] = NULL;
+  ret = tor_tls_create_certificate(pk1, pk2, "hello", "hello2", 1);
+  tt_assert(!ret);
+
+  fixed_crypto_pk_get_evp_pkey_result_index = 0;
+  fixed_crypto_pk_get_evp_pkey_result[0] = tor_malloc_zero(sizeof(EVP_PKEY));
+  fixed_crypto_pk_get_evp_pkey_result[1] = tor_malloc_zero(sizeof(EVP_PKEY));
+  ret = tor_tls_create_certificate(pk1, pk2, "hello", "hello2", 1);
+  tt_assert(!ret);
+
+  MOCK(crypto_rand, fixed_crypto_rand);
+  fixed_crypto_rand_result = -1;
+  fixed_crypto_pk_get_evp_pkey_result_index = 0;
+  fixed_crypto_pk_get_evp_pkey_result[0] = tor_malloc_zero(sizeof(EVP_PKEY));
+  fixed_crypto_pk_get_evp_pkey_result[1] = tor_malloc_zero(sizeof(EVP_PKEY));
+  ret = tor_tls_create_certificate(pk1, pk2, "hello", "hello2", 1);
+  tt_assert(!ret);
+
+ done:
+  UNMOCK(crypto_rand);
+  UNMOCK(crypto_pk_get_evp_pkey_);
+}
+
+static void
+test_tortls_cert_new(void *ignored)
+{
+  (void)ignored;
+  tor_x509_cert_t *ret;
+  X509 *cert = read_cert_from(validCertString);
+
+  ret = tor_x509_cert_new(NULL);
+  tt_assert(!ret);
+
+  ret = tor_x509_cert_new(cert);
+  tt_assert(ret);
+
+  X509_get_pubkey(cert)->type = EVP_PKEY_DSA;
+  ret = tor_x509_cert_new(cert);
+  tt_assert(ret);
+
+  cert->cert_info = NULL;
+  ret = tor_x509_cert_new(cert);
+  tt_assert(ret);
+
+ done:
+  (void)0;
+}
+
+
+static void
+test_tortls_cert_is_valid(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_x509_cert_t *cert = NULL, *scert;
+
+  scert = tor_malloc_zero(sizeof(tor_x509_cert_t));
+  ret = tor_tls_cert_is_valid(LOG_WARN, cert, scert, 0);
+  tt_int_op(ret, OP_EQ, 0);
+
+  cert = tor_x509_cert_new(read_cert_from(validCertString));
+  scert = tor_x509_cert_new(read_cert_from(caCertString));
+  ret = tor_tls_cert_is_valid(LOG_WARN, cert, scert, 0);
+  tt_int_op(ret, OP_EQ, 1);
+
+  cert = tor_x509_cert_new(read_cert_from(validCertString));
+  scert = tor_x509_cert_new(read_cert_from(caCertString));
+  cert->cert->cert_info->validity->notAfter = ASN1_TIME_set(NULL, time(NULL)-1000000);
+  ret = tor_tls_cert_is_valid(LOG_WARN, cert, scert, 0);
+  tt_int_op(ret, OP_EQ, 0);
+
+  cert = tor_x509_cert_new(read_cert_from(validCertString));
+  scert = tor_x509_cert_new(read_cert_from(caCertString));
+  cert->cert->cert_info->key = NULL;
+  ret = tor_tls_cert_is_valid(LOG_WARN, cert, scert, 1);
+  tt_int_op(ret, OP_EQ, 0);
+
+  cert = tor_x509_cert_new(read_cert_from(validCertString));
+  scert = tor_x509_cert_new(read_cert_from(caCertString));
+  BN_one(EVP_PKEY_get1_RSA(X509_get_pubkey(cert->cert))->n);
+  ret = tor_tls_cert_is_valid(LOG_WARN, cert, scert, 1);
+  tt_int_op(ret, OP_EQ, 0);
+
+  cert = tor_x509_cert_new(read_cert_from(validCertString));
+  scert = tor_x509_cert_new(read_cert_from(caCertString));
+  X509_get_pubkey(cert->cert)->type = EVP_PKEY_EC;
+  ret = tor_tls_cert_is_valid(LOG_WARN, cert, scert, 1);
+  tt_int_op(ret, OP_EQ, 0);
+
+  cert = tor_x509_cert_new(read_cert_from(validCertString));
+  scert = tor_x509_cert_new(read_cert_from(caCertString));
+  X509_get_pubkey(cert->cert)->type = EVP_PKEY_EC;
+  ret = tor_tls_cert_is_valid(LOG_WARN, cert, scert, 0);
+  tt_int_op(ret, OP_EQ, 1);
+
+  cert = tor_x509_cert_new(read_cert_from(validCertString));
+  scert = tor_x509_cert_new(read_cert_from(caCertString));
+  X509_get_pubkey(cert->cert)->type = EVP_PKEY_EC;
+  X509_get_pubkey(cert->cert)->ameth = NULL;
+  ret = tor_tls_cert_is_valid(LOG_WARN, cert, scert, 0);
+  tt_int_op(ret, OP_EQ, 0);
+
+ done:
+  (void)0;
+}
+
+
+static void
+test_tortls_context_init_one(void *ignored)
+{
+  (void)ignored;
+  int ret;
+  tor_tls_context_t *old = NULL;
+
+  MOCK(crypto_pk_new, fixed_crypto_pk_new);
+
+  fixed_crypto_pk_new_result_index = 0;
+  fixed_crypto_pk_new_result[0] = NULL;
+  ret = tor_tls_context_init_one(&old, NULL, 0, 0, 0);
+  tt_int_op(ret, OP_EQ, -1);
+
+ done:
+  UNMOCK(crypto_pk_new);
+}
+
 #define LOCAL_TEST_CASE(name, flags)                  \
   { #name, test_tortls_##name, (flags), NULL, NULL }
 
@@ -2076,5 +2741,10 @@ struct testcase_t tortls_tests[] = {
   LOCAL_TEST_CASE(find_cipher_by_id, 0),
   LOCAL_TEST_CASE(session_secret_cb, 0),
   LOCAL_TEST_CASE(debug_state_callback, 0),
+  LOCAL_TEST_CASE(context_new, 0),
+  LOCAL_TEST_CASE(create_certificate, 0),
+  LOCAL_TEST_CASE(cert_new, 0),
+  LOCAL_TEST_CASE(cert_is_valid, 0),
+  LOCAL_TEST_CASE(context_init_one, 0),
   END_OF_TESTCASES
 };
