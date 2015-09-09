@@ -1468,10 +1468,12 @@ options_act(const or_options_t *old_options)
     if (options->DisableDebuggerAttachment && !disabled_debugger_attach &&
         running_tor) {
       int ok = tor_disable_debugger_attach();
+      /* LCOV_EXCL_START the warned_debugger_attach is 0 can't reach inside. */
       if (warned_debugger_attach && ok == 1) {
         log_notice(LD_CONFIG, "Disabled attaching debuggers for unprivileged "
                    "users.");
       }
+      /* LCOV_EXCL_STOP */
       disabled_debugger_attach = (ok == 1);
     } else if (!options->DisableDebuggerAttachment &&
                !warned_debugger_attach) {
@@ -1498,12 +1500,14 @@ options_act(const or_options_t *old_options)
 #endif
 
 #ifdef ENABLE_TOR2WEB_MODE
+/* LCOV_EXCL_START */
   if (!options->Tor2webMode) {
     log_err(LD_CONFIG, "This copy of Tor was compiled to run in "
             "'tor2web mode'. It can only be run with the Tor2webMode torrc "
             "option enabled.");
     return -1;
   }
+/* LCOV_EXCL_STOP */
 #else
   if (options->Tor2webMode) {
     log_err(LD_CONFIG, "This copy of Tor was not compiled to run in "
