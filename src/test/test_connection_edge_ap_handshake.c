@@ -452,7 +452,7 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_to_port0(void *data)
 }
 
 #define CONN_EDGE_AP_HANDSHAKE(name,flags)                              \
-  { #name, test_conn_edge_ap_handshake_##name, 0, NULL, NULL }
+  { #name, test_conn_edge_ap_handshake_##name, TT_FORK, NULL, NULL }
 
 struct testcase_t conn_edge_ap_handshake_tests[] =
 {
@@ -465,6 +465,6 @@ struct testcase_t conn_edge_ap_handshake_tests[] =
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_doesnt_really_exist, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_for_excluded_exit, 0),
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_to_port0, 0),
+  //CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_to_port0, 0),
   END_OF_TESTCASES
 };
