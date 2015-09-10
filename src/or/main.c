@@ -1531,7 +1531,7 @@ run_scheduled_events(time_t now)
     if (is_server &&
         (have_completed_a_circuit() || !any_predicted_circuits(now)) &&
         !we_are_hibernating()) {
-      if (stats_n_seconds_working < TIMEOUT_UNTIL_UNREACHABILITY_COMPLAINT) {
+      if (get_uptime() < TIMEOUT_UNTIL_UNREACHABILITY_COMPLAINT) {
         consider_testing_reachability(1, dirport_reachability_count==0);
         if (++dirport_reachability_count > 5)
           dirport_reachability_count = 0;
