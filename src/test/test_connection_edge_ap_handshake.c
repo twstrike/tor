@@ -344,17 +344,17 @@ node_get_by_nickname_mock(const char *nickname, int warn)
   tor_assert(warn);
   return exit_node_mock;
 }
+
 static void
 init_exit_node_mock()
 {
-  MOCK(node_get_by_nickname, node_get_by_nickname_mock);
   exit_node_mock = tor_malloc_zero(sizeof(node_t));
   exit_node_mock->rs = tor_malloc_zero(sizeof(routerstatus_t));
 }
+
 static void
 destroy_exit_node_mock()
 {
-  UNMOCK(node_get_by_nickname);
   tor_free(exit_node_mock->rs);
   tor_free(exit_node_mock);
 }
@@ -373,6 +373,7 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_for_excluded_exit(voi
   MOCK(get_options, get_options_mock);
   MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
   MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+  MOCK(node_get_by_nickname, node_get_by_nickname_mock);
 
   init_rewrite_mock();
   init_exit_node_mock();
@@ -403,6 +404,7 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_for_excluded_exit(voi
     UNMOCK(get_options);
     UNMOCK(connection_ap_handshake_rewrite);
     UNMOCK(connection_mark_unattached_ap_);
+    UNMOCK(node_get_by_nickname);
 
     destroy_rewrite_mock();
     destroy_mock_options();
@@ -424,15 +426,17 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_to_port0(void *data)
   MOCK(get_options, get_options_mock);
   MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
   MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+  MOCK(node_get_by_nickname, node_get_by_nickname_mock);
 
   init_rewrite_mock();
+  init_mock_options();
+  init_exit_node_mock();
+
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_NONE;
   SET_SOCKS_ADDRESS(conn->socks_request, "http://www.wellformed.exit");
   conn->socks_request->command = SOCKS_COMMAND_CONNECT;
-  init_mock_options();
   options_mock->AllowDotExit = 1;
-  init_exit_node_mock();
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
 
@@ -443,6 +447,7 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_to_port0(void *data)
     UNMOCK(get_options);
     UNMOCK(connection_ap_handshake_rewrite);
     UNMOCK(connection_mark_unattached_ap_);
+    UNMOCK(node_get_by_nickname);
 
     destroy_rewrite_mock();
     destroy_mock_options();
@@ -465,6 +470,6 @@ struct testcase_t conn_edge_ap_handshake_tests[] =
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_doesnt_really_exist, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_for_excluded_exit, TT_FORK),
-  //CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_to_port0, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_to_port0, 0),
   END_OF_TESTCASES
 };
