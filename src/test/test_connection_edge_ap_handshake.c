@@ -23,29 +23,6 @@
 
 #define NS_MODULE conn_edge_ap_handshake
 
-static void *
-entryconn_rewrite_setup(const struct testcase_t *tc)
-{
-  (void)tc;
-  entry_connection_t *ec = entry_connection_new(CONN_TYPE_AP, AF_INET);
-  addressmap_init();
-  return ec;
-}
-
-static int
-entryconn_rewrite_teardown(const struct testcase_t *tc, void *arg)
-{
-  (void)tc;
-  entry_connection_t *ec = arg;
-  if (ec)
-    connection_free_(ENTRY_TO_CONN(ec));
-  addressmap_free_all();
-  return 1;
-}
-
-static struct testcase_setup_t test_rewrite_setup = {
-  entryconn_rewrite_setup, entryconn_rewrite_teardown
-};
 
 static rewrite_result_t *rewrite_mock = NULL; 
 static void
@@ -55,19 +32,20 @@ connection_ap_handshake_rewrite_mock(entry_connection_t *conn,
   tor_assert(result);
   result->should_close = rewrite_mock->should_close;
   result->end_reason = rewrite_mock->end_reason;
-  result->exit_source = rewrite_mock->exit_source;
+  memcpy(&result->exit_source, &rewrite_mock->exit_source, sizeof(addressmap_entry_source_t));
   (void) conn;
 }
+
 static void
 init_rewrite_mock()
 {
-  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
   rewrite_mock = tor_malloc_zero(sizeof(rewrite_result_t));
 }
+
 static void
 destroy_rewrite_mock()
 {
-  UNMOCK(connection_ap_handshake_rewrite);
+  tor_free(rewrite_mock);
 }
 
 static int unattachment_reason_spy;
@@ -83,25 +61,18 @@ connection_mark_unattached_ap_mock(entry_connection_t *conn,
   (void) line;
   (void) file;
 }
-static void
-init_mark_unattached_ap_mock()
-{
-  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
-}
-static void
-destroy_mark_unattached_ap_mock()
-{
-  UNMOCK(connection_mark_unattached_ap_);
-}
 
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_answer(void *data)
 {
-  entry_connection_t *conn = data;
+  entry_connection_t *conn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  init_mark_unattached_ap_mock();
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+
   init_rewrite_mock();
   rewrite_mock->should_close = 1;
   rewrite_mock->end_reason = END_STREAM_REASON_DONE;
@@ -111,9 +82,10 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_answer(void *dat
   tt_int_op(res, OP_EQ, 0);
 
   done:
-    destroy_mark_unattached_ap_mock();
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+
     destroy_rewrite_mock();
-    tor_free(rewrite_mock);
     tor_free(circuit); 
     tor_free(path); 
 }
@@ -121,11 +93,14 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_answer(void *dat
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_error(void *data)
 {
-  entry_connection_t *conn = data;
+  entry_connection_t *conn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  init_mark_unattached_ap_mock();
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+
   init_rewrite_mock();
   rewrite_mock->should_close = 1;
   rewrite_mock->end_reason = END_STREAM_REASON_MISC;
@@ -135,9 +110,10 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_error(void *data
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    destroy_mark_unattached_ap_mock();
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+
     destroy_rewrite_mock();
-    tor_free(rewrite_mock);
     tor_free(circuit); 
     tor_free(path); 
 }
@@ -148,11 +124,14 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_error(void *data
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_bogus(void *data)
 {
-  entry_connection_t *conn = data;
+  entry_connection_t *conn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  init_mark_unattached_ap_mock();
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+
   init_rewrite_mock();
   rewrite_mock->should_close = 0;
   SET_SOCKS_ADDRESS(conn->socks_request, "http://www.bogus.onion");
@@ -164,9 +143,10 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_bogu
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    destroy_mark_unattached_ap_mock();
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+
     destroy_rewrite_mock();
-    tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
 }
@@ -174,11 +154,14 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_bogu
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_unallowed_exit(void *data)
 {
-  entry_connection_t *conn = data;
+  entry_connection_t *conn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  init_mark_unattached_ap_mock();
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+
   init_rewrite_mock();
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_AUTOMAP;
@@ -191,9 +174,10 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_unal
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    destroy_mark_unattached_ap_mock();
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+
     destroy_rewrite_mock();
-    tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
 }
@@ -201,11 +185,14 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_unal
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_dns_exit(void *data)
 {
-  entry_connection_t *conn = data;
+  entry_connection_t *conn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  init_mark_unattached_ap_mock();
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+
   init_rewrite_mock();
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_DNS;
@@ -218,9 +205,10 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_dns_
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    destroy_mark_unattached_ap_mock();
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+
     destroy_rewrite_mock();
-    tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
 }
@@ -228,11 +216,14 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_dns_
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_exit_but_not_remapped(void *data)
 {
-  entry_connection_t *conn = data;
+  entry_connection_t *conn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  init_mark_unattached_ap_mock();
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+
   init_rewrite_mock();
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_NONE;
@@ -245,9 +236,10 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_hostname_is_exit
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    destroy_mark_unattached_ap_mock();
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+
     destroy_rewrite_mock();
-    tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
 }
@@ -259,27 +251,31 @@ get_options_mock(void)
   tor_assert(options_mock);
   return options_mock;
 }
-static void
+
+inline static void
 init_mock_options()
 {
   options_mock = tor_malloc_zero(sizeof(options_mock));
-  MOCK(get_options, get_options_mock);
 }
-static void
+
+inline static void
 destroy_mock_options()
 {
   tor_free(options_mock);
-  UNMOCK(get_options);
 }
 
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed(void *data)
 {
-  entry_connection_t *conn = data;
+  entry_connection_t *conn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  init_mark_unattached_ap_mock();
+  MOCK(get_options, get_options_mock);
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+
   init_rewrite_mock();
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_NONE;
@@ -294,10 +290,11 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_is_allowed_
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    destroy_mark_unattached_ap_mock();
+    UNMOCK(get_options);
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+
     destroy_rewrite_mock();
-    destroy_mock_options();
-    tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
     destroy_mock_options();
@@ -306,11 +303,15 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_is_allowed_
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_doesnt_really_exist(void *data)
 {
-  entry_connection_t *conn = data;
+  entry_connection_t *conn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  init_mark_unattached_ap_mock();
+  MOCK(get_options, get_options_mock);
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+
   init_rewrite_mock();
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_NONE;
@@ -325,10 +326,12 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_when_exit_doesnt_real
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    destroy_mark_unattached_ap_mock();
+    UNMOCK(get_options);
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+
     destroy_rewrite_mock();
     destroy_mock_options();
-    tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
 }
@@ -361,12 +364,16 @@ static routerset_t *excluded_nodes = NULL;
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_for_excluded_exit(void *data)
 {
-  entry_connection_t *conn = data;
+  entry_connection_t *conn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
   int prev_log = setup_capture_of_logs(LOG_INFO);
 
-  init_mark_unattached_ap_mock();
+  MOCK(get_options, get_options_mock);
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+
   init_rewrite_mock();
   init_exit_node_mock();
   init_mock_options();
@@ -393,11 +400,13 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_for_excluded_exit(voi
   tt_str_op(mock_saved_log_at(-1), OP_EQ, "Excluded relay in exit address 'http://www.exit'. Refusing.\n");
 
   done:
-    destroy_mark_unattached_ap_mock();
+    UNMOCK(get_options);
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+
     destroy_rewrite_mock();
     destroy_mock_options();
     destroy_exit_node_mock();
-    tor_free(rewrite_mock);
     tor_free(excluded_nodes);
     tor_free(circuit);
     tor_free(path);
@@ -407,11 +416,15 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_for_excluded_exit(voi
 static void
 test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_to_port0(void *data)
 {
-  entry_connection_t *conn = data;
+  entry_connection_t *conn = entry_connection_new(CONN_TYPE_AP, AF_INET);
+  addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
 
-  init_mark_unattached_ap_mock();
+  MOCK(get_options, get_options_mock);
+  MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
+  MOCK(connection_mark_unattached_ap_, connection_mark_unattached_ap_mock);
+
   init_rewrite_mock();
   rewrite_mock->should_close = 0;
   rewrite_mock->exit_source = ADDRMAPSRC_NONE;
@@ -427,17 +440,19 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_to_port0(void *data)
   tt_int_op(res, OP_EQ, -1);
 
   done:
-    destroy_mark_unattached_ap_mock();
+    UNMOCK(get_options);
+    UNMOCK(connection_ap_handshake_rewrite);
+    UNMOCK(connection_mark_unattached_ap_);
+
     destroy_rewrite_mock();
     destroy_mock_options();
     destroy_exit_node_mock();
-    tor_free(rewrite_mock);
     tor_free(circuit);
     tor_free(path);
 }
 
 #define CONN_EDGE_AP_HANDSHAKE(name,flags)                              \
-  { #name, test_conn_edge_ap_handshake_##name, (flags), &test_rewrite_setup, NULL }
+  { #name, test_conn_edge_ap_handshake_##name, 0, NULL, NULL }
 
 struct testcase_t conn_edge_ap_handshake_tests[] =
 {
@@ -450,6 +465,6 @@ struct testcase_t conn_edge_ap_handshake_tests[] =
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_doesnt_really_exist, 0),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_for_excluded_exit, 0),
-  //CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_to_port0, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_to_port0, 0),
   END_OF_TESTCASES
 };
