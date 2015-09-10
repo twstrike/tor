@@ -15,7 +15,7 @@
 #include "testsupport.h"
 
 crypto_pk_t *get_onion_key(void);
-time_t get_onion_key_set_at(void);
+MOCK_DECL(time_t, get_onion_key_set_at, (void));
 void set_server_identity_key(crypto_pk_t *k);
 crypto_pk_t *get_server_identity_key(void);
 int server_identity_key_is_set(void);

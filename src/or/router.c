@@ -185,8 +185,8 @@ ntor_key_map_free(di_digest256_map_t *map)
  * when the process launched, or the time of the most recent key rotation since
  * the process launched.
  */
-time_t
-get_onion_key_set_at(void)
+MOCK_IMPL(time_t,
+get_onion_key_set_at, (void))
 {
   return onionkey_set_at;
 }
