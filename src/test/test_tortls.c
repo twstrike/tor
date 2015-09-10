@@ -1533,7 +1533,7 @@ test_tortls_session_secret_cb(void *ignored)
   (void)ignored;
   tor_tls_t *tls;
   SSL_CTX *ctx;
-  STACK_OF(SSL_CIPHER) *ciphers;
+  STACK_OF(SSL_CIPHER) *ciphers = NULL;
   SSL_CIPHER *one;
 
   SSL_library_init();
@@ -1721,7 +1721,11 @@ test_tortls_find_cipher_by_id(void *ignored)
   tt_int_op(ret, OP_EQ, 1);
 
   ret = find_cipher_by_id(ssl, empty_method, 0xFFFF);
+#ifdef HAVE_SSL_CIPHER_FIND
+  tt_int_op(ret, OP_EQ, 0);
+#else
   tt_int_op(ret, OP_EQ, 1);
+#endif
 
   empty_method->get_cipher = fake_get_cipher;
   ret = find_cipher_by_id(ssl, empty_method, 0xC00A);
@@ -1739,7 +1743,11 @@ test_tortls_find_cipher_by_id(void *ignored)
 
   empty_method->num_ciphers = fake_num_ciphers;
   ret = find_cipher_by_id(ssl, empty_method, 0xC00A);
+#ifdef HAVE_SSL_CIPHER_FIND
+  tt_int_op(ret, OP_EQ, 1);
+#else
   tt_int_op(ret, OP_EQ, 0);
+#endif
 
  done:
   tor_free(empty_method);
