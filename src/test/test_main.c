@@ -15,6 +15,7 @@
 #include "transports.h"
 #include "router.h"
 #include "entrynodes.h"
+#include "hibernate.h"
 
 static or_state_t *mock_state = NULL;
 static void
@@ -510,6 +511,223 @@ test_run_scheduled_events__adds_entropy(void *data)
     rend_cache_free_all();
 }
 
+static void
+test_run_scheduled_events__check_auth_certificate_expiriry(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.check_v3_certificate = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.check_v3_certificate, OP_EQ, now + 5*60);
+
+  done:
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__check_network_status_expiry(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.check_for_expired_networkstatus = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.check_for_expired_networkstatus, OP_EQ, now + 2*60);
+
+  done:
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__clean_caches(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.clean_caches = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.clean_caches, OP_EQ, now + 30*60);
+
+  done:
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__retry_dns_init(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.retry_dns_init = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.retry_dns_init, OP_EQ, now + 10*60);
+
+  done:
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+NS_DECL(int, server_mode, (const or_options_t *options));
+NS_DECL(int, have_completed_a_circuit, (void));
+NS_DECL(int, we_are_hibernating, (void));
+NS_DECL(long, get_uptime, (void));
+NS_DECL(time_t, get_onion_key_set_at, (void));
+
+static int
+NS(server_mode)(const or_options_t *options)
+{
+  (void)options;
+
+  return 1;
+}
+
+static int
+NS(have_completed_a_circuit)(void)
+{
+  return 1;
+}
+
+static int
+NS(we_are_hibernating)(void)
+{
+  return 0;
+}
+
+static long
+NS(get_uptime)(void)
+{
+  return TIMEOUT_UNTIL_UNREACHABILITY_COMPLAINT + 1;
+}
+
+static time_t
+NS(get_onion_key_set_at)(void)
+{
+  return time(NULL) + MIN_ONION_KEY_LIFETIME; 
+}
+
+static void
+test_run_scheduled_events__check_descriptor(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+//  tor_free(mock_options->DataDirectory);
+//  mock_options->DataDirectory = tor_strdup(get_fname("main_datadir_test"));
+//#ifdef _WIN32
+//  tt_int_op(0, OP_EQ, mkdir(mock_options->DataDirectory));
+//  tt_int_op(0, OP_EQ, mkdir(options_get_datadir_fname2_suffix(mock_options, "keys", NULL, NULL)));
+//#else
+//  tt_int_op(0, OP_EQ, mkdir(mock_options->DataDirectory, 0700));
+//  tt_int_op(0, OP_EQ, mkdir(options_get_datadir_fname2_suffix(mock_options, "keys", NULL, NULL), 0777));
+//#endif
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_options, get_options_mock);
+  MOCK(get_or_state, get_or_state_mock);
+
+  mock_options->DisableNetwork = 1;
+  time_to.check_descriptor = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.check_descriptor, OP_EQ, before_now);
+
+  mock_options->DisableNetwork = 0;
+  time_to.check_descriptor = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.check_descriptor, OP_EQ, now + 60);
+
+  NS_MOCK(server_mode);
+  NS_MOCK(get_onion_key_set_at);
+  NS_MOCK(have_completed_a_circuit);
+  NS_MOCK(we_are_hibernating);
+
+  time_to.check_descriptor = before_now;
+  time_to.recheck_bandwidth = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.check_descriptor, OP_EQ, now + 60);
+  tt_int_op(time_to.recheck_bandwidth, OP_EQ, before_now);
+
+  NS_MOCK(get_uptime);
+
+  time_to.check_descriptor = before_now;
+  time_to.recheck_bandwidth = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.check_descriptor, OP_EQ, now + 60);
+  tt_int_op(time_to.recheck_bandwidth, OP_EQ, now + 12*60*60);
+
+  done:
+    NS_UNMOCK(get_uptime);
+    NS_UNMOCK(we_are_hibernating);
+    NS_UNMOCK(have_completed_a_circuit);
+    NS_UNMOCK(get_onion_key_set_at);
+    NS_UNMOCK(server_mode);
+    UNMOCK(get_or_state);
+    UNMOCK(get_options);
+    tor_free(mock_options->DataDirectory);
+    rend_cache_free_all();
+}
+
 #define RUN_SCHEDULED_EVENTS(name, flags) \
   { #name, test_run_scheduled_events__##name, (flags), NULL, NULL }
 
@@ -526,5 +744,10 @@ struct testcase_t main_tests[] = {
   RUN_SCHEDULED_EVENTS(resets_descriptor_failures, 0),
   RUN_SCHEDULED_EVENTS(changes_tls_context, 0),
   RUN_SCHEDULED_EVENTS(adds_entropy, 0),
+  RUN_SCHEDULED_EVENTS(check_auth_certificate_expiriry, 0),
+  RUN_SCHEDULED_EVENTS(check_network_status_expiry, 0),
+  RUN_SCHEDULED_EVENTS(clean_caches, 0),
+  RUN_SCHEDULED_EVENTS(retry_dns_init, 0),
+  RUN_SCHEDULED_EVENTS(check_descriptor, 0),
   END_OF_TESTCASES
 };
