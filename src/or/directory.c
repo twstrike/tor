@@ -1589,7 +1589,7 @@ load_downloaded_routers(const char *body, smartlist_t *which,
  *
  * The caller will take care of marking the connection for close.
  */
-static int
+STATIC int
 connection_dir_client_reached_eof(dir_connection_t *conn)
 {
   char *body;
