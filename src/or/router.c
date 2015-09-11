@@ -1717,10 +1717,11 @@ router_compare_to_my_exit_policy(const tor_addr_t *addr, uint16_t port)
 int
 router_my_exit_policy_is_reject_star(void)
 {
-  if (!router_get_my_routerinfo()) /* make sure desc_routerinfo exists */
+  const routerinfo_t *me = router_get_my_routerinfo();
+  if (!me) /* make sure desc_routerinfo exists */
     return -1;
 
-  return desc_routerinfo->policy_is_reject_star;
+  return me->policy_is_reject_star;
 }
 
 /** Return true iff I'm a server and <b>digest</b> is equal to
