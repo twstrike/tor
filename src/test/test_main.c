@@ -16,6 +16,7 @@
 #include "router.h"
 #include "entrynodes.h"
 #include "hibernate.h"
+#include "dirserv.h"
 
 static or_state_t *mock_state = NULL;
 static void
@@ -111,6 +112,7 @@ test_run_scheduled_events__writes_cell_stats_to_disk(void *data)
   done:
     UNMOCK(get_options);
     UNMOCK(get_or_state);
+    tor_free(mock_options);
     rend_cache_free_all();
 }
 
@@ -149,6 +151,7 @@ test_run_scheduled_events__writes_dir_req_stats_to_disk(void *data)
   done:
     UNMOCK(get_options);
     UNMOCK(get_or_state);
+    tor_free(mock_options);
     rend_cache_free_all();
 }
 
@@ -187,6 +190,7 @@ test_run_scheduled_events__writes_entry_stats_to_disk(void *data)
   done:
     UNMOCK(get_options);
     UNMOCK(get_or_state);
+    tor_free(mock_options);
     rend_cache_free_all();
 }
 
@@ -225,6 +229,7 @@ test_run_scheduled_events__writes_hidden_service_stats_to_disk(void *data)
   done:
     UNMOCK(get_options);
     UNMOCK(get_or_state);
+    tor_free(mock_options);
     rend_cache_free_all();
 }
 
@@ -263,6 +268,7 @@ test_run_scheduled_events__writes_exit_port_stats_to_disk(void *data)
   done:
     UNMOCK(get_options);
     UNMOCK(get_or_state);
+    tor_free(mock_options);
     rend_cache_free_all();
 }
 
@@ -301,6 +307,7 @@ test_run_scheduled_events__writes_conn_direction_stats_to_disk(void *data)
   done:
     UNMOCK(get_options);
     UNMOCK(get_or_state);
+    tor_free(mock_options);
     rend_cache_free_all();
 }
 
@@ -341,6 +348,7 @@ test_run_scheduled_events__writes_bridge_authoritative_dir_stats_to_disk(void *d
   done:
     UNMOCK(get_options);
     UNMOCK(get_or_state);
+    tor_free(mock_options);
     rend_cache_free_all();
 }
 
@@ -424,6 +432,7 @@ test_run_scheduled_events__fetches_bridge_descriptors(void *data)
     NS_UNMOCK(fetch_bridge_descriptors);
     UNMOCK(get_options);
     UNMOCK(get_or_state);
+    tor_free(mock_options);
     rend_cache_free_all();
 }
 
@@ -512,7 +521,7 @@ test_run_scheduled_events__adds_entropy(void *data)
 }
 
 static void
-test_run_scheduled_events__check_auth_certificate_expiriry(void *data)
+test_run_scheduled_events__checks_auth_certificate_expiriry(void *data)
 {
   time_t now = time(NULL);
   time_t after_now = now + 60;
@@ -539,7 +548,7 @@ test_run_scheduled_events__check_auth_certificate_expiriry(void *data)
 }
 
 static void
-test_run_scheduled_events__check_network_status_expiry(void *data)
+test_run_scheduled_events__checks_network_status_expiry(void *data)
 {
   time_t now = time(NULL);
   time_t after_now = now + 60;
@@ -566,7 +575,7 @@ test_run_scheduled_events__check_network_status_expiry(void *data)
 }
 
 static void
-test_run_scheduled_events__clean_caches(void *data)
+test_run_scheduled_events__cleans_caches(void *data)
 {
   time_t now = time(NULL);
   time_t after_now = now + 60;
@@ -593,7 +602,7 @@ test_run_scheduled_events__clean_caches(void *data)
 }
 
 static void
-test_run_scheduled_events__retry_dns_init(void *data)
+test_run_scheduled_events__retries_dns_init(void *data)
 {
   time_t now = time(NULL);
   time_t after_now = now + 60;
@@ -658,7 +667,7 @@ NS(get_onion_key_set_at)(void)
 }
 
 static void
-test_run_scheduled_events__check_descriptor(void *data)
+test_run_scheduled_events__checks_descriptor(void *data)
 {
   time_t now = time(NULL);
   time_t after_now = now + 60;
@@ -670,16 +679,6 @@ test_run_scheduled_events__check_descriptor(void *data)
 
   init_mock_state();
   init_mock_options();
-
-//  tor_free(mock_options->DataDirectory);
-//  mock_options->DataDirectory = tor_strdup(get_fname("main_datadir_test"));
-//#ifdef _WIN32
-//  tt_int_op(0, OP_EQ, mkdir(mock_options->DataDirectory));
-//  tt_int_op(0, OP_EQ, mkdir(options_get_datadir_fname2_suffix(mock_options, "keys", NULL, NULL)));
-//#else
-//  tt_int_op(0, OP_EQ, mkdir(mock_options->DataDirectory, 0700));
-//  tt_int_op(0, OP_EQ, mkdir(options_get_datadir_fname2_suffix(mock_options, "keys", NULL, NULL), 0777));
-//#endif
 
   set_all_times_to(after_now);
   mock_state->next_write = after_now;
@@ -725,6 +724,215 @@ test_run_scheduled_events__check_descriptor(void *data)
     UNMOCK(get_or_state);
     UNMOCK(get_options);
     tor_free(mock_options->DataDirectory);
+    tor_free(mock_options);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__launches_reachability_test(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+  MOCK(get_options, get_options_mock);
+
+  mock_options->BridgeAuthoritativeDir = 1;
+
+  time_to.launch_reachability_tests = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.launch_reachability_tests, OP_EQ, now + REACHABILITY_TEST_INTERVAL);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    tor_free(mock_options);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__downrates_stability(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+
+  time_to.downrate_stability = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.downrate_stability, OP_EQ, now + 12*60*60);
+
+  done:
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__saves_stability(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+  MOCK(get_options, get_options_mock);
+
+  mock_options->BridgeAuthoritativeDir = 1;
+
+  tor_free(mock_options->DataDirectory);
+  mock_options->DataDirectory = tor_strdup(get_fname("main_datadir_test"));
+
+  time_to.downrate_stability = before_now;
+  time_to.save_stability = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.save_stability, OP_EQ, now + 30*60);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    tor_free(mock_options->DataDirectory);
+    tor_free(mock_options);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__writes_bridge_stats_to_disk(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+  MOCK(get_options, get_options_mock);
+
+  mock_options->BridgeRelay = 1;
+  mock_options->BridgeRecordUsageByCountry = 1;
+
+  time_to.write_bridge_stats = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_bridge_stats, OP_EQ, now + WRITE_STATS_INTERVAL);
+
+  geoip_bridge_stats_init(before_now);
+
+  time_to.write_bridge_stats = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_bridge_stats, OP_EQ, before_now + WRITE_STATS_INTERVAL);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    tor_free(mock_options);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__writes_bridge_status_file(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+  MOCK(get_options, get_options_mock);
+
+  mock_options->BridgeAuthoritativeDir = 1;
+
+  tor_free(mock_options->DataDirectory);
+  mock_options->DataDirectory = tor_strdup(get_fname("main_datadir_test"));
+
+  time_to.write_bridge_status_file = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.write_bridge_status_file, OP_EQ, now + 30*60);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    tor_free(mock_options->DataDirectory);
+    tor_free(mock_options);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__writes_heartbeat_messages(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+  MOCK(get_options, get_options_mock);
+
+  mock_options->HeartbeatPeriod = 59;
+
+  time_to.next_heartbeat = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.next_heartbeat, OP_EQ, now + mock_options->HeartbeatPeriod);
+
+  done:
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
     rend_cache_free_all();
 }
 
@@ -739,15 +947,21 @@ struct testcase_t main_tests[] = {
   RUN_SCHEDULED_EVENTS(writes_exit_port_stats_to_disk, 0),
   RUN_SCHEDULED_EVENTS(writes_conn_direction_stats_to_disk, 0),
   RUN_SCHEDULED_EVENTS(writes_bridge_authoritative_dir_stats_to_disk, 0),
+  RUN_SCHEDULED_EVENTS(writes_bridge_stats_to_disk, 0),
   RUN_SCHEDULED_EVENTS(fetches_dir_descriptors, 0),
   RUN_SCHEDULED_EVENTS(fetches_bridge_descriptors, 0),
   RUN_SCHEDULED_EVENTS(resets_descriptor_failures, 0),
   RUN_SCHEDULED_EVENTS(changes_tls_context, 0),
   RUN_SCHEDULED_EVENTS(adds_entropy, 0),
-  RUN_SCHEDULED_EVENTS(check_auth_certificate_expiriry, 0),
-  RUN_SCHEDULED_EVENTS(check_network_status_expiry, 0),
-  RUN_SCHEDULED_EVENTS(clean_caches, 0),
-  RUN_SCHEDULED_EVENTS(retry_dns_init, 0),
-  RUN_SCHEDULED_EVENTS(check_descriptor, 0),
+  RUN_SCHEDULED_EVENTS(checks_auth_certificate_expiriry, 0),
+  RUN_SCHEDULED_EVENTS(checks_network_status_expiry, 0),
+  RUN_SCHEDULED_EVENTS(cleans_caches, 0),
+  RUN_SCHEDULED_EVENTS(retries_dns_init, 0),
+  RUN_SCHEDULED_EVENTS(checks_descriptor, 0),
+  RUN_SCHEDULED_EVENTS(launches_reachability_test, 0),
+  RUN_SCHEDULED_EVENTS(downrates_stability, 0),
+  RUN_SCHEDULED_EVENTS(saves_stability, 0),
+  RUN_SCHEDULED_EVENTS(writes_bridge_status_file, 0),
+  RUN_SCHEDULED_EVENTS(writes_heartbeat_messages, 0),
   END_OF_TESTCASES
 };
