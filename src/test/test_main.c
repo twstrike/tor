@@ -663,7 +663,7 @@ NS(get_uptime)(void)
 static time_t
 NS(get_onion_key_set_at)(void)
 {
-  return time(NULL) + MIN_ONION_KEY_LIFETIME; 
+  return time(NULL) + MIN_ONION_KEY_LIFETIME;
 }
 
 static void
@@ -936,8 +936,111 @@ test_run_scheduled_events__writes_heartbeat_messages(void *data)
     rend_cache_free_all();
 }
 
+NS_DECL(int,
+public_server_mode, (const or_options_t *options));
+
+static int
+NS(public_server_mode)(const or_options_t *options)
+{
+  (void)options;
+  return 1;
+}
+
+NS_DECL(const routerinfo_t *, router_get_my_routerinfo, (void));
+
+static routerinfo_t *mock_routerinfo;
+static const routerinfo_t *
+NS(router_get_my_routerinfo)(void)
+{
+  tor_assert(mock_routerinfo);
+  return mock_routerinfo;
+}
+
+static void
+test_run_scheduled_events__checks_for_correct_dns(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+  MOCK(get_options, get_options_mock);
+  NS_MOCK(public_server_mode);
+  NS_MOCK(router_get_my_routerinfo);
+
+  mock_routerinfo = tor_malloc(sizeof(routerinfo_t));
+  mock_routerinfo->policy_is_reject_star = 0;
+
+  time_to.check_for_correct_dns = 0;
+  run_scheduled_events(now);
+  tt_int_op(time_to.check_for_correct_dns, OP_GE, now + 60);
+  tt_int_op(time_to.check_for_correct_dns, OP_LE, now + 180);
+
+  mock_options->ServerDNSDetectHijacking = 0;
+
+  time_to.check_for_correct_dns = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.check_for_correct_dns, OP_GE, now + 12*3600);
+  tt_int_op(time_to.check_for_correct_dns, OP_LE, now + 2*12*3600);
+
+  done:
+    NS_UNMOCK(router_get_my_routerinfo);
+    NS_UNMOCK(public_server_mode);
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    rend_cache_free_all();
+}
+
+static void
+test_run_scheduled_events__checks_port_forwarding(void *data)
+{
+  time_t now = time(NULL);
+  time_t after_now = now + 60;
+  time_t before_now = now - 60;
+  (void) data;
+
+  rend_cache_init();
+  init_connection_lists();
+
+  init_mock_state();
+  init_mock_options();
+
+  set_all_times_to(after_now);
+  mock_state->next_write = after_now;
+
+  MOCK(get_or_state, get_or_state_mock);
+  MOCK(get_options, get_options_mock);
+  NS_MOCK(server_mode);
+
+  mock_options->PortForwarding = 1;
+  tor_free(mock_options->DataDirectory);
+  mock_options->DataDirectory = tor_strdup(get_fname("main_datadir_test"));
+
+  time_to.check_port_forwarding = before_now;
+  run_scheduled_events(now);
+  tt_int_op(time_to.check_port_forwarding, OP_EQ, now + 5);
+
+  done:
+    NS_UNMOCK(server_mode);
+    UNMOCK(get_options);
+    UNMOCK(get_or_state);
+    tor_free(mock_options->DataDirectory);
+    tor_free(mock_options);
+    rend_cache_free_all();
+}
+
 #define RUN_SCHEDULED_EVENTS(name, flags) \
-  { #name, test_run_scheduled_events__##name, (flags), NULL, NULL }
+  { #name, test_run_scheduled_events__##name, TT_FORK, NULL, NULL }
 
 struct testcase_t main_tests[] = {
   RUN_SCHEDULED_EVENTS(writes_cell_stats_to_disk, 0),
@@ -963,5 +1066,7 @@ struct testcase_t main_tests[] = {
   RUN_SCHEDULED_EVENTS(saves_stability, 0),
   RUN_SCHEDULED_EVENTS(writes_bridge_status_file, 0),
   RUN_SCHEDULED_EVENTS(writes_heartbeat_messages, 0),
+  RUN_SCHEDULED_EVENTS(checks_for_correct_dns, 0),
+  RUN_SCHEDULED_EVENTS(checks_port_forwarding, 0),
   END_OF_TESTCASES
 };
