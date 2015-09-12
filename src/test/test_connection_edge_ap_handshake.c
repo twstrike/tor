@@ -24,7 +24,7 @@
 #define NS_MODULE conn_edge_ap_handshake
 
 
-static rewrite_result_t *rewrite_mock = NULL; 
+static rewrite_result_t *rewrite_mock = NULL;
 static void
 connection_ap_handshake_rewrite_mock(entry_connection_t *conn,
                                        rewrite_result_t *result)
@@ -86,8 +86,8 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_answer(void *dat
     UNMOCK(connection_mark_unattached_ap_);
 
     destroy_rewrite_mock();
-    tor_free(circuit); 
-    tor_free(path); 
+    tor_free(circuit);
+    tor_free(path);
 }
 
 static void
@@ -114,8 +114,8 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_with_error(void *data
     UNMOCK(connection_mark_unattached_ap_);
 
     destroy_rewrite_mock();
-    tor_free(circuit); 
-    tor_free(path); 
+    tor_free(circuit);
+    tor_free(path);
 }
 
 #define SET_SOCKS_ADDRESS(socks, dest) \
@@ -384,15 +384,15 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_for_excluded_exit(voi
   rewrite_mock->exit_source = ADDRMAPSRC_NONE;
   SET_SOCKS_ADDRESS(conn->socks_request, "http://www.wellformed.exit");
   conn->socks_request->command = SOCKS_COMMAND_CONNECT;
-  strlcpy(exit_node_mock->rs->nickname, "wellformed", 10);
+  strlcpy(exit_node_mock->rs->nickname, "wellformed", MAX_NICKNAME_LEN+1);
 
   options_mock->AllowDotExit = 1;
   options_mock->StrictNodes = 0;
   options_mock->SafeLogging_ = SAFELOG_SCRUB_NONE;
 
   excluded_nodes = routerset_new();
-  smartlist_add(excluded_nodes->list, "wellformed");
-  strmap_set(excluded_nodes->names, "wellformed", exit_node_mock);
+  smartlist_add(excluded_nodes->list, tor_strdup("wellformed"));
+  strmap_set(excluded_nodes->names, tor_strdup("wellformed"), exit_node_mock);
   options_mock->ExcludeExitNodes = excluded_nodes;
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
@@ -438,6 +438,8 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_to_port0(void *data)
   SET_SOCKS_ADDRESS(conn->socks_request, "http://www.wellformed.exit");
   conn->socks_request->command = SOCKS_COMMAND_CONNECT;
   options_mock->AllowDotExit = 1;
+  options_mock->ExcludeExitNodes = routerset_new();
+  options_mock->ExcludeExitNodesUnion_ = routerset_new();
 
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
 
