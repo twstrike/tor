@@ -3822,8 +3822,8 @@ test_dir_find_dl_schedule_and_len(void* data)
 struct testcase_t dir_tests[] = {
   DIR_LEGACY(nicknames),
   DIR_LEGACY(formats),
-  DIR(routerinfo_parsing, 0),
-  DIR(extrainfo_parsing, 0),
+  DIR(routerinfo_parsing, TT_FORK),
+  DIR(extrainfo_parsing, TT_FORK),
   DIR(parse_router_list, TT_FORK),
   DIR(load_routers, TT_FORK),
   DIR(load_extrainfo, TT_FORK),
@@ -3854,4 +3854,3 @@ struct testcase_t dir_tests[] = {
   DIR(find_dl_schedule_and_len, 0),
   END_OF_TESTCASES
 };
-

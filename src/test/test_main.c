@@ -663,7 +663,7 @@ NS(get_uptime)(void)
 static time_t
 NS(get_onion_key_set_at)(void)
 {
-  return time(NULL) + MIN_ONION_KEY_LIFETIME; 
+  return time(NULL) + MIN_ONION_KEY_LIFETIME;
 }
 
 static void
@@ -1040,7 +1040,7 @@ test_run_scheduled_events__checks_port_forwarding(void *data)
 }
 
 #define RUN_SCHEDULED_EVENTS(name, flags) \
-  { #name, test_run_scheduled_events__##name, (flags), NULL, NULL }
+  { #name, test_run_scheduled_events__##name, TT_FORK, NULL, NULL }
 
 struct testcase_t main_tests[] = {
   RUN_SCHEDULED_EVENTS(writes_cell_stats_to_disk, 0),

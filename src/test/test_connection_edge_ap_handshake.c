@@ -369,7 +369,6 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_for_excluded_exit(voi
   addressmap_init();
   origin_circuit_t *circuit = NULL;
   crypt_path_t *path = NULL;
-  int prev_log = setup_capture_of_logs(LOG_INFO);
 
   MOCK(get_options, get_options_mock);
   MOCK(connection_ap_handshake_rewrite, connection_ap_handshake_rewrite_mock);
@@ -395,6 +394,7 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_for_excluded_exit(voi
   strmap_set(excluded_nodes->names, tor_strdup("wellformed"), exit_node_mock);
   options_mock->ExcludeExitNodes = excluded_nodes;
 
+  int prev_log = setup_capture_of_logs(LOG_INFO);
   int res = connection_ap_handshake_rewrite_and_attach(conn, circuit, path);
 
   tt_int_op(unattachment_reason_spy, OP_EQ, END_STREAM_REASON_TORPROTOCOL);
@@ -460,19 +460,19 @@ test_conn_edge_ap_handshake_rewrite_and_attach_closes_conn_to_port0(void *data)
 }
 
 #define CONN_EDGE_AP_HANDSHAKE(name,flags)                              \
-  { #name, test_conn_edge_ap_handshake_##name, 0, NULL, NULL }
+  { #name, test_conn_edge_ap_handshake_##name, (flags), NULL, NULL }
 
 struct testcase_t conn_edge_ap_handshake_tests[] =
 {
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_with_answer, 0),
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_with_error, 0),
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_bogus, 0),
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_unallowed_exit, 0),
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_dns_exit, 0),
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_exit_but_not_remapped, 0),
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed, 0),
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_doesnt_really_exist, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_with_answer, TT_FORK),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_with_error, TT_FORK),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_bogus, TT_FORK),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_unallowed_exit, TT_FORK),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_dns_exit, TT_FORK),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_hostname_is_exit_but_not_remapped, TT_FORK),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_is_allowed_but_malformed, TT_FORK),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_when_exit_doesnt_really_exist, TT_FORK),
   CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_for_excluded_exit, TT_FORK),
-  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_to_port0, 0),
+  CONN_EDGE_AP_HANDSHAKE(rewrite_and_attach_closes_conn_to_port0, TT_FORK),
   END_OF_TESTCASES
 };

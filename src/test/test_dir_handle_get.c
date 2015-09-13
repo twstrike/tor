@@ -241,7 +241,7 @@ test_dir_handle_get_bytes_txt(void *data)
   tt_assert(strstr(header, "Content-Type: text/plain\r\n"));
   tt_assert(strstr(header, "Content-Encoding: identity\r\n"));
   tt_assert(strstr(header, "Pragma: no-cache\r\n"));
-  
+
   sprintf(buff, "Content-Length: %ld\r\n", body_len);
   tt_assert(strstr(header, buff));
 
@@ -323,7 +323,7 @@ test_dir_handle_get_rendezvous2_on_encrypted_conn_not_well_formed(void *data)
   tt_assert(connection_dir_is_encrypted(conn));
 
   //TODO: this cant be reached because rend_valid_descriptor_id() prevents this
-  //case to happen. This test is the same as 
+  //case to happen. This test is the same as
   //test_dir_handle_get_rendezvous2_on_encrypted_conn_with_invalid_desc_id
   //We should refactor to remove the case from the switch.
 
@@ -652,7 +652,7 @@ test_dir_handle_get_networkstatus_bridges_not_found_without_auth(void *data)
   init_mock_options();
   mock_options->BridgeAuthoritativeDir = 1;
   mock_options->BridgePassword_AuthDigest_ = "digest";
- 
+
   conn = dir_connection_new(tor_addr_family(&MOCK_TOR_ADDR));
   TO_CONN(conn)->linked = 1;
 
@@ -1170,7 +1170,7 @@ extern const char AUTHORITY_CERT_3[];
 extern const char AUTHORITY_SIGNKEY_A_DIGEST[];
 
 static const char TEST_CERT_IDENT_KEY[] =
-  "D867ACF56A9D229B35C25F0090BC9867E906BE69"; 
+  "D867ACF56A9D229B35C25F0090BC9867E906BE69";
 
 static void
 test_dir_handle_get_server_keys_all(void* data)
@@ -1831,7 +1831,7 @@ test_dir_handle_get_status_vote_current_not_found(void* data)
 
 #define VOTE_DIGEST "312A4890D4D832597ABBD3089C782DBBFB81E48D"
 
-const char* VOTE_BODY_V3 = 
+const char* VOTE_BODY_V3 =
 "network-status-version 3\n"
 "vote-status vote\n"
 "consensus-methods 13 14 15 16 17 18 19 20 21\n"
@@ -2491,7 +2491,7 @@ struct testcase_t dir_handle_get_tests[] = {
   DIR_HANDLE_CMD(rendezvous2_not_found, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_with_invalid_desc_id, 0),
   DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_not_well_formed, 0),
-  DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_success, 0),
+  DIR_HANDLE_CMD(rendezvous2_on_encrypted_conn_success, TT_FORK),
   DIR_HANDLE_CMD(micro_d_not_found, 0),
   DIR_HANDLE_CMD(micro_d_server_busy, 0),
   DIR_HANDLE_CMD(micro_d, 0),

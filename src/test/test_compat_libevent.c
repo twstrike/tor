@@ -206,7 +206,7 @@ test_compat_libevent_header_version(void *ignored)
 
 
 struct testcase_t compat_libevent_tests[] = {
-  { "logging_callback", test_compat_libevent_logging_callback, 0, NULL, NULL },
+  { "logging_callback", test_compat_libevent_logging_callback, TT_FORK, NULL, NULL },
   { "le_versions_compatibility", test_compat_libevent_le_versions_compatibility, 0, NULL, NULL },
   { "tor_decode_libevent_version", test_compat_libevent_tor_decode_libevent_version, 0, NULL, NULL },
   { "header_version", test_compat_libevent_header_version, 0, NULL, NULL },

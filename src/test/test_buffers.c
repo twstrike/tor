@@ -759,8 +759,7 @@ struct testcase_t buffer_tests[] = {
   { "zlib_fin_with_nil", test_buffers_zlib_fin_with_nil, TT_FORK, NULL, NULL },
   { "zlib_fin_at_chunk_end", test_buffers_zlib_fin_at_chunk_end, TT_FORK,
     NULL, NULL},
-  { "tls_read_mocked", test_buffers_tls_read_mocked, 0,
+  { "tls_read_mocked", test_buffers_tls_read_mocked, TT_FORK,
     NULL, NULL },
   END_OF_TESTCASES
 };
-

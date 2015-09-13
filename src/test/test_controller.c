@@ -155,9 +155,8 @@ test_rend_service_parse_port_config(void *arg)
 }
 
 struct testcase_t controller_tests[] = {
-  { "add_onion_helper_keyarg", test_add_onion_helper_keyarg, 0, NULL, NULL },
+  { "add_onion_helper_keyarg", test_add_onion_helper_keyarg, TT_FORK, NULL, NULL },
   { "rend_service_parse_port_config", test_rend_service_parse_port_config, 0,
     NULL, NULL },
   END_OF_TESTCASES
 };
-

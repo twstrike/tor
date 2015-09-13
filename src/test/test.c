@@ -1102,16 +1102,15 @@ test_stats(void *arg)
   { #name, test_ ## name , TT_FORK, NULL, NULL }
 
 static struct testcase_t test_array[] = {
-  ENT(onion_handshake),
-  { "bad_onion_handshake", test_bad_onion_handshake, 0, NULL, NULL },
-  ENT(onion_queues),
-  { "ntor_handshake", test_ntor_handshake, 0, NULL, NULL },
+  FORK(onion_handshake),
+  FORK(bad_onion_handshake),
+  FORK(onion_queues),
+  ENT(ntor_handshake),
   ENT(circuit_timeout),
-  ENT(rend_fns),
+  FORK(rend_fns),
   ENT(geoip),
   FORK(geoip_with_pt),
   FORK(stats),
-
   END_OF_TESTCASES
 };
 

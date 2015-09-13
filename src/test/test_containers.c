@@ -1237,7 +1237,7 @@ struct testcase_t container_tests[] = {
   CONTAINER_LEGACY(smartlist_strings),
   CONTAINER_LEGACY(smartlist_overlap),
   CONTAINER_LEGACY(smartlist_digests),
-  CONTAINER_LEGACY(smartlist_join),
+  CONTAINER(smartlist_join, TT_FORK),
   CONTAINER_LEGACY(smartlist_pos),
   CONTAINER(smartlist_ints_eq, 0),
   CONTAINER_LEGACY(bitarray),
@@ -1252,4 +1252,3 @@ struct testcase_t container_tests[] = {
   CONTAINER(smartlist_strings_eq, 0),
   END_OF_TESTCASES
 };
-
