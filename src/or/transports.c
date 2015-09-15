@@ -360,8 +360,8 @@ static int check_if_restarts_needed = 0;
 
 /** Return true if there are still unconfigured managed proxies, or proxies
  * that need restarting. */
-int
-pt_proxies_configuration_pending(void)
+MOCK_IMPL(int,
+pt_proxies_configuration_pending, (void))
 {
   return unconfigured_proxies_n || check_if_restarts_needed;
 }

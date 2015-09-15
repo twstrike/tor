@@ -239,8 +239,8 @@ set_buffer_lengths_to_zero(tor_socket_t s)
 /** Return 1 if we have successfully built a circuit, and nothing has changed
  * to make us think that maybe we can't.
  */
-int
-have_completed_a_circuit(void)
+MOCK_IMPL(int,
+have_completed_a_circuit, (void))
 {
   return can_complete_circuits;
 }
