@@ -4001,8 +4001,8 @@ test_config_options_act_options_transit_req_fresh_tls_cxt(void *arg)
   tt_int_op(public_server_mode(old_options),OP_EQ,public_server_mode(options));
   old_options->Logs = options->Logs;
   old_options->LogMessageDomains = options->LogMessageDomains;
-  options->TLSECGroup = "P256";
-  old_options->TLSECGroup = "P224";
+  options->TLSECGroup = tor_strdup("P256");
+  old_options->TLSECGroup = tor_strdup("P224");
   crypto_pk_t *key = NULL;
   key = pk_generate(2);
   set_client_identity_key(key);
@@ -4049,8 +4049,8 @@ test_config_options_act_options_transit_req_fresh_tls_cxt_fail(void *arg)
   tt_int_op(public_server_mode(old_options),OP_EQ,public_server_mode(options));
   old_options->Logs = options->Logs;
   old_options->LogMessageDomains = options->LogMessageDomains;
-  options->TLSECGroup = "P256";
-  old_options->TLSECGroup = "P224";
+  options->TLSECGroup = tor_strdup("P256");
+  old_options->TLSECGroup = tor_strdup("P224");
   crypto_pk_t *key = NULL;
   key = pk_generate(2);
   set_client_identity_key(key);
@@ -4103,8 +4103,8 @@ test_config_options_act_options_transit_req_fresh_tls_cxt_error(void *arg)
   tt_int_op(public_server_mode(old_options),OP_EQ,public_server_mode(options));
   old_options->Logs = options->Logs;
   old_options->LogMessageDomains = options->LogMessageDomains;
-  options->TLSECGroup = "P256";
-  old_options->TLSECGroup = "P224";
+  options->TLSECGroup = tor_strdup("P256");
+  old_options->TLSECGroup = tor_strdup("P224");
   crypto_pk_t *key = NULL;
   key = pk_generate(2);
   set_client_identity_key(key);
@@ -4399,7 +4399,7 @@ test_config_options_act_write_pidfile(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  options->PidFile = "tmp/tor_test_PidFile";
+  options->PidFile = tor_strdup("tmp/tor_test_PidFile");
   tt_int_op(options_act(old_options), OP_EQ, 0);
 
  done:
@@ -4418,7 +4418,7 @@ test_config_options_act_BridgePassword(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  options->BridgePassword = "some password";
+  options->BridgePassword = tor_strdup("some password");
   tt_int_op(options_act(old_options), OP_EQ, 0);
 
  done:
@@ -4445,7 +4445,7 @@ test_config_options_act_BridgePassword_error(void *arg)
   or_options_t *options, *old_options;
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
-  options->BridgePassword = "some password";
+  options->BridgePassword = tor_strdup("some password");
 
   NS_MOCK(alloc_http_authenticator);
 
@@ -4469,7 +4469,7 @@ test_config_options_act_parse_outbound_addresses_error(void *arg)
   or_options_t *options, *old_options;
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
-  options->BridgePassword = "some password";
+  options->BridgePassword = tor_strdup("some password");
 
   options->OutboundBindAddress = tor_malloc_zero(sizeof(config_line_t));
   options->OutboundBindAddress->key = tor_strdup("OutboundBindAddress");
@@ -4510,7 +4510,7 @@ test_config_options_act_routerset_add_unknown_ccs_error(void *arg)
 
   NS_MOCK(routerset_add_unknown_ccs);
 
-  options->BridgePassword = "some password";
+  options->BridgePassword = tor_strdup("some password");
 
   tt_int_op(options_act(old_options), OP_EQ, 0);
 
@@ -5047,7 +5047,7 @@ test_config_options_act_DirPortFrontPage(void *arg)
   old_options = options_new();
   options = test_setup_option_CMD_TOR();
 
-  options->DirPortFrontPage = "";
+  options->DirPortFrontPage = tor_strdup("");
 
   tt_int_op(options_act(old_options), OP_EQ, 0);
 
@@ -5684,7 +5684,7 @@ test_config_options_act_VirtualAddrNetworkIPv4(void *arg)
   smartlist_add(list, tor_strndup("foo", 3));
   old_options->AutomapHostsSuffixes = list;
 
-  old_options->VirtualAddrNetworkIPv4 = "127.192.9.9/99";
+  old_options->VirtualAddrNetworkIPv4 = tor_strdup("127.192.9.9/99");
 
   NS_MOCK(addressmap_clear_invalid_automaps);
   options_act(old_options);
@@ -5712,8 +5712,8 @@ test_config_options_act_VirtualAddrNetworkIPv6(void *arg)
   smartlist_add(list, tor_strndup("foo", 3));
   old_options->AutomapHostsSuffixes = list;
 
-  old_options->VirtualAddrNetworkIPv6 = "[FE90::]/99";
-  old_options->VirtualAddrNetworkIPv4 = "127.192.0.0/10";
+  old_options->VirtualAddrNetworkIPv6 = tor_strdup("[FE90::]/99");
+  old_options->VirtualAddrNetworkIPv4 = tor_strdup("127.192.0.0/10");
 
   NS_MOCK(addressmap_clear_invalid_automaps);
   options_act(old_options);
