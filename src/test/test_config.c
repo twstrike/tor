@@ -3713,14 +3713,14 @@ test_config_default_fallback_dirs(void *arg)
 //Mock get_options_mutable
 static or_options_t * mock_global_options = NULL;
 
-or_options_t *
+static or_options_t *
 mock_get_options_mutable(void)
 {
   tor_assert(mock_global_options);
   return mock_global_options;
 }
 
-void
+static void
 init_mock_global_options(void)
 {
   or_options_t *current = get_options_mutable();
@@ -4242,6 +4242,8 @@ NS_DECL(int, accounting_parse_options, (const or_options_t *options,
 static int
 NS(accounting_parse_options)(const or_options_t *options, int validate_only)
 {
+  (void)options;
+  (void)validate_only;
   CALLED(accounting_parse_options)++;
   return -1;
 }
@@ -5335,6 +5337,8 @@ NS_DECL(void, dirvote_recalculate_timing, (const or_options_t *op,
 static void
 NS(dirvote_recalculate_timing)(const or_options_t *op, time_t now)
 {
+  (void)op;
+  (void)now;
   CALLED(dirvote_recalculate_timing)++;
 }
 
@@ -5441,6 +5445,8 @@ static void
 NS(connection_or_update_token_buckets)(smartlist_t *conns,
                                        const or_options_t *options)
 {
+  (void)conns;
+  (void)options;
   CALLED(connection_or_update_token_buckets)++;
 }
 
@@ -5505,6 +5511,7 @@ NS_DECL(void, ip_address_changed, (int at_interface));
 void
 NS(ip_address_changed)(int at_interface)
 {
+  (void)at_interface;
   CALLED(ip_address_changed)++;
 }
 
@@ -5553,6 +5560,7 @@ NS_DECL(void, ip_address_changed, (int at_interface));
 void
 NS(ip_address_changed)(int at_interface)
 {
+  (void)at_interface;
   CALLED(ip_address_changed)++;
 }
 
@@ -5645,6 +5653,7 @@ NS_DECL(void, addressmap_clear_invalid_automaps,
 void
 NS(addressmap_clear_invalid_automaps)(const or_options_t *options)
 {
+  (void)options;
   CALLED(addressmap_clear_invalid_automaps)++;
 }
 
